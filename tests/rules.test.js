@@ -32,7 +32,7 @@ function fuzzPayloads(slide) {
     SMEAR: { slide, thickness: 0.3 }, FILL_DROPPER: { reagent: REAGENTS.IKI },
     DROP: { slide, count: 1 }, TICK: { seconds: 1 },
     PLACE_COVERSLIP: { slide, angleDeg: 45 }, LIFT_COVERSLIP: { slide },
-    RINSE_SLIDE: { slide }, MOUNT: { slide },
+    RINSE_SLIDE: { slide }, MOUNT: { slide }, CLEAN_LENS: {},
     SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
     FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
     NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
@@ -389,6 +389,25 @@ test('핀셋이 비었을 때의 안내가 실제로 닿는 상황을 말한다'
   assert.equal(r.outcome, 'happened');
   assert.equal(r.tag, 'forceps-empty');
   assert.ok(!r.message.includes('손으로'), `아직 옛 문구다: ${r.message}`);
+});
+
+test('더러워진 대물렌즈를 닦을 수 있다', () => {
+  // 덮개 유리 없이 고배율로 올리면 렌즈가 시료에 닿는다. 여태 되돌릴 길이 없었다 —
+  // 한 번의 실수로 현미경을 못 쓰게 만드는 것은 이 실험이 가르치려는 바가 아니다.
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'MOUNT', { slide: 'B' }).state;
+  const dirty = run(s, 'SET_OBJECTIVE', { objective: 40 });
+  assert.equal(dirty.tag, 'lens-touched');
+  assert.equal(dirty.state.slides.B.lensTouched, true);
+
+  const cleaned = run(dirty.state, 'CLEAN_LENS');
+  assert.equal(cleaned.tag, 'lens-cleaned');
+  assert.equal(cleaned.state.slides.B.lensTouched, false);
+  // 렌즈만 닦는다. 슬라이드에 이미 생긴 일은 그대로다.
+  assert.equal(cleaned.state.slides.B.sample.thickness, 0.3);
+
+  assert.equal(run(cleaned.state, 'CLEAN_LENS').outcome, 'happened', '깨끗해도 막지 않는다');
 });
 
 test('받침 유리를 씻으면 처음으로 돌아간다', () => {

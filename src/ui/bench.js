@@ -104,11 +104,15 @@ function defaultItems() {
     shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', label: I.forceps }),
     shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', label: I.bottleIKI }),
     shelf(1250, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', label: I.bottleSUDAN }),
-    // 작업면
-    surface(80, { id: 'dish', asset: 'dish', kind: 'dish', label: I.dish }),
-    surface(400, { id: 'microscope', asset: 'microscope', kind: 'microscope', label: I.microscope }),
-    surface(850, { id: 'waste', asset: 'waste', kind: 'waste', label: I.waste }),
-    surface(1150, { id: 'tissue', asset: 'tissue', kind: 'tissue', label: I.tissue }),
+    // 작업면. 씻는 곳(개수대)과 버리는 곳(쓰레기통·폐액통)을 나눠 둔다 —
+    // 실험 접시 하나가 둘을 겸하고 있었는데, 그림도 이름도 그 일과 맞지 않았다.
+    // 접시는 실험대에서 뺐다. 두 물건이 그 일을 나눠 가진 뒤로는 놓아 둘 자리라는 뜻밖에
+    // 남지 않는데, 자리를 차지하면 학생은 "이걸로 뭘 해야 하나" 를 계속 묻게 된다.
+    surface(15, { id: 'sink', asset: 'sink', kind: 'sink', label: I.sink }),
+    surface(410, { id: 'tissue', asset: 'tissue', kind: 'tissue', label: I.tissue }),
+    surface(640, { id: 'microscope', asset: 'microscope', kind: 'microscope', label: I.microscope }),
+    surface(995, { id: 'waste', asset: 'waste', kind: 'waste', label: I.waste }),
+    surface(1255, { id: 'bin', asset: 'bin', kind: 'bin', label: I.bin }),
   ].map((it) => ({ ...it, y: it.bottom - heightMm(it.asset) }));
 }
 
@@ -143,15 +147,37 @@ export function dropTable(store, openZoom = () => {}) {
       // 덮는 것도 들어내는 것도 손끝 일이다. 실험대에서 끌어다 대는 것으로는 각도를 못 정하고,
       // 덮인 유리를 집어 드는 것은 더 어렵다. 대면 확대 뷰가 열리고 거기서 한다.
       slide: (item, target) => openZoom('slide', target.slide, 'forceps'),
-      // 쓴 덮개 유리를 버린다.
-      dish: () => store.dispatch('DISCARD_COVERSLIP', {}),
+      // 쓴 덮개 유리는 고형 폐기물이다. 폐액통이 아니라 쓰레기통에 버린다.
+      bin: () => store.dispatch('DISCARD_COVERSLIP', {}),
+    },
+    // 휴지로 대물렌즈를 닦는다. 덮개 유리 없이 고배율로 올려 렌즈가 더러워졌을 때
+    // 되돌릴 길이 여태 없었다 — 한 번의 실수로 현미경을 못 쓰게 두지 않는다.
+    tissue: {
+      microscope: () => store.dispatch('CLEAN_LENS', {}),
     },
     slide: {
-      // 올리기만 한다. 배율은 확대 뷰에서 학생이 고른다 —
-      // 1단계에서 올리자마자 400배로 맞춰 주던 것을 걷어냈다. 그러면 아무것도 안 했는데
-      // "저배율에서 초점을 맞추지 않고 올렸습니다" 라는 경고가 뜨고, 화면은 초점이 맞아 보였다.
-      microscope: (item) => store.dispatch('MOUNT', { slide: item.slide }),
-      dish: (item) => store.dispatch('RINSE_SLIDE', { slide: item.slide }),
+      /**
+       * 재물대에 올린다.
+       *
+       * 1단계는 여기서 저배율 초점까지 **대신 맞춰 주고** 400배로 올려 준다.
+       * 나사 조작을 잘못하면 슬라이드가 깨져 되돌릴 길이 좁아지는데, 1단계는 그걸
+       * 감당하는 자리가 아니다. 2·3단계는 저배율부터 직접 올라간다.
+       *
+       * **순서가 전부다.** 조동나사는 고배율에서 돌리면 슬라이드를 깨뜨린다.
+       * 배율은 슬라이드를 바꿔도 그대로 남아 있으므로, 앞 슬라이드를 400배로 보다가
+       * 새것을 올리면 곧바로 400배에서 조동나사를 돌리는 셈이 된다 — 올리자마자 깨진다.
+       * 그래서 저배율로 **먼저 내리고**, 초점을 맞추고, 그다음 올린다.
+       * 이 순서라야 `SET_OBJECTIVE` 가 "저배율에서 초점을 맞추지 않고 올렸습니다" 라는,
+       * 학생이 한 적 없는 일로 나무라지도 않는다.
+       */
+      microscope: (item) => {
+        store.dispatch('MOUNT', { slide: item.slide });
+        if (store.getState().session.level !== 1) return;
+        store.dispatch('SET_OBJECTIVE', { objective: 4 });
+        store.dispatch('COARSE_FOCUS', { delta: -store.getState().microscope.coarse });
+        store.dispatch('SET_OBJECTIVE', { objective: 40 });
+      },
+      sink: (item) => store.dispatch('RINSE_SLIDE', { slide: item.slide }),
     },
   };
 }
@@ -174,10 +200,28 @@ export function tapTable(store, onOpenZoom) {
   };
 }
 
+/**
+ * 실험대 배치를 mm 사각형으로 낸다.
+ *
+ * 물건이 서로 겹치면 나중에 그려진 쪽이 앞선 쪽의 클릭을 통째로 가로챈다.
+ * 실제로 개수대를 500 mm 로 잡았더니 세로 375 mm 로 자라 선반 위 받침 유리를 덮었고,
+ * 받침 유리를 끌 수가 없었다. 눈으로는 개수대가 아래쪽에만 그려져 있어 보이지 않는다 —
+ * 애셋은 저마다 400×300 프레임을 채워 그리므로 **빈 여백까지 잡는 영역**이기 때문이다.
+ */
+export function benchLayout() {
+  return defaultItems().map((it) => ({
+    id: it.id,
+    x: it.x,
+    y: it.y,
+    w: CONTRACT[it.asset].realSizeMm,
+    h: heightMm(it.asset),
+  }));
+}
+
 /** 실험대에 놓인 물건들. 배치를 몰라도 종류만 알면 되는 검사에 쓴다. */
 export const BENCH_KINDS = [
   'banana', 'slide', 'coverslip', 'dropper', 'forceps',
-  'bottle', 'dish', 'microscope', 'waste', 'tissue',
+  'bottle', 'microscope', 'waste', 'sink', 'bin', 'tissue',
 ];
 
 /**
@@ -450,15 +494,14 @@ export function createBench(root, store, { onOpenZoom }) {
     const run = target ? DROPS[item.kind]?.[target.kind] : null;
     if (run) run(item, target, { smearMm: drag.smearMm, lastDx: drag.lastDx, lastDy: drag.lastDy });
 
-    // 쓴 물건은 제자리로 돌아간다. 실험대에 남는 것은 재물대에 올라가 사라진 받침 유리뿐이다.
+    // 쓴 물건은 언제나 제자리로 돌아간다.
     //
     // 놓인 자리는 결과에 아무 영향을 주지 않는데, 물건이 놓인 채로 남으면 자리가 뜻을 갖는 것처럼
-    // 보인다 — 현미경 위에 얹힌 받침 유리는 재물대에 올라간 것처럼 보이고(실제로는 아니다),
-    // 실험 접시에 얹힌 받침 유리는 접시를 가려 다음 조작을 막는다.
-    if (!isHidden(item)) {
-      item.x = item.homeX;
-      item.y = item.homeY;
-    }
+    // 보인다 — 현미경 위에 얹힌 받침 유리는 재물대에 올라간 것처럼 보인다(실제로는 아니다).
+    // 재물대에 올라가 화면에서 사라진 받침 유리도 마찬가지로 되돌려 둔다.
+    // 그러지 않으면 내렸을 때 현미경 위에 겹쳐 나타나 다시 집을 수가 없다.
+    item.x = item.homeX;
+    item.y = item.homeY;
     drag = null;
     renderTokens();
   }

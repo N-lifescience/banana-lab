@@ -7,7 +7,7 @@
  */
 
 import * as banana from './assets/banana.js';
-import { ASSETS, SAMPLE_STATES } from './assets/index.js';
+import { ASSETS, SAMPLE_STATES, PENDING } from './assets/index.js';
 import { renderFOV } from './render/fov.js';
 import { observability } from './sim/quality.js';
 import { UI } from './ui/strings.js';
@@ -124,7 +124,10 @@ document.querySelectorAll('#reagent button').forEach((b) => {
 function paintSheet() {
   $('#sheet').innerHTML = Object.entries(ASSETS).map(([name, mod]) => {
     const sample = SAMPLE_STATES[name]?.[0] ?? {};
-    return `<div class="cell">${mod.render({ ...sample, seed: state.seed })}<span class="name">${name}</span></div>`;
+    // 한글 이름과 함께 파일 키도 보여 준다 — 그림을 고칠 사람이 찾아야 할 것은 키다.
+    const label = `${UI.assetNames[name] ?? name} <code>${name}.js</code>`;
+    const pending = PENDING.includes(name) ? ' <b>자리표시</b>' : '';
+    return `<div class="cell">${mod.render({ ...sample, seed: state.seed })}<span class="name">${label}${pending}</span></div>`;
   }).join('');
 }
 

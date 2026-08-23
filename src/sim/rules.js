@@ -14,7 +14,7 @@
  */
 
 import {
-  REAGENTS, coverage, excess, focusError, brightness, isTooThick,
+  REAGENTS, SLIDE_IDS, coverage, excess, focusError, brightness, isTooThick,
   HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
 import { focusTolerance } from './optics.js';
@@ -195,7 +195,7 @@ export const ACTIONS = {
   PLACE_COVERSLIP(state, { slide, angleDeg = 45 }) {
     const s = state.slides[slide];
     if (state.tools.forceps.holding === 'usedCoverslip') {
-      return happened(state, '한 번 쓴 덮개 유리는 다시 쓰지 않습니다. 실험 접시에 버리고 새것을 집으세요.', 'coverslip-used');
+      return happened(state, '한 번 쓴 덮개 유리는 다시 쓰지 않습니다. 쓰레기통에 버리고 새것을 집으세요.', 'coverslip-used');
     }
     if (state.tools.forceps.holding !== 'coverslip') {
       // 예전 문구는 "손으로 집으려 하니 미끄러집니다. 핀셋을 쓰세요" 였는데,
@@ -244,7 +244,7 @@ export const ACTIONS = {
    * 기포가 잔뜩 생겼거나 덮는 순서를 틀렸을 때 되돌아갈 길이다.
    *
    * 들어낸 것은 **쓴 덮개 유리**다. 시료가 묻었고 얇아서 닦아 쓰지 않는다 —
-   * 실제 실험실에서도 버린다. 핀셋에 물린 채로 남으니 실험 접시에 버리고 새것을 집는다.
+   * 실제 실험실에서도 버린다. 핀셋에 물린 채로 남으니 쓰레기통에 버리고 새것을 집는다.
    */
   LIFT_COVERSLIP(state, { slide }) {
     const s = state.slides[slide];
@@ -255,10 +255,28 @@ export const ACTIONS = {
       withSlide(state, slide, { coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 } }),
       { forceps: { holding: 'usedCoverslip' } }
     );
-    return happened(next, '덮개 유리를 들어냈습니다. 한 번 쓴 것이니 실험 접시에 버리세요.', 'coverslip-lifted');
+    return happened(next, '덮개 유리를 들어냈습니다. 한 번 쓴 것이니 쓰레기통에 버리세요.', 'coverslip-lifted');
   },
 
-  /** 쓴 덮개 유리를 실험 접시에 버린다. */
+  /**
+   * 더러워진 대물렌즈를 닦는다.
+   *
+   * 덮개 유리 없이 고배율로 올리면 렌즈가 시료에 닿아 더러워지는데(`SET_OBJECTIVE`),
+   * 여태 그걸 되돌릴 길이 없었다. 실제 실험실에서도 렌즈 종이로 닦아 낸다 —
+   * 한 번의 실수로 현미경을 못 쓰게 만드는 것은 이 실험이 가르치려는 바가 아니다.
+   * 렌즈만 닦는다. 슬라이드에 이미 생긴 일(금, 뭉개진 시료)은 그대로다.
+   */
+  CLEAN_LENS(state) {
+    const dirty = SLIDE_IDS.filter((id) => state.slides[id].lensTouched);
+    if (dirty.length === 0) {
+      return happened(state, '렌즈는 깨끗합니다.');
+    }
+    let next = state;
+    for (const id of dirty) next = withSlide(next, id, { lensTouched: false });
+    return happened(next, '대물렌즈를 닦았습니다. 시야가 다시 맑아집니다.', 'lens-cleaned');
+  },
+
+  /** 쓴 덮개 유리를 쓰레기통에 버린다. */
   DISCARD_COVERSLIP(state) {
     if (!state.tools.forceps.holding) {
       return happened(state, '핀셋이 비어 있습니다.');
@@ -267,7 +285,7 @@ export const ACTIONS = {
   },
 
   /**
-   * 실험 접시에서 받침 유리를 씻는다.
+   * 개수대에서 받침 유리를 씻는다.
    *
    * 시료를 너무 두껍게 바르거나 시약을 엉뚱한 데 떨어뜨렸을 때 처음으로 돌아가는 길이다.
    * 이것이 없으면 받침 유리 석 장이 전부인 실험에서 한 번의 실수가 곧 끝이 된다 —

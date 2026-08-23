@@ -14,16 +14,21 @@ import * as bottle from './bottle.js';
 import * as microscope from './microscope.js';
 import * as dish from './dish.js';
 import * as waste from './waste.js';
+import * as sink from './sink.js';
+import * as bin from './bin.js';
 import * as tissue from './tissue.js';
 import * as bench from './bench.js';
 
 export const ASSETS = {
   banana, slide, coverslip, dropper, forceps, bottle,
-  microscope, dish, waste, tissue, bench,
+  microscope, dish, waste, sink, bin, tissue, bench,
 };
 
-/** 아직 구현되지 않은 애셋. T02에서 12종을 모두 채웠다. */
-export const PENDING = [];
+/**
+ * 그림을 다시 그려야 하는 애셋. 계약과 상호작용은 이미 붙어 있고 형태만 자리표시다.
+ * 붙여 넣을 지시는 tasks/T12-PROMPT.md 에 있다.
+ */
+export const PENDING = ['sink', 'bin'];
 
 /** 린터와 UI가 함께 쓰는 대표 상태 조합. 애셋마다 최소 이 상태들에서 검사한다. */
 export const SAMPLE_STATES = {
@@ -49,6 +54,8 @@ export const SAMPLE_STATES = {
   ],
   dish: [{ contents: [] }],
   waste: [{ level: 0 }, { level: 0.6 }],
+  sink: [{ water: 0 }, { water: 1 }],
+  bin: [{ fill: 0 }, { fill: 1 }],
   tissue: [{ used: 0 }],
   bench: [{}],
 };

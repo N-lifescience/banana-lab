@@ -20,7 +20,7 @@ const center = (b) => [b.x + b.width / 2, b.y + b.height / 2];
 async function drag(from, to) {
   const a = await box(from);
   const z = await box(to);
-  if (!a || !z) throw new Error(`끌 물건이 없습니다: ${from} → ${to}`);
+  if (!a || !z) throw new Error(`끌 물건이 없습니다: ${!a ? from : to} (from=${!!a} to=${!!z}) 상태=${JSON.stringify(await page.evaluate(() => ({ stage: window.__store.getState().microscope.stage })))}`);
   await page.mouse.move(...center(a));
   await page.mouse.down();
   await page.mouse.move(...center(z), { steps: 10 });
@@ -133,11 +133,11 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
 await page.evaluate(() => window.__store.dispatch('UNMOUNT', {}));
 await page.waitForTimeout(80);
 const homeBefore = await box('[data-id="slideA"]');
-const dishBox = await box('[data-id="dish"]');
+const farBox = await box('[data-id="sink"]');
 await page.mouse.move(...center(homeBefore));
 await page.mouse.down();
 // 어디에도 닿지 않는 빈 곳으로
-await page.mouse.move(dishBox.x + dishBox.width * 3, dishBox.y - 90, { steps: 8 });
+await page.mouse.move(farBox.x + farBox.width * 3, farBox.y - 90, { steps: 8 });
 await page.mouse.up();
 await page.waitForTimeout(120);
 const homeAfter = await box('[data-id="slideA"]');
@@ -146,9 +146,9 @@ ok(Math.abs(homeAfter.x - homeBefore.x) < 2 && Math.abs(homeAfter.y - homeBefore
    `${homeBefore.x.toFixed(0)},${homeBefore.y.toFixed(0)} → ${homeAfter.x.toFixed(0)},${homeAfter.y.toFixed(0)}`);
 
 // 실험 접시로 씻기
-await drag('[data-id="slideB"]', '[data-id="dish"]');
+await drag('[data-id="slideB"]', '[data-id="sink"]');
 const washed = await page.evaluate(() => window.__store.getState().slides.B.sample);
-ok(washed === null, '받침 유리를 실험 접시에 대면 씻긴다', `sample=${JSON.stringify(washed)}`);
+ok(washed === null, '받침 유리를 개수대에 대면 씻긴다', `sample=${JSON.stringify(washed)}`);
 
 // 다시 바르고, 스포이트를 채워 받침 유리에 댄다 → 확대 뷰가 열려야 한다
 await drag('[data-id="banana"]', '[data-id="slideB"]');
@@ -259,22 +259,22 @@ const after = await page.evaluate(() => ({
 ok(after.placed === false && after.holding === 'usedCoverslip',
    '들어낸 덮개 유리는 핀셋에 물린 채 남는다', JSON.stringify(after));
 const usedHint = await page.locator('#cover-hint').innerText();
-ok(usedHint.includes('실험 접시'), '쓴 것은 버리라고 알려 준다', JSON.stringify(usedHint));
+ok(usedHint.includes('쓰레기통'), '쓴 것은 버리라고 알려 준다', JSON.stringify(usedHint));
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(150);
 
 // 실험 접시에 버린다
-await drag('[data-id="forceps"]', '[data-id="dish"]');
+await drag('[data-id="forceps"]', '[data-id="bin"]');
 const discarded = await page.evaluate(() => window.__store.getState().tools.forceps.holding);
-ok(discarded === null, '쓴 덮개 유리를 실험 접시에 버린다', `holding=${discarded}`);
+ok(discarded === null, '쓴 덮개 유리를 쓰레기통에 버린다', `holding=${discarded}`);
 
 // 재물대 버튼이 어느 유리인지 말하는가
 await drag('[data-id="slideB"]', '[data-id="microscope"]');
 const unmountLabel = await page.locator('#unmount').innerText();
 ok(unmountLabel.includes('(나)'), '내리기 버튼이 어느 받침 유리인지 말한다', JSON.stringify(unmountLabel));
-ok(await page.evaluate(() => window.__store.getState().microscope.objective) === 4,
-   '올리는 것만으로 배율이 정해지지 않는다');
+ok(await page.evaluate(() => window.__store.getState().microscope.objective) === 40,
+   '1단계는 올리면 400배까지 대신 맞춰 준다');
 
 /* ---------- 현미경 확대 뷰 ---------- */
 
@@ -293,20 +293,32 @@ ok(figBox.x + figBox.width <= fovBox.x + 1, '현미경 그림과 시야가 겹�
    `그림 끝 ${(figBox.x + figBox.width).toFixed(0)} / 시야 시작 ${fovBox.x.toFixed(0)}`);
 
 // 다이얼을 돌리면 초점이 바뀌고 재물대가 움직인다
-const stageBefore = await page.locator('#scope-figure #stage').getAttribute('transform');
-const dial = await box('#dial-coarse');
-const [dx0, dy0] = center(dial);
-await page.mouse.move(dx0, dy0 - 22);
-await page.mouse.down();
-for (const a of [0, 45, 90, 135, 180]) {
-  const r = 22, rad = ((a - 90) * Math.PI) / 180;
-  await page.mouse.move(dx0 + r * Math.cos(rad), dy0 + r * Math.sin(rad));
-}
-await page.mouse.up();
-await page.waitForTimeout(200);
-const coarseAfter = await page.evaluate(() => window.__store.getState().microscope.coarse);
-const stageAfter = await page.locator('#scope-figure #stage').getAttribute('transform');
-ok(Math.abs(coarseAfter) > 0.01, '다이얼을 돌리면 조동나사가 움직인다', `coarse=${coarseAfter?.toFixed(3)}`);
+// 미동나사로 검사한다. 1단계는 올리면 400배가 되고, 그 배율에서 **조동나사**를 돌리면
+// 슬라이드에 금이 가는 것이 규칙이다 — 그건 아래에서 따로 확인한다.
+const stageTf = () => page.evaluate(
+  () => document.querySelector('#scope-figure #stage')?.getAttribute('transform') ?? null);
+const turnDial = async (id, turns = 0.5) => {
+  const d = await box(id);
+  const [cx, cy] = center(d);
+  const r = Math.min(d.width, d.height) / 2 - 6;
+  await page.mouse.move(cx, cy - r);
+  await page.mouse.down();
+  const steps = Math.max(6, Math.round(turns * 12));
+  for (let i = 1; i <= steps; i++) {
+    const rad = ((i / steps) * turns * 360 - 90) * Math.PI / 180;
+    await page.mouse.move(cx + r * Math.cos(rad), cy + r * Math.sin(rad));
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+};
+
+const stageBefore = await stageTf();
+const fineBefore = await page.evaluate(() => window.__store.getState().microscope.fine);
+await turnDial('#dial-fine');
+const fineAfter = await page.evaluate(() => window.__store.getState().microscope.fine);
+const stageAfter = await stageTf();
+ok(Math.abs(fineAfter - fineBefore) > 0.005, '다이얼을 돌리면 미동나사가 움직인다',
+   `fine ${fineBefore?.toFixed(3)} → ${fineAfter?.toFixed(3)}`);
 ok(stageBefore !== stageAfter, '나사를 돌리면 재물대 높이가 바뀐다',
    `${stageBefore} → ${stageAfter}`);
 
@@ -322,18 +334,35 @@ await page.waitForTimeout(200);
 const cards = await page.locator('#notebook .capture-card').count();
 ok(cards >= 1, '기록한 결과가 탐구 노트 5단계에 보인다', `카드 ${cards}장`);
 
-// 고배율에서 조동나사를 돌리면 깨지고, 화면이 그 사실을 말한다
+// 고배율에서 조동나사 다이얼을 돌리면 깨지고, 화면이 그 사실을 말한다.
+// 손으로 돌려서 확인한다 — dispatch 로 부르면 다이얼이 그 결과를 화면에 반영하는지는 못 본다.
 await page.locator('[data-id="microscope"]').click();
-await page.waitForTimeout(200);
-await page.evaluate(() => {
-  window.__store.dispatch('SET_OBJECTIVE', { objective: 40 });
-  window.__store.dispatch('COARSE_FOCUS', { delta: 0.3 });
-});
 await page.waitForTimeout(250);
+ok(await page.evaluate(() => window.__store.getState().microscope.objective) === 40,
+   '1단계는 다시 올려도 400배로 맞춰 준다');
+await turnDial('#dial-coarse', 0.4);
 const emptyWhy = await page.locator('[data-why="cracked"]').innerText().catch(() => '');
-ok(emptyWhy.includes('금이'), '깨져서 내려간 것을 확대 뷰가 설명한다', JSON.stringify(emptyWhy));
+ok(emptyWhy.includes('금이'), '고배율에서 조동나사를 돌리면 깨지고, 확대 뷰가 그 사실을 말한다',
+   JSON.stringify(emptyWhy));
+
+// 휴지로 렌즈를 닦을 수 있는가
 await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+await page.evaluate(() => window.__store.dispatch('NOTE_VIOLATION', { kind: 'hands-unwashed' }));
+await page.evaluate(() => {
+  const st = window.__store.getState();
+  window.__store.dispatch('MOUNT', { slide: 'A' });
+  return st;
+});
 await page.waitForTimeout(120);
+const dirty = await page.evaluate(() => {
+  window.__store.dispatch('SET_OBJECTIVE', { objective: 40 });
+  return window.__store.getState().slides.A.lensTouched;
+});
+ok(dirty === true, '덮개 유리 없이 고배율로 올리면 렌즈가 더러워진다');
+await drag('[data-id="tissue"]', '[data-id="microscope"]');
+const cleaned = await page.evaluate(() => window.__store.getState().slides.A.lensTouched);
+ok(cleaned === false, '휴지를 현미경에 대면 렌즈를 닦는다', `lensTouched=${cleaned}`);
 
 /* ---------- 버튼이 눈에 보이는가 (다크 모드에서 흰 바탕 흰 글씨였다) ---------- */
 

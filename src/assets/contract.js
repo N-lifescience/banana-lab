@@ -145,6 +145,19 @@ export const CONTRACT = {
                      '#bin-shade': { required: true, mutable: [] },
                      '#level': { required: true, mutable: ['y', 'height', 'fill'] } } },
 
+  // 개수대 폭 380 · 쓰레기통 높이 240. 둘 다 자리표시 그림이다 (tasks/T12-PROMPT.md).
+  // 개수대를 더 키우면 세로로 자라 선반 위 물건을 덮는다 — tests/bench.test.js 가 잡는다.
+  sink:   { file: 'sink.js',   realSizeMm: 380,  viewBox: '0 0 400 300', states: ['water'],
+            nodes: { '#basin': { required: true, mutable: [] },
+                     '#basin-shade': { required: true, mutable: [] },
+                     '#faucet': { required: true, mutable: [] },
+                     '#water': { required: true, mutable: ['opacity'] } } },
+
+  bin:    { file: 'bin.js',    realSizeMm: 240,  viewBox: '0 0 400 300', states: ['fill'],
+            nodes: { '#trash': { required: true, mutable: [] },
+                     '#trash-shade': { required: true, mutable: [] },
+                     '#trash-fill': { required: true, mutable: ['opacity'] } } },
+
   tissue: { file: 'tissue.js', realSizeMm: 215,  viewBox: '0 0 400 300', states: ['used'],
             nodes: { '#box': { required: true, mutable: [] },
                      '#box-shade': { required: true, mutable: [] },

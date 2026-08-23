@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dropTable, tapTable, BENCH_KINDS } from '../src/ui/bench.js';
+import { dropTable, tapTable, BENCH_KINDS, benchLayout } from '../src/ui/bench.js';
 import { UI } from '../src/ui/strings.js';
 import { initialState } from '../src/sim/state.js';
 
@@ -37,6 +37,29 @@ test('끌어다 놓는 표의 출발과 도착이 모두 실험대에 있는 물
     for (const to of Object.keys(targets)) {
       assert.ok(BENCH_KINDS.includes(to), `${from} → ${to} 의 ${to} 가 실험대에 없다`);
     }
+  }
+});
+
+test('실험대 위 물건들이 서로 겹치지 않는다', () => {
+  // 겹치면 나중에 그려진 쪽이 앞선 쪽의 클릭을 통째로 가로챈다.
+  // 애셋은 저마다 400×300 프레임을 채워 그리므로 잡는 영역에 **빈 여백까지 들어간다** —
+  // 화면에서는 아래쪽에만 그려져 있어 보이는 물건이 위쪽 물건을 덮을 수 있다.
+  // 실제로 개수대를 500 mm 로 잡았다가 선반 위 받침 유리를 못 끌게 됐다.
+  const items = benchLayout();
+  const hit = (a, b) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      assert.ok(!hit(items[i], items[j]),
+        `${items[i].id} 와 ${items[j].id} 가 겹칩니다 — 뒤엣것이 앞엣것의 클릭을 가로챕니다`);
+    }
+  }
+});
+
+test('실험대 위 물건이 실험대를 벗어나지 않는다', () => {
+  for (const it of benchLayout()) {
+    assert.ok(it.x >= 0 && it.x + it.w <= 1500, `${it.id} 가 실험대 폭(1500 mm)을 벗어납니다`);
+    assert.ok(it.y >= 0, `${it.id} 가 실험대 위쪽으로 벗어납니다`);
   }
 });
 
@@ -120,10 +143,22 @@ test('손끝으로 하는 일은 실험대에서 곧장 일어나지 않고 확�
   }
 });
 
-test('받침 유리를 현미경에 올리는 것으로 배율이 정해지지 않는다', () => {
-  // 올리자마자 400배로 맞춰 주면 "저배율에서 초점을 맞추지 않고 올렸습니다" 경고가
-  // 학생이 아무것도 안 했는데 뜬다. 저배율부터 올라가는 것이 이 실험에서 배우는 절차다.
-  for (const level of LEVELS) {
+test('1단계만 저배율 초점을 대신 맞춰 주고 고배율로 올려 준다', () => {
+  // 나사 조작을 잘못하면 슬라이드가 깨져 되돌릴 길이 좁아진다. 1단계는 그걸 감당하는 자리가 아니다.
+  // 다만 **순서**가 중요하다 — 초점을 먼저 맞추고 배율을 올린다.
+  // 400배로 올린 뒤 조동나사를 건드리면 그 자리에서 슬라이드가 깨지고,
+  // 초점을 안 맞춘 채 올리면 학생이 한 적 없는 일로 "저배율에서 초점을 안 맞췄다" 는 경고가 뜬다.
+  // 배율은 슬라이드를 바꿔도 남아 있다. 앞 것을 400배로 보다가 새것을 올리면
+  // 곧바로 400배에서 조동나사를 돌리는 셈이 되어 올리자마자 깨진다 — 실제로 그렇게 깨졌다.
+  const one = fakeStore(1, (s) => ({ ...s, microscope: { ...s.microscope, objective: 40 } }));
+  dropTable(one).slide.microscope({ kind: 'slide', slide: 'B' }, { kind: 'microscope' }, {});
+  assert.deepEqual(one.calls.map((c) => c.type),
+    ['MOUNT', 'SET_OBJECTIVE', 'COARSE_FOCUS', 'SET_OBJECTIVE']);
+  assert.equal(one.calls[1].payload.objective, 4, '조동나사를 돌리기 전에 저배율로 내려야 한다');
+  assert.equal(one.calls[3].payload.objective, 40);
+
+  // 2·3단계는 저배율부터 직접 올라간다.
+  for (const level of [2, 3]) {
     const store = fakeStore(level);
     dropTable(store).slide.microscope({ kind: 'slide', slide: 'B' }, { kind: 'microscope' }, {});
     assert.deepEqual(store.calls.map((c) => c.type), ['MOUNT'],
@@ -131,19 +166,19 @@ test('받침 유리를 현미경에 올리는 것으로 배율이 정해지지 �
   }
 });
 
-test('쓴 덮개 유리는 실험 접시에 버린다', () => {
+test('쓴 덮개 유리는 쓰레기통에 버린다', () => {
   const store = fakeStore(1, (s) => ({
     ...s, tools: { ...s.tools, forceps: { holding: 'usedCoverslip' } },
   }));
-  dropTable(store).forceps.dish({ kind: 'forceps' }, { kind: 'dish' }, {});
+  dropTable(store).forceps.bin({ kind: 'forceps' }, { kind: 'bin' }, {});
   assert.deepEqual(store.calls.map((c) => c.type), ['DISCARD_COVERSLIP']);
 });
 
-test('받침 유리를 실험 접시에 대면 씻는다', () => {
-  // 실험 접시는 T08 까지 아무 일도 하지 않는 물건이었다. 씻을 길이 없으면
+test('받침 유리를 개수대에 대면 씻는다', () => {
+  // 씻을 길이 없으면
   // 받침 유리 석 장짜리 실험에서 실수 한 번이 곧 막다른 길이 된다.
   const store = fakeStore();
-  dropTable(store).slide.dish({ kind: 'slide', slide: 'C' }, { kind: 'dish' }, {});
+  dropTable(store).slide.sink({ kind: 'slide', slide: 'C' }, { kind: 'sink' }, {});
   assert.deepEqual(store.calls, [{ type: 'RINSE_SLIDE', payload: { slide: 'C' } }]);
 });
 
