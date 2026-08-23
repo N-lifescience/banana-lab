@@ -29,7 +29,7 @@ function createStore(initial, onMessage) {
     dispatch(type, payload, opts = {}) {
       const result = reduce(state, { type, payload });
       state = result.state;
-      if (result.outcome !== 'ok') onMessage(result.message, result.outcome);
+      if (result.outcome !== 'ok') onMessage(result.message, result.outcome, result.tag);
       if (!opts.skipNotify) notify(result);
       return result;
     },
@@ -39,8 +39,25 @@ function createStore(initial, onMessage) {
   };
 }
 
-const toast = createToastQueue($('#toast-region'));
-const store = createStore(initialState(), (message, outcome) => toast.push(message, outcome));
+/**
+ * 난이도는 주소로 정한다 — `?level=2`. 없으면 1단계다.
+ *
+ * 교사가 반이나 모둠에 따라 다른 링크를 나눠 주는 것이 교실에서 가장 간단하다.
+ * 화면에 선택기를 두면 학생이 어려운 단계를 슬쩍 낮출 수 있고, 그건 이 앱이 볼 일이 아니다.
+ * 이 통로가 없으면 `docs/06` 의 난이도 3단계가 구현돼 있어도 아무도 2·3단계에 닿지 못한다.
+ */
+function levelFromUrl() {
+  const raw = Number(new URLSearchParams(location.search).get('level'));
+  return raw === 2 || raw === 3 ? raw : 1;
+}
+
+// getLevel 은 store 를 나중에 참조한다 — 실제로 호출되는 시점(토스트가 뜰 때)에는
+// store 가 이미 만들어져 있으므로 순서상 문제 없다.
+const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
+const store = createStore(
+  initialState(levelFromUrl()),
+  (message, outcome, tag) => toast.push(message, outcome, tag)
+);
 window.__store = store; // scripts/check-ui.mjs 가 되돌리기 기록 검사에 쓴다.
 
 const zoom = createZoom($('#zoom'), store);

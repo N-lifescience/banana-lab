@@ -121,8 +121,18 @@ export function createZoom(root, store) {
       return;
     }
     const p = fieldParams(st, slideId);
+    // T07 1단계 — 배율 선택 UI 를 내주지 않는다(고정 400배). 대신 색만으로 용액을 구분하지
+    // 않도록 어느 슬라이드·용액인지 글자로 밝혀 둔다(청람/선홍 색맹 대응).
+    const objectivePicker = st.session.level === 1 ? '' : `
+        <div class="ctrl-group" role="group" aria-label="${UI.controls.objective}">
+          <span>${UI.controls.objective}</span>
+          <button type="button" data-obj="4">${UI.units.mag(40)}</button>
+          <button type="button" data-obj="10">${UI.units.mag(100)}</button>
+          <button type="button" data-obj="40">${UI.units.mag(400)}</button>
+        </div>`;
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
+      <p class="zoom-slide-label">${UI.slides[slideId]} · ${UI.reagents[p.reagent ?? 'NONE']}</p>
       <div class="zoom-fov" id="fov-slot" tabindex="0"></div>
       <div class="zoom-gauge" id="quality">
         <div class="bar"><div class="fill" id="zoom-gauge-fill"></div></div>
@@ -130,12 +140,7 @@ export function createZoom(root, store) {
         <div class="hint" id="zoom-gauge-hint"></div>
       </div>
       <div class="zoom-scope-controls">
-        <div class="ctrl-group" role="group" aria-label="${UI.controls.objective}">
-          <span>${UI.controls.objective}</span>
-          <button type="button" data-obj="4">${UI.units.mag(40)}</button>
-          <button type="button" data-obj="10">${UI.units.mag(100)}</button>
-          <button type="button" data-obj="40">${UI.units.mag(400)}</button>
-        </div>
+        ${objectivePicker}
         <div class="ctrl-group">
           <span>${UI.zoom.coarseGroup}</span>
           <button type="button" id="coarse-out">${UI.zoom.coarseFocusOut}</button>

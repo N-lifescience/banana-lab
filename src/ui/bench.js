@@ -191,7 +191,10 @@ export function createBench(root, store, { onOpenZoom }) {
     } else if (item.kind === 'dropper' && t === 'bottle') {
       store.dispatch('FILL_DROPPER', { reagent: target.reagent });
     } else if (item.kind === 'dropper' && t === 'slide') {
-      store.dispatch('DROP', { slide: target.slide, count: 1 });
+      // T07 1단계 — 변인 조작을 고정해 둔다: 방울 수 선택 UI 를 따로 내주는 대신,
+      // 한 번의 조작이 정확한 두 방울이 되게 한다. 그래도 반복해서 놓으면 넘칠 수 있다 — 막지 않는다.
+      const count = store.getState().session.level === 1 ? 2 : 1;
+      store.dispatch('DROP', { slide: target.slide, count });
     } else if (item.kind === 'dropper' && t === 'waste') {
       store.dispatch('RINSE_DROPPER', {});
     } else if (item.kind === 'forceps' && t === 'coverslip') {
@@ -210,6 +213,10 @@ export function createBench(root, store, { onOpenZoom }) {
       }
     } else if (item.kind === 'slide' && t === 'microscope') {
       store.dispatch('MOUNT', { slide: item.slide });
+      // T07 1단계 — 배율도 고정한다: 대물렌즈 선택 UI 를 안 주는 대신 400배로 맞춰 둔다.
+      if (store.getState().session.level === 1) {
+        store.dispatch('SET_OBJECTIVE', { objective: 40 });
+      }
     }
   }
 
@@ -280,6 +287,10 @@ export function createBench(root, store, { onOpenZoom }) {
   }
 
   function renderTokens() {
+    // 키보드 활성화(Enter/Space)로 조작하면 상태가 바뀌어 여기로 다시 들어오는데,
+    // 매번 새 <button> 을 만들면 포커스가 <body> 로 빠져 Tab 흐름이 끊긴다.
+    // 같은 id 를 가진 새 요소로 포커스를 옮겨 준다.
+    const focusedId = layer.contains(document.activeElement) ? document.activeElement.dataset.id : null;
     layer.innerHTML = '';
     for (const item of items) {
       if (isHidden(item)) continue;
@@ -313,6 +324,7 @@ export function createBench(root, store, { onOpenZoom }) {
 
       layer.appendChild(el);
     }
+    if (focusedId) layer.querySelector(`[data-id="${focusedId}"]`)?.focus();
   }
 
   // 드래그 도중에는 다시 그리지 않는다. TICK 처럼 사용자와 무관하게 들어오는 상태 변경이

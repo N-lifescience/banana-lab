@@ -113,6 +113,8 @@
   .zoom-close{position:absolute;top:12px;right:12px;border:1px solid var(--rule);
     background:var(--sunk);border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12.5px}
   .zoom-body h2{font-size:16px;margin:0 26px 14px 0}
+  /* 색만으로 용액을 구분하지 않도록 시야 위에 어느 슬라이드·용액인지 글자로도 밝혀 둔다 */
+  .zoom-slide-label{font-size:12.5px;color:var(--ink-mute);margin:-8px 0 10px}
   .zoom-slide-stage,.zoom-fov{background:var(--sunk);border-radius:6px;padding:10px;
     display:flex;justify-content:center;touch-action:none}
   .zoom-slide-stage svg{width:100%;max-width:320px;height:auto}
@@ -135,6 +137,12 @@
   .zoom-empty{color:var(--ink-mute);font-size:13.5px}
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* 터치 기기에서 손가락으로 누르는 버튼은 44px 이상. 실험대 물건(.token)은
+     ::after 로 이미 보장하므로 여기서는 나머지 버튼만 다룬다. */
+  @media (pointer:coarse){
+    button:not(.token){min-height:44px;padding-left:14px;padding-right:14px}
+  }
 </style>
 </head>
 <body>
