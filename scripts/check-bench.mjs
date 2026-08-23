@@ -216,6 +216,19 @@ ok(drops1 === 1 && drops2 === 2, '고무를 누를 때마다 한 방울씩 떨�
 ok(await page.locator('#dropper-tool').getAttribute('data-over') === 'true',
    '한 방울 떨어뜨려도 스포이트가 받침 유리 위에 남는다');
 
+// 색이 변하는 동안 확대 뷰는 1초마다 통째로 다시 그려진다.
+// 그때 도구가 붙잡아 둔 요소가 DOM 에서 떨어져 나가면, 떨어져 나간 요소의 크기는 0 이라
+// 스포이트가 유리 한가운데 있는데도 "받침 유리 위로 옮기세요" 라고 말하게 된다.
+await page.waitForTimeout(2200);
+const afterTicks = await page.evaluate(() => ({
+  over: document.querySelector('#dropper-tool')?.dataset.over,
+  hint: document.querySelector('#cover-hint')?.textContent ?? '',
+  reaction: window.__store.getState().slides.B.reactionT,
+}));
+ok(afterTicks.over === 'true' && afterTicks.hint.includes('고무를 누르면'),
+   '색이 변하는 동안 다시 그려져도 안내가 어긋나지 않는다',
+   `over=${afterTicks.over} 반응=${afterTicks.reaction?.toFixed(2)} ${JSON.stringify(afterTicks.hint.slice(0, 30))}`);
+
 // 도구 없이 열면 아무 도구도 안 나온다
 await page.keyboard.press('Escape');
 await page.waitForTimeout(120);

@@ -138,9 +138,8 @@ export function createZoom(root, store) {
         ? `<button type="button" class="zoom-action" id="cover-lift">${UI.zoom.liftCoverslip}</button>`
         : ''}`;
 
-    const dropper = body.querySelector('#dropper-tool');
-    if (dropper) bindDropperTool(dropper);
-
+    // 받침 유리 그림을 **먼저** 넣는다. 도구는 자기가 유리 위에 있는지를 크기로 재는데,
+    // 그림이 없는 동안에는 그 칸의 높이가 0 이라 언제나 "유리 밖" 이 된다.
     body.querySelector('#slide-stage').innerHTML = slideModule.render({
       sample: s.sample, stain: s.stain, reaction: s.reactionT,
       coverslip: s.coverslip.placed, bubbles: s.coverslip.bubbles, seed: s.seed,
@@ -149,6 +148,9 @@ export function createZoom(root, store) {
     body.querySelector('#cover-lift')?.addEventListener('click', () => {
       store.dispatch('LIFT_COVERSLIP', { slide: slideId });
     });
+
+    const dropper = body.querySelector('#dropper-tool');
+    if (dropper) bindDropperTool(dropper);
 
     const tool = body.querySelector('#cover-tool');
     if (tool) bindCoverTool(tool);
@@ -182,18 +184,21 @@ export function createZoom(root, store) {
    * 계산기 두드리기가 된다. 핀셋과 같은 방식으로 쥐고 옮긴다.
    */
   function bindDropperTool(el) {
-    const hint = body.querySelector('#cover-hint');
-    const stage = body.querySelector('#slide-stage');
+    // 붙잡아 두지 않고 쓸 때마다 찾는다 — 위 el$ 주석 참조.
+    const hint = () => el$('#cover-hint');
+    const stage = () => el$('#slide-stage');
     let drag = null;
 
     function paint() {
       const d = store.getState().tools.dropper;
       el.innerHTML = dropperSvg(d);
-      const over = overlaps(el, stage);
+      const over = overlaps(el, stage());
       el.dataset.over = String(over);
-      if (!d.holds) hint.textContent = UI.zoom.dropperEmpty;
-      else hint.textContent = over ? UI.zoom.dropperOver : UI.zoom.dropperHint(UI.reagents[d.holds]);
-      hint.dataset.good = String(over && Boolean(d.holds));
+      const h = hint();
+      if (!h) return;
+      if (!d.holds) h.textContent = UI.zoom.dropperEmpty;
+      else h.textContent = over ? UI.zoom.dropperOver : UI.zoom.dropperHint(UI.reagents[d.holds]);
+      h.dataset.good = String(over && Boolean(d.holds));
     }
 
     // 다시 그려져도 손은 있던 자리에 있다.
@@ -228,7 +233,7 @@ export function createZoom(root, store) {
       drag = null;
       busy = false;
       // 고무를 눌렀고, 스포이트 끝이 받침 유리 위에 있으면 한 방울.
-      if (squeeze && overlaps(el, stage)) store.dispatch('DROP', { slide: slideId, count: 1 });
+      if (squeeze && overlaps(el, stage())) store.dispatch('DROP', { slide: slideId, count: 1 });
       else paint();
     };
     el.addEventListener('pointerup', end);
@@ -297,9 +302,19 @@ export function createZoom(root, store) {
     </svg>`;
   }
 
+  /**
+   * 화면 안 요소는 **쓸 때마다 다시 찾는다.**
+   *
+   * 확대 뷰는 상태가 바뀔 때마다 통째로 다시 그려진다 — 색이 변하는 동안에는 1초마다.
+   * 붙잡아 둔 참조는 그때 DOM 에서 떨어져 나가는데, 떨어져 나간 요소의 사각형은 전부 0 이라
+   * "받침 유리와 겹치지 않는다" 는 답이 나온다. 스포이트가 유리 한가운데 있는데도
+   * 계속 "받침 유리 위로 옮기세요" 라고 말하던 원인이 이것이었다.
+   */
+  const el$ = (sel) => body.querySelector(sel);
+
   function bindCoverTool(tool) {
-    const hint = body.querySelector('#cover-hint');
-    const stage = body.querySelector('#slide-stage');
+    const hint = () => el$('#cover-hint');
+    const stage = () => el$('#slide-stage');
     let drag = null;
     // 다시 그려져도 기울기와 자리를 그대로 이어받는다.
     tool.style.transform = `translate(${toolPos.x}px, ${toolPos.y}px)`;
@@ -308,10 +323,12 @@ export function createZoom(root, store) {
       tool.innerHTML = coverToolSvg(coverDeg);
       const deg = coverDeg;
       const bubbles = bubblesFromAngle(deg);
-      hint.textContent =
+      const h = hint();
+      if (!h) return;
+      h.textContent =
         `${UI.zoom.coverAngle} ${UI.zoom.coverAngleDeg(deg)} · ` +
         (bubbles === 0 ? UI.zoom.coverAngleGood : UI.zoom.coverAngleBad);
-      hint.dataset.good = String(bubbles === 0);
+      h.dataset.good = String(bubbles === 0);
     }
 
     function place() {
@@ -346,7 +363,7 @@ export function createZoom(root, store) {
       tool.releasePointerCapture(e.pointerId);
       tool.classList.remove('cover-tool--dragging');
       const moved = drag.moved;
-      const touched = overlaps(tool, stage);
+      const touched = overlaps(tool, stage());
       drag = null;
       busy = false;
       if (!moved || !touched) {
