@@ -7,3 +7,7 @@ dist/
 .env.*
 !.env.example
 shots/
+
+# 에이전트 런타임 상태. .omc/skills/ 만 커밋 대상이다.
+.omc/
+!.omc/skills/
