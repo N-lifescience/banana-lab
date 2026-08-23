@@ -16,6 +16,18 @@ async function box(sel) {
 }
 const center = (b) => [b.x + b.width / 2, b.y + b.height / 2];
 
+/** 한 물건을 다른 물건 한가운데로 끌어다 놓는다. */
+async function drag(from, to) {
+  const a = await box(from);
+  const z = await box(to);
+  if (!a || !z) throw new Error(`끌 물건이 없습니다: ${from} → ${to}`);
+  await page.mouse.move(...center(a));
+  await page.mouse.down();
+  await page.mouse.move(...center(z), { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+}
+
 /* ---------- 1단계 ---------- */
 await page.goto(BASE, { waitUntil: 'networkidle' });
 
@@ -114,6 +126,136 @@ await page.mouse.up();
 await page.waitForTimeout(120);
 const viol = await page.evaluate(() => window.__store.getState().session.violations);
 ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것으로 기록된다', JSON.stringify(viol));
+
+/* ---------- 슬라이드 제작 확대 뷰 ---------- */
+
+// 빗나간 슬라이드는 제자리로 돌아가는가 (현미경 위에 얹혀 "올라간 것처럼" 보이지 않는가)
+await page.evaluate(() => window.__store.dispatch('UNMOUNT', {}));
+await page.waitForTimeout(80);
+const homeBefore = await box('[data-id="slideA"]');
+const dishBox = await box('[data-id="dish"]');
+await page.mouse.move(...center(homeBefore));
+await page.mouse.down();
+// 어디에도 닿지 않는 빈 곳으로
+await page.mouse.move(dishBox.x + dishBox.width * 3, dishBox.y - 90, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(120);
+const homeAfter = await box('[data-id="slideA"]');
+ok(Math.abs(homeAfter.x - homeBefore.x) < 2 && Math.abs(homeAfter.y - homeBefore.y) < 2,
+   '아무 데도 닿지 않은 물건은 제자리로 돌아간다',
+   `${homeBefore.x.toFixed(0)},${homeBefore.y.toFixed(0)} → ${homeAfter.x.toFixed(0)},${homeAfter.y.toFixed(0)}`);
+
+// 실험 접시로 씻기
+await drag('[data-id="slideB"]', '[data-id="dish"]');
+const washed = await page.evaluate(() => window.__store.getState().slides.B.sample);
+ok(washed === null, '받침 유리를 실험 접시에 대면 씻긴다', `sample=${JSON.stringify(washed)}`);
+
+// 다시 바르고 — 한 번에 한 방울인가
+await drag('[data-id="banana"]', '[data-id="slideB"]');
+await drag('[data-id="dropper"]', '[data-id="bottleIKI"]');
+await drag('[data-id="dropper"]', '[data-id="slideB"]');
+const drops1 = await page.evaluate(() => window.__store.getState().slides.B.drops);
+await drag('[data-id="dropper"]', '[data-id="slideB"]');
+const drops2 = await page.evaluate(() => window.__store.getState().slides.B.drops);
+ok(drops1 === 1 && drops2 === 2, '한 번 가져다 대면 한 방울이다', `${drops1} → ${drops2}`);
+
+// 슬라이드 제작 뷰 — 제목이 시약 이름을 미리 알려 주지 않는가
+await page.locator('[data-id="slideB"]').click();
+await page.waitForTimeout(150);
+const title = await page.locator('.zoom-body h2').innerText();
+ok(title === '(나) 슬라이드 제작', '제목이 무엇을 떨어뜨릴지 미리 알려 주지 않는다', JSON.stringify(title));
+
+// 시료가 눈에 보이는가 (덮기 전)
+const smearOpacity = await page.locator('#slide-stage #smear').getAttribute('fill-opacity');
+ok(Number(smearOpacity) >= 0.5, '얇게 발라도 시료가 보인다', `fill-opacity=${smearOpacity}`);
+
+// 덮개 유리를 비스듬히 끌어 내린다 → 기포 0
+const chip = await box('#cover-chip');
+const stageBox = await box('#slide-stage');
+await page.mouse.move(...center(chip));
+await page.mouse.down();
+// 시작점에서 오른쪽·아래로 같은 거리 = 45°
+const [cx0, cy0] = center(chip);
+const dxy = Math.max(stageBox.y + stageBox.height / 2 - cy0, 60);
+await page.mouse.move(cx0 + dxy, cy0 + dxy, { steps: 10 });
+const hintText = await page.locator('#cover-hint').innerText();
+const hintGood = await page.locator('#cover-hint').getAttribute('data-good');
+ok(/\d+°/.test(hintText), '끄는 동안 기울기가 숫자로 보인다', JSON.stringify(hintText));
+ok(hintGood === 'true', '45° 부근이면 기포가 안 생긴다고 알려 준다', `data-good=${hintGood}`);
+await page.mouse.up();
+await page.waitForTimeout(150);
+const cov = await page.evaluate(() => window.__store.getState().slides.B.coverslip);
+ok(cov.placed && cov.bubbles === 0, '비스듬히 끌어 내리면 기포 없이 덮인다', JSON.stringify(cov));
+
+// 덮여도 시료가 비치는가
+const csFill = await page.locator('#slide-stage #coverslip rect').getAttribute('fill-opacity');
+ok(csFill !== null && Number(csFill) < 1, '덮개 유리가 비쳐 시료가 계속 보인다', `fill-opacity=${csFill}`);
+
+// 들어내기
+await page.locator('#cover-lift').click();
+await page.waitForTimeout(150);
+const lifted = await page.evaluate(() => window.__store.getState().slides.B.coverslip.placed);
+ok(lifted === false, '덮개 유리를 다시 들어낼 수 있다');
+
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
+
+// 재물대 버튼이 어느 유리인지 말하는가
+await drag('[data-id="slideB"]', '[data-id="microscope"]');
+const unmountLabel = await page.locator('#unmount').innerText();
+ok(unmountLabel.includes('(나)'), '내리기 버튼이 어느 받침 유리인지 말한다', JSON.stringify(unmountLabel));
+
+/* ---------- 버튼이 눈에 보이는가 (다크 모드에서 흰 바탕 흰 글씨였다) ---------- */
+
+async function checkButtonContrast(page, where) {
+  const bad = await page.evaluate(() => {
+    const lum = (c) => {
+      const [r, g, b] = c.map((v) => {
+        const s = v / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const parse = (s) => (s.match(/[\d.]+/g) ?? []).slice(0, 4).map(Number);
+    const solidBg = (el) => {
+      for (let n = el; n; n = n.parentElement) {
+        const c = parse(getComputedStyle(n).backgroundColor);
+        if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c;
+      }
+      return [255, 255, 255];
+    };
+    const out = [];
+    for (const el of document.querySelectorAll('button')) {
+      if (!el.offsetParent || !el.textContent.trim()) continue;
+      const fg = parse(getComputedStyle(el).color);
+      const bg = solidBg(el);
+      const [a, b] = [lum(fg) + 0.05, lum(bg) + 0.05].sort((x, y) => y - x);
+      const ratio = a / b;
+      if (ratio < 3) out.push(`${el.id || el.className || el.textContent.trim()}=${ratio.toFixed(2)}`);
+    }
+    return out;
+  });
+  ok(bad.length === 0, `버튼 글자가 배경에 묻히지 않는다 (${where})`, bad.join(' / '));
+}
+
+await checkButtonContrast(page, '라이트');
+
+const darkPage = await browser.newPage({ viewport: { width: 1400, height: 900 }, colorScheme: 'dark' });
+await darkPage.goto(BASE, { waitUntil: 'networkidle' });
+await darkPage.evaluate(() => window.__store.dispatch('MOUNT', { slide: 'A' }));
+await darkPage.locator('[data-id="microscope"]').click();
+await darkPage.waitForTimeout(200);
+ok(await darkPage.locator('#capture').isVisible(), '현미경 뷰에 결과 기록 버튼이 있다');
+await checkButtonContrast(darkPage, '다크 — 현미경 뷰');
+await darkPage.keyboard.press('Escape');
+// 탐구 노트 7단계를 모두 열어 본다 — 골라 놓은 탭은 배경이 --indigo 로 바뀌므로
+// 탭마다 대비가 달라진다. 한 단계만 보면 놓친다.
+for (let i = 1; i <= 7; i++) {
+  await darkPage.locator(`.note-tab[data-stage="${i}"]`).click();
+  await darkPage.waitForTimeout(60);
+  await checkButtonContrast(darkPage, `다크 — 탐구 노트 ${i}단계`);
+}
+await darkPage.close();
 
 /* ---------- 3단계 — 안내만 줄고 조작은 그대로인가 ---------- */
 await page.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });

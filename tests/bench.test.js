@@ -16,14 +16,15 @@ import { initialState } from '../src/sim/state.js';
 const LEVELS = [1, 2, 3];
 
 /** dispatch 를 받아 적기만 하는 가짜 저장소. */
-function fakeStore(level = 1) {
+function fakeStore(level = 1, patch = (s) => s) {
   const calls = [];
+  const state = patch(initialState(level, 12345));
   return {
     calls,
-    getState: () => initialState(level, 12345),
+    getState: () => state,
     dispatch(type, payload) {
       calls.push({ type, payload });
-      return { state: initialState(level, 12345), outcome: 'ok', message: null, tag: null };
+      return { state, outcome: 'ok', message: null, tag: null };
     },
   };
 }
@@ -101,6 +102,45 @@ test('문지른 거리가 시료 두께가 된다', () => {
       `${why}: ${smearMm}mm → ${store.calls[0].payload.thickness} (기대 ${expected})`
     );
   }
+});
+
+test('한 번 가져다 대면 한 방울이다 — 난이도와 무관하게', () => {
+  // 예전에는 1단계에서 한 번에 두 방울이 됐다. 그러면 이 실험의 변인인 "몇 방울인가" 가
+  // 학생 손을 떠나고, 세어 볼 일 자체가 없어진다.
+  for (const level of LEVELS) {
+    const store = fakeStore(level);
+    dropTable(store).dropper.slide({ kind: 'dropper' }, { kind: 'slide', slide: 'B' }, {});
+    assert.deepEqual(store.calls, [{ type: 'DROP', payload: { slide: 'B', count: 1 } }],
+      `${level}단계에서 한 번에 한 방울이 아니다`);
+  }
+});
+
+test('빈 핀셋을 덮인 받침 유리에 대면 덮는 게 아니라 들어낸다', () => {
+  const covered = (s) => ({
+    ...s,
+    slides: { ...s.slides, B: { ...s.slides.B, coverslip: { placed: true, angleAtDrop: 90, bubbles: 4 } } },
+  });
+  const drag = { lastDx: 10, lastDy: 10 };
+
+  const empty = fakeStore(1, covered);
+  dropTable(empty).forceps.slide({ kind: 'forceps' }, { kind: 'slide', slide: 'B' }, drag);
+  assert.deepEqual(empty.calls.map((c) => c.type), ['LIFT_COVERSLIP'],
+    '기포가 잔뜩 생겼을 때 되돌아갈 길이 이것뿐이다');
+
+  // 덮개 유리를 들고 있으면 여전히 덮는다.
+  const holding = fakeStore(1, (s) => ({
+    ...covered(s), tools: { ...s.tools, forceps: { holding: 'coverslip' } },
+  }));
+  dropTable(holding).forceps.slide({ kind: 'forceps' }, { kind: 'slide', slide: 'B' }, drag);
+  assert.deepEqual(holding.calls.map((c) => c.type), ['PLACE_COVERSLIP']);
+});
+
+test('받침 유리를 실험 접시에 대면 씻는다', () => {
+  // 실험 접시는 T08 까지 아무 일도 하지 않는 물건이었다. 씻을 길이 없으면
+  // 받침 유리 석 장짜리 실험에서 실수 한 번이 곧 막다른 길이 된다.
+  const store = fakeStore();
+  dropTable(store).slide.dish({ kind: 'slide', slide: 'C' }, { kind: 'dish' }, {});
+  assert.deepEqual(store.calls, [{ type: 'RINSE_SLIDE', payload: { slide: 'C' } }]);
 });
 
 test('안전 수칙 세 가지를 실험대에서 부를 수 있다', () => {

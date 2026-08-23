@@ -11,6 +11,7 @@
  */
 
 import { renderFOV } from '../render/fov.js';
+import { bubblesFromAngle } from '../sim/rules.js';
 import { observability } from '../sim/quality.js';
 import { fieldParams, focusError, brightness, isFloating, PAN_LIMIT } from '../sim/state.js';
 import { UI } from './strings.js';
@@ -86,28 +87,126 @@ export function createZoom(root, store) {
 
   function renderSlideMode() {
     const s = store.getState().slides[slideId];
-    const label = UI.slides[slideId];
+    // 제목에 "(나) 아이오딘–아이오딘화 칼륨" 을 그대로 쓰면 화면이 무엇을 떨어뜨릴지
+    // 미리 알려 주는 꼴이 된다. 어느 유리인지만 밝히고, 무엇을 할지는 탐구 노트가 안내한다.
     body.innerHTML = `
-      <h2>${UI.zoom.slideMode(label)}</h2>
-      <div class="zoom-slide-stage"></div>
+      <h2>${UI.zoom.slideMode(UI.slideShort[slideId])}</h2>
+      <div class="zoom-slide-workspace">
+        ${s.coverslip.placed ? '' : `
+          <button type="button" class="cover-chip" id="cover-chip"
+            aria-label="${UI.zoom.coverDragLabel}"></button>`}
+        <div class="zoom-slide-stage" id="slide-stage"></div>
+      </div>
+      <p class="cover-hint" id="cover-hint">${
+        s.coverslip.placed ? UI.zoom.coverPlaced : UI.zoom.coverDragHint
+      }</p>
       <dl class="zoom-readout">
         <div><dt>${UI.controls.reagent}</dt><dd>${UI.reagents[s.stain ?? 'NONE']}</dd></div>
         <div><dt>${UI.controls.drops}</dt><dd>${UI.units.drops(s.drops)}</dd></div>
-        <div><dt>덮개 유리</dt><dd>${s.coverslip.placed ? `놓임 (기포 ${s.coverslip.bubbles}개)` : '없음'}</dd></div>
+        <div><dt>${UI.zoom.coverDragLabel}</dt><dd>${
+          s.coverslip.placed ? `놓임 (기포 ${s.coverslip.bubbles}개)` : '없음'
+        }</dd></div>
       </dl>
-      <div class="zoom-cover-control">
-        <label for="zoom-cover-angle">${UI.zoom.coverAngle}</label>
-        <input type="range" id="zoom-cover-angle" min="0" max="90" step="1" value="45">
-        <button type="button" id="zoom-cover-place">${UI.zoom.placeCoverslip}</button>
-      </div>`;
-    body.querySelector('.zoom-slide-stage').innerHTML = slideModule.render({
+      ${s.coverslip.placed
+        ? `<button type="button" class="zoom-action" id="cover-lift">${UI.zoom.liftCoverslip}</button>`
+        : ''}`;
+
+    body.querySelector('#slide-stage').innerHTML = slideModule.render({
       sample: s.sample, stain: s.stain, reaction: s.reactionT,
       coverslip: s.coverslip.placed, bubbles: s.coverslip.bubbles, seed: s.seed,
     });
-    body.querySelector('#zoom-cover-place').addEventListener('click', () => {
-      const angleDeg = Number(body.querySelector('#zoom-cover-angle').value);
-      store.dispatch('PLACE_COVERSLIP', { slide: slideId, angleDeg });
+
+    body.querySelector('#cover-lift')?.addEventListener('click', () => {
+      store.dispatch('LIFT_COVERSLIP', { slide: slideId });
     });
+
+    const chip = body.querySelector('#cover-chip');
+    if (chip) {
+      chip.innerHTML = coverChipSvg();
+      bindCoverDrag(chip);
+    }
+  }
+
+  /** 끌고 다니는 덮개 유리 조각. 받침 유리 애셋의 덮개 유리와 같은 모양을 쓴다. */
+  function coverChipSvg() {
+    // 받침 유리 위에 놓인 덮개 유리는 밝은 유리에 겹쳐서 옅어도 보이지만(fill-opacity 0.3),
+    // 손에 들려 허공에 있는 동안에는 배경에 묻힌다 — 다크 모드에서 특히.
+    // 들고 있을 때만 진하게 그린다. 같은 물건이지만 뒤에 무엇이 있느냐가 다르다.
+    return `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="10" y="10" width="60" height="60" rx="2"
+        fill="${slideModule.COVERSLIP_FILL}" fill-opacity="0.9"
+        stroke="${slideModule.COVERSLIP_INK}" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+  }
+
+  /**
+   * 덮개 유리를 끌어 내려 덮는다.
+   *
+   * 끌어온 **전체 방향**이 곧 놓는 각도다 — 옆으로 끌면 0°(눕혀 놓기), 곧장 내리면 90°,
+   * 비스듬히 내리면 45° 근처. 기포는 이 각도에서 나온다 (`bubblesFromAngle`).
+   * 마지막 한 프레임의 방향이 아니라 시작점부터의 방향을 쓴다 — 손이 떨려도 값이 튀지 않는다.
+   */
+  function bindCoverDrag(chip) {
+    let drag = null;
+    const hint = body.querySelector('#cover-hint');
+    const stage = body.querySelector('#slide-stage');
+
+    const angleOf = (dx, dy) => Math.round(
+      (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI
+    );
+
+    chip.addEventListener('pointerdown', (e) => {
+      chip.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
+      busy = true;
+      chip.classList.add('cover-chip--dragging');
+    });
+
+    chip.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x0;
+      const dy = e.clientY - drag.y0;
+      const deg = angleOf(dx, dy);
+      drag.deg = deg;
+      chip.style.transform = `translate(${dx}px, ${dy}px) rotate(${deg}deg)`;
+      const bubbles = bubblesFromAngle(deg);
+      hint.textContent =
+        `${UI.zoom.coverAngle} ${UI.zoom.coverAngleDeg(deg)} · ` +
+        (bubbles === 0 ? UI.zoom.coverAngleGood : UI.zoom.coverAngleBad);
+      hint.dataset.good = String(bubbles === 0);
+    });
+
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      chip.releasePointerCapture(e.pointerId);
+      chip.classList.remove('cover-chip--dragging');
+      const deg = drag.deg;
+      const over = overlaps(chip, stage);
+      drag = null;
+      busy = false;
+      if (deg === undefined || !over) {
+        // 받침 유리에 닿지 않았다. 아무 일도 일어나지 않고 제자리로 돌아간다.
+        chip.style.transform = '';
+        renderSlideMode();
+        return;
+      }
+      // 핀셋으로 미리 집어 오지 않았어도 여기서는 집는 동작까지 함께 한 것으로 본다.
+      // 확대 뷰는 그 손놀림을 가까이서 보는 화면이지, 다른 규칙이 도는 곳이 아니다.
+      if (store.getState().tools.forceps.holding !== 'coverslip') {
+        store.dispatch('PICK_COVERSLIP', {});
+      }
+      store.dispatch('PLACE_COVERSLIP', { slide: slideId, angleDeg: deg });
+    };
+    chip.addEventListener('pointerup', end);
+    chip.addEventListener('pointercancel', end);
+  }
+
+  /** 두 요소가 화면에서 겹치는가. 덮개 유리는 받침 유리 어디에 닿아도 덮인 것으로 본다. */
+  function overlaps(a, b) {
+    const r = a.getBoundingClientRect();
+    const q = b.getBoundingClientRect();
+    return r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top;
   }
 
   /* ---------------------------------------------------------------- */
@@ -132,7 +231,7 @@ export function createZoom(root, store) {
         </div>`;
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
-      <p class="zoom-slide-label">${UI.slides[slideId]} · ${UI.reagents[p.reagent ?? 'NONE']}</p>
+      <p class="zoom-slide-label">${UI.slideShort[slideId]} · ${UI.reagents[p.reagent ?? 'NONE']}</p>
       <div class="zoom-fov" id="fov-slot" tabindex="0"></div>
       <div class="zoom-gauge" id="quality">
         <div class="bar"><div class="fill" id="zoom-gauge-fill"></div></div>
@@ -154,7 +253,7 @@ export function createZoom(root, store) {
           <label for="zoom-diaphragm">${UI.controls.diaphragm}</label>
           <input type="range" id="zoom-diaphragm" min="0" max="1" step="0.02" value="${st.microscope.diaphragm}">
         </div>
-        <button type="button" id="capture">${UI.zoom.capture}</button>
+        <button type="button" class="zoom-action" id="capture">${UI.zoom.capture}</button>
       </div>`;
 
     const fovWrap = body.querySelector('#fov-slot');

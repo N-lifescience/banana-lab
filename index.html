@@ -19,7 +19,12 @@
   html,body{height:100%}
   body{margin:0;background:var(--ground);color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6}
-  button{font:inherit;color:inherit}
+  /* 버튼은 배경까지 테마에서 가져온다.
+     color 만 물려받으면 브라우저 기본 배경(밝은 회색)에 밝은 글자가 얹혀
+     다크 모드에서 흰 바탕에 흰 글씨가 된다 — 버튼이 통째로 사라진다.
+     실제로 "결과 기록" 버튼이 그렇게 안 보였다. 개별 버튼마다 칠하지 말고 여기서 막는다. */
+  button{font:inherit;color:var(--ink);background:var(--sunk);
+    border:1px solid var(--rule);border-radius:5px;cursor:pointer}
   :focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
 
   .layout{display:grid;grid-template-columns:1.5fr 1fr;gap:0;height:100vh}
@@ -85,7 +90,9 @@
   .note-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
   .note-tab{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
     padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
-  .note-tab[aria-selected="true"]{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  /* 골라 놓은 탭·보기. 글자를 #fff 로 박아 두면 다크 모드에서 --indigo 가 밝아지면서
+     밝은 바탕에 흰 글씨가 된다 (대비 2.35). 바탕색 토큰을 쓰면 두 테마에서 함께 뒤집힌다. */
+  .note-tab[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
   .note-step{margin-bottom:18px}
   .substep-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
   .substep{border:1px solid var(--rule);border-radius:6px;padding:10px}
@@ -113,7 +120,7 @@
   .reflect-options{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
   .reflect-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
     padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
-  .reflect-opt--chosen{background:var(--indigo);color:#fff;border-color:var(--indigo)}
+  .reflect-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
   .reflect-retry{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
     padding:5px 9px;font-size:12.5px;cursor:pointer}
   #self-eval .self-eval-item{margin-bottom:16px}
@@ -145,7 +152,20 @@
   .zoom-readout{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:14px 0;font-size:13px}
   .zoom-readout dt{color:var(--ink-mute)}
   .zoom-readout dd{margin:0;font-family:ui-monospace,monospace}
-  .zoom-cover-control{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+  /* 눈에 띄어야 하는 버튼 — 결과 기록, 덮개 유리 들어내기 */
+  .zoom-action{width:100%;background:var(--indigo);color:var(--surface);
+    border-color:var(--indigo);padding:10px 14px;font-size:13.5px;font-weight:600}
+
+  /* 덮개 유리를 끌어 내려 덮는 자리. 받침 유리 위쪽에 놓고 아래로 끌게 한다. */
+  .zoom-slide-workspace{position:relative;padding-top:74px}
+  .cover-chip{position:absolute;top:0;left:8px;width:62px;height:62px;padding:0;
+    background:none;border:none;border-radius:4px;cursor:grab;touch-action:none;line-height:0;
+    transform-origin:50% 50%}
+  .cover-chip svg{width:100%;height:100%;display:block;pointer-events:none}
+  .cover-chip--dragging{cursor:grabbing;z-index:3}
+  .cover-hint{font-size:12.5px;color:var(--ink-mute);margin:8px 0 0}
+  .cover-hint[data-good="true"]{color:var(--good)}
+  .cover-hint[data-good="false"]{color:var(--warn)}
   .zoom-gauge{margin:14px 0}
   .zoom-gauge .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
   .zoom-gauge .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}

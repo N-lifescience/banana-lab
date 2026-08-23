@@ -12,14 +12,24 @@ export const NODES = [
 ];
 
 /**
+ * 확대 뷰가 끌고 다니는 덮개 유리 조각에 쓸 색.
+ * UI 쪽에서 색을 새로 고르면 같은 물건이 두 화면에서 다른 색이 된다 — 여기서 한 번만 정한다.
+ */
+export const COVERSLIP_FILL = PALETTE.glass[0];
+export const COVERSLIP_INK = INK;
+
+/**
  * 시료 및 시약 반응에 따른 도말(smear) 채움 색상을 결정합니다.
  */
 export function smearFill(state = {}) {
-  if (!state.sample) return PALETTE.flesh[0];
+  // 시료를 바르지 않았을 때의 색은 쓰이지 않는다 (불투명도가 0 이다).
+  if (!state.sample) return PALETTE.flesh[1];
   const stain = state.stain;
   const reaction = state.reaction ?? (stain ? 1 : 0);
 
-  if (!stain) return PALETTE.flesh[0];
+  // 시약을 안 쓴 (가) 대조군. 밝은 flesh[0] 은 받침 유리 색(glass[0])과 거의 같아
+  // 발렸는지 안 발렸는지 화면에서 구분되지 않는다. 실제로도 옅지만 보이기는 해야 한다.
+  if (!stain) return PALETTE.flesh[1];
 
   if (stain === 'IKI' || stain === 'iodine') {
     if (reaction >= 0.7) return PALETTE.stainStarch[0];
@@ -44,7 +54,8 @@ export function smearOpacity(state = {}) {
   const thickness = typeof state.sample === 'object' && state.sample.thickness !== undefined
     ? state.sample.thickness
     : 0.5;
-  return clamp(0.35 + thickness * 0.55, 0.2, 1).toFixed(2);
+  // 얇게 발라도 발린 것은 보여야 한다. 두께 차이는 여전히 남는다 (0.60 ~ 0.96).
+  return clamp(0.55 + thickness * 0.45, 0.5, 1).toFixed(2);
 }
 
 /**
@@ -114,10 +125,12 @@ export function render(state = {}) {
   <!-- 시료 도말 (중앙) -->
   <path id="smear" d="M 180,140 C 168,145 165,155 175,162 C 185,168 215,166 228,158 C 238,150 232,138 218,136 C 202,134 190,136 180,140 Z" fill="${sFill}" fill-opacity="${sOpacity}"/>
 
-  <!-- 덮개유리 (커버글라스) -->
+  <!-- 덮개유리 (커버글라스)
+       유리는 비쳐야 한다. 불투명하게 두면 덮는 순간 시료가 통째로 사라져,
+       덮은 뒤에 일어나는 일(색 변화, 가장자리로 새는 용액)이 화면에서 보이지 않는다. -->
   <g id="coverslip" opacity="${csOpacity}" transform="${csTransform}">
-    <rect x="170" y="120" width="60" height="60" rx="2" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <path d="M 172,178 L 228,178 A 2,2 0 0 0 230,176 L 230,122 L 226,126 L 226,174 L 176,174 Z" fill="${PALETTE.glass[1]}"/>
+    <rect x="170" y="120" width="60" height="60" rx="2" fill="${PALETTE.glass[0]}" fill-opacity="0.3" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <path d="M 172,178 L 228,178 A 2,2 0 0 0 230,176 L 230,122 L 226,126 L 226,174 L 176,174 Z" fill="${PALETTE.glass[1]}" fill-opacity="0.55"/>
   </g>
 
   <!-- 기포 -->

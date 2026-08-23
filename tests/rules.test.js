@@ -20,6 +20,26 @@ function run(state, type, payload) {
   return reduce(state, { type, payload });
 }
 
+/**
+ * 모든 액션을 훑는 회귀 테스트에 쓰는 인자표.
+ *
+ * 두 곳에 따로 적어 뒀더니 액션을 하나 늘릴 때마다 한쪽만 고치고 다른 쪽이
+ * `state.slides[undefined]` 로 터졌다. 한 곳에서만 적는다 —
+ * 여기 없는 액션은 인자 없이도 돌아야 한다는 뜻이다.
+ */
+function fuzzPayloads(slide) {
+  return {
+    SMEAR: { slide, thickness: 0.3 }, FILL_DROPPER: { reagent: REAGENTS.IKI },
+    DROP: { slide, count: 1 }, TICK: { seconds: 1 },
+    PLACE_COVERSLIP: { slide, angleDeg: 45 }, LIFT_COVERSLIP: { slide },
+    RINSE_SLIDE: { slide }, MOUNT: { slide },
+    SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
+    FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
+    NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
+    MOVE_STAGE: { dx: 20, dy: 0 },
+  };
+}
+
 /** 시약을 떨어뜨린 슬라이드의 색 변화가 끝날 때까지 시간을 돌린다 (R-07) */
 function tickUntilReacted(state) {
   for (let i = 0; i < 10; i++) {
@@ -330,6 +350,64 @@ test('조리개를 닫으면 어두워진다 — 막지는 않는다', () => {
   assert.equal(r.state.microscope.diaphragm, 0.1);
 });
 
+test('덮개 유리는 다시 들어내고 덮을 수 있다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  // 수직으로 떨어뜨려 기포를 만든다
+  const bad = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 90 });
+  assert.equal(bad.tag, 'bubbles');
+  assert.ok(bad.state.slides.B.coverslip.bubbles > 0);
+
+  const lifted = run(bad.state, 'LIFT_COVERSLIP', { slide: 'B' });
+  assert.equal(lifted.outcome, 'ok');
+  assert.equal(lifted.state.slides.B.coverslip.placed, false);
+  assert.equal(lifted.state.slides.B.coverslip.bubbles, 0, '들어내면 기포도 함께 사라진다');
+  assert.equal(lifted.state.tools.forceps.holding, 'coverslip', '들어낸 것은 핀셋에 남는다');
+
+  const again = run(lifted.state, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(again.outcome, 'ok', '집으러 다시 갈 필요 없이 그대로 다시 덮는다');
+  assert.equal(again.state.slides.B.coverslip.bubbles, 0);
+
+  assert.equal(run(S0(), 'LIFT_COVERSLIP', { slide: 'A' }).outcome, 'happened',
+    '덮여 있지 않아도 막지 않는다');
+});
+
+test('핀셋이 비었을 때의 안내가 실제로 닿는 상황을 말한다', () => {
+  // 예전 문구는 "손으로 집으려 하니 미끄러집니다. 핀셋을 쓰세요" 였는데,
+  // 여기 닿는 유일한 길이 핀셋을 가져다 대는 것이라 앞뒤가 맞지 않았다.
+  const r = run(S0(), 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'forceps-empty');
+  assert.ok(!r.message.includes('손으로'), `아직 옛 문구다: ${r.message}`);
+});
+
+test('받침 유리를 씻으면 처음으로 돌아간다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.9 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
+  s = run(s, 'DROP', { slide: 'B', count: 3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  s = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 90 }).state;
+
+  const washed = run(s, 'RINSE_SLIDE', { slide: 'B' });
+  assert.equal(washed.outcome, 'happened');
+  const b = washed.state.slides.B;
+  assert.equal(b.sample, null);
+  assert.equal(b.stain, null);
+  assert.equal(b.drops, 0);
+  assert.equal(b.reactionT, 0);
+  assert.equal(b.coverslip.placed, false);
+  assert.equal(b.coverslip.bubbles, 0);
+  assert.equal(washed.state.slides.C.sample, null, '다른 받침 유리는 건드리지 않는다');
+
+  // 금이 간 유리는 씻어도 그대로다 — 막지는 않는다.
+  const cracked = { ...s, slides: { ...s.slides, C: { ...s.slides.C, cracked: true } } };
+  const r = run(cracked, 'RINSE_SLIDE', { slide: 'C' });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.state.slides.C.cracked, true);
+});
+
 test('재물대에 잘못 올린 슬라이드는 되돌리기를 쓰지 않고 내릴 수 있다', () => {
   let s = run(S0(), 'MOUNT', { slide: 'B' }).state;
   assert.equal(s.microscope.stage, 'B');
@@ -507,15 +585,7 @@ test('하드 게이트는 두 종류뿐이다', () => {
   s = run(s, 'COARSE_FOCUS', { delta: 0.4 }).state;
   states.push(s);
 
-  const payloads = {
-    SMEAR: { slide: 'B' }, FILL_DROPPER: { reagent: REAGENTS.IKI },
-    DROP: { slide: 'B', count: 1 }, TICK: { seconds: 1 },
-    PLACE_COVERSLIP: { slide: 'B', angleDeg: 70 }, MOUNT: { slide: 'B' },
-    SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
-    FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.1 },
-    NOTE_VIOLATION: { kind: 'cap-left-open' },
-    SAVE_NOTE: { step: '3b', text: '관찰 기록' },
-  };
+  const payloads = { ...fuzzPayloads('B'), PLACE_COVERSLIP: { slide: 'B', angleDeg: 70 } };
 
   const allowed = new Set(Object.values(BLOCKING_REASONS));
   for (const st of states) {
@@ -533,15 +603,7 @@ test('방울이 있는 슬라이드는 반드시 시약이 정해져 있다', ()
   // 시야 렌더러가 이 불변식에 기대고 있다. (가) 대조군은 방울이 0개인 한 가지 상태뿐이라
   // "대조군에 두 방울" 같은 조합은 존재하지 않는다.
   // 이게 깨지면 시약 없이 염색된 시야가 나올 수 있다.
-  const payloads = {
-    SMEAR: { slide: 'A', thickness: 0.3 }, FILL_DROPPER: { reagent: REAGENTS.IKI },
-    DROP: { slide: 'A', count: 1 }, TICK: { seconds: 1 },
-    PLACE_COVERSLIP: { slide: 'A', angleDeg: 45 }, MOUNT: { slide: 'A' },
-    SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
-    FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
-    NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
-    MOVE_STAGE: { dx: 20, dy: 0 },
-  };
+  const payloads = fuzzPayloads('A');
   const types = Object.keys(ACTIONS);
   // 시드로 순서를 정해 결정적으로 훑는다. Math.random() 을 쓰면 실패가 재현되지 않는다.
   let s = S0();

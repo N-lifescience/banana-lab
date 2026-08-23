@@ -76,12 +76,6 @@ const SMEAR_FULL_MM = 700;
 const SMEAR_MIN = 0.12;
 const SMEAR_MAX = 0.9;
 
-/**
- * 손에 들고 쓰는 도구. 대상에 놓아 조작을 마치면 제자리(선반)로 돌아온다.
- * 그러지 않으면 대상 위에 그대로 남아, 나중에 그 대상(슬라이드 등)을 다시 누를 수 없게 가린다.
- */
-const HAND_TOOLS = new Set(['banana', 'dropper', 'forceps']);
-
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }
@@ -137,26 +131,28 @@ export function dropTable(store) {
     },
     dropper: {
       bottle: (item, target) => store.dispatch('FILL_DROPPER', { reagent: target.reagent }),
-      slide: (item, target) => {
-        // T07 1단계 — 변인 조작을 고정해 둔다: 방울 수 선택 UI 를 따로 내주는 대신,
-        // 한 번의 조작이 정확한 두 방울이 되게 한다. 그래도 반복해서 놓으면 넘칠 수 있다 — 막지 않는다.
-        const count = store.getState().session.level === 1 ? 2 : 1;
-        store.dispatch('DROP', { slide: target.slide, count });
-      },
+      // 한 번 가져다 대면 한 방울이다. 두 방울을 놓으려면 두 번 한다.
+      // 예전에는 1단계에서 한 번에 두 방울이 되게 해 뒀는데, 그러면 "두 방울" 이라는
+      // 이 실험의 변인이 학생 손을 떠난다 — 몇 방울인지 세어 볼 일 자체가 없어진다.
+      slide: (item, target) => store.dispatch('DROP', { slide: target.slide, count: 1 }),
       waste: () => store.dispatch('RINSE_DROPPER', {}),
     },
     forceps: {
-      coverslip: (item, target, d) => {
-        const result = store.dispatch('PICK_COVERSLIP', {});
-        if (result.state.tools.forceps.holding === 'coverslip') d.onPickCoverslip(target.id);
-      },
+      coverslip: () => store.dispatch('PICK_COVERSLIP', {}),
       slide: (item, target, d) => {
+        const st = store.getState();
+        // 빈 핀셋을 이미 덮인 받침 유리에 대는 것은 "덮기" 가 아니라 "들어내기" 다.
+        // (어떤 종류끼리 무슨 일이 일어나는가는 위 표가 정하고, 그 안에서 무엇을 할지는
+        //  상태를 봐도 된다 — 걸러 내는 것이 아니라 고르는 것이기 때문이다.)
+        if (st.slides[target.slide].coverslip.placed && st.tools.forceps.holding !== 'coverslip') {
+          store.dispatch('LIFT_COVERSLIP', { slide: target.slide });
+          return;
+        }
         // 마지막 이동 방향으로 놓는 각도를 정한다. 대각선으로 내려놓을수록 45°에 가깝다.
         const angleDeg = clamp(
           (Math.atan2(Math.abs(d.lastDy), Math.abs(d.lastDx)) * 180) / Math.PI, 0, 90
         );
-        const result = store.dispatch('PLACE_COVERSLIP', { slide: target.slide, angleDeg });
-        if (result.state.tools.forceps.holding !== 'coverslip') d.onUseCoverslip();
+        store.dispatch('PLACE_COVERSLIP', { slide: target.slide, angleDeg });
       },
     },
     slide: {
@@ -167,6 +163,7 @@ export function dropTable(store) {
           store.dispatch('SET_OBJECTIVE', { objective: 40 });
         }
       },
+      dish: (item) => store.dispatch('RINSE_SLIDE', { slide: item.slide }),
     },
   };
 }
@@ -209,7 +206,7 @@ export function createBench(root, store, { onOpenZoom }) {
     <div class="bench-bar">
       <button type="button" id="undo">${UI.undo.label}</button>
       <span id="undo-left"></span>
-      <button type="button" id="unmount" hidden>${UI.bench.unmount}</button>
+      <button type="button" id="unmount" hidden></button>
     </div>
     <div class="bench-stage">
       <div class="bench-bg" aria-hidden="true"></div>
@@ -230,12 +227,7 @@ export function createBench(root, store, { onOpenZoom }) {
 
   const items = defaultItems();
   for (const item of items) { item.homeX = item.x; item.homeY = item.y; }
-  let pickedCoverslipId = null;
   let drag = null;
-
-  function findItem(id) {
-    return items.find((it) => it.id === id);
-  }
 
   function slideRenderState(slideId) {
     const s = store.getState().slides[slideId];
@@ -276,11 +268,14 @@ export function createBench(root, store, { onOpenZoom }) {
     }
   }
 
+  /**
+   * 재물대에 올라간 받침 유리는 실험대에서 사라진다 — 그 자리에 있으니까.
+   *
+   * 덮개 유리는 사라지지 않는다. 한 상자에서 계속 꺼내 쓰는 물건이고,
+   * 석 장을 세고 있다가 잘못 덮은 뒤 씻고 다시 하면 곧바로 바닥나 막다른 길이 된다.
+   */
   function isHidden(item) {
-    const st = store.getState();
-    if (item.kind === 'slide') return st.microscope.stage === item.slide;
-    if (item.kind === 'coverslip') return Boolean(item.used) || item.id === pickedCoverslipId;
-    return false;
+    return item.kind === 'slide' && store.getState().microscope.stage === item.slide;
   }
 
   const elFor = (id) => layer.querySelector(`[data-id="${id}"]`);
@@ -462,20 +457,14 @@ export function createBench(root, store, { onOpenZoom }) {
     // 여기서 놓쳐 버리면 계량기가 다 찼는데도 아무 일이 안 일어난다. 문지른 것은 문지른 것이다.
     if (!target && drag.smearMm > 0 && drag.smearTarget) target = drag.smearTarget;
     const run = target ? DROPS[item.kind]?.[target.kind] : null;
-    if (run) {
-      run(item, target, {
-        smearMm: drag.smearMm, lastDx: drag.lastDx, lastDy: drag.lastDy,
-        onPickCoverslip: (id) => { pickedCoverslipId = id; },
-        onUseCoverslip: () => {
-          if (pickedCoverslipId) {
-            const c = findItem(pickedCoverslipId);
-            if (c) c.used = true;
-            pickedCoverslipId = null;
-          }
-        },
-      });
-    }
-    if (target && HAND_TOOLS.has(item.kind)) {
+    if (run) run(item, target, { smearMm: drag.smearMm, lastDx: drag.lastDx, lastDy: drag.lastDy });
+
+    // 쓴 물건은 제자리로 돌아간다. 실험대에 남는 것은 재물대에 올라가 사라진 받침 유리뿐이다.
+    //
+    // 놓인 자리는 결과에 아무 영향을 주지 않는데, 물건이 놓인 채로 남으면 자리가 뜻을 갖는 것처럼
+    // 보인다 — 현미경 위에 얹힌 받침 유리는 재물대에 올라간 것처럼 보이고(실제로는 아니다),
+    // 실험 접시에 얹힌 받침 유리는 접시를 가려 다음 조작을 막는다.
+    if (!isHidden(item)) {
       item.x = item.homeX;
       item.y = item.homeY;
     }
@@ -536,6 +525,9 @@ export function createBench(root, store, { onOpenZoom }) {
     root.querySelector('#undo-left').textContent =
       undosLeft === Infinity ? UI.undo.unlimited : UI.undo.left(undosLeft);
     unmountBtn.hidden = !st.microscope.stage;
+    if (st.microscope.stage) {
+      unmountBtn.textContent = UI.bench.unmount(UI.slideShort[st.microscope.stage]);
+    }
   }
 
   // 드래그 도중에는 다시 그리지 않는다. TICK 처럼 사용자와 무관하게 들어오는 상태 변경이

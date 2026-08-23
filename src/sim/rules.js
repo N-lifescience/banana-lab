@@ -195,7 +195,9 @@ export const ACTIONS = {
   PLACE_COVERSLIP(state, { slide, angleDeg = 45 }) {
     const s = state.slides[slide];
     if (state.tools.forceps.holding !== 'coverslip') {
-      return happened(state, '손으로 집으려 하니 덮개 유리가 미끄러집니다. 핀셋을 쓰세요.');
+      // 예전 문구는 "손으로 집으려 하니 미끄러집니다. 핀셋을 쓰세요" 였는데,
+      // 여기까지 오는 유일한 길이 **핀셋을 가져다 대는 것**이라 닿을 수 없는 말이었다.
+      return happened(state, '핀셋이 비어 있습니다. 덮개 유리를 먼저 집으세요.', 'forceps-empty');
     }
     const bubbles = bubblesFromAngle(angleDeg);
     const next = withTools(
@@ -226,7 +228,53 @@ export const ACTIONS = {
     if (!s.coverslip.placed) {
       return happened(next, '덮개 유리 없이 올렸습니다. 고배율로 올리면 대물렌즈가 시료에 닿습니다.', 'no-coverslip');
     }
+    // 재물대에는 한 장만 올라간다. 바꿔 올려도 토스트를 띄우지 않는다 —
+    // 세 장을 차례로 올려 보는 것이 이 실험의 정상 경로이고, 거기에 알림을 달면
+    // 제대로 하고 있을 때마다 경고가 뜨는 꼴이 된다.
+    // 무엇이 올라가 있는지는 실험대의 내리기 버튼이 이름으로 말한다 (bench.js).
     return ok(next);
+  },
+
+  /**
+   * 덮은 덮개 유리를 핀셋으로 다시 들어낸다.
+   *
+   * 기포가 잔뜩 생겼거나 덮는 순서를 틀렸을 때 되돌아갈 길이다.
+   * 실제 실험에서도 들어내고 다시 덮는다 — 막을 이유가 없다.
+   * 들어낸 덮개 유리는 핀셋에 남으므로 그대로 다시 덮을 수 있다.
+   */
+  LIFT_COVERSLIP(state, { slide }) {
+    const s = state.slides[slide];
+    if (!s.coverslip.placed) {
+      return happened(state, '이 받침 유리에는 덮개 유리가 없습니다.');
+    }
+    const next = withTools(
+      withSlide(state, slide, { coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 } }),
+      { forceps: { holding: 'coverslip' } }
+    );
+    return ok(next);
+  },
+
+  /**
+   * 실험 접시에서 받침 유리를 씻는다.
+   *
+   * 시료를 너무 두껍게 바르거나 시약을 엉뚱한 데 떨어뜨렸을 때 처음으로 돌아가는 길이다.
+   * 이것이 없으면 받침 유리 석 장이 전부인 실험에서 한 번의 실수가 곧 끝이 된다 —
+   * 그건 "강제하지 말고 결과로 답한다" 가 아니라 그냥 막다른 길이다.
+   * 금이 간 유리도 씻는 것 자체는 막지 않는다 — 씻겨도 금은 그대로 남는다.
+   * 여기에 하드 게이트를 하나 더 다는 것보다, 씻고 나서도 여전히 못 쓴다는 것을
+   * 눈으로 보는 편이 이 프로젝트의 방식에 맞다.
+   */
+  RINSE_SLIDE(state, { slide }) {
+    const s = state.slides[slide];
+    if (s.cracked) {
+      return happened(state, '씻어도 금은 그대로입니다. 이 받침 유리는 쓸 수 없습니다.', 'cracked');
+    }
+    const next = withSlide(state, slide, {
+      sample: null, stain: null, drops: 0, reactionT: 0,
+      coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 },
+      contaminated: false, lensTouched: false,
+    });
+    return happened(next, '받침 유리를 씻었습니다. 처음부터 다시 만들 수 있습니다.', 'slide-rinsed');
   },
 
   /**
