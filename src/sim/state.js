@@ -25,6 +25,15 @@ export function initialSlide(id) {
   };
 }
 
+/**
+ * 난이도별 되돌리기 횟수.
+ * 1단계는 마음껏 시도하게 두고, 올라갈수록 한 번의 조작을 무겁게 만든다.
+ */
+export const UNDO_LIMITS = { 1: Infinity, 2: 3, 3: 1 };
+
+/** 되돌리기용 상태 스냅샷 보관 개수 */
+export const HISTORY_LIMIT = 20;
+
 export function initialState(level = 1, seed = 20260823) {
   return {
     slides: Object.fromEntries(
@@ -51,7 +60,10 @@ export function initialState(level = 1, seed = 20260823) {
       notes: {},          // { '3b': '관찰 기록...' }
       captures: [],       // { slide, objective, drops, reagent, seed, quality, focusErr, bubbles }
       violations: [],     // 안전 규칙 위반 기록. 감점하지 않고 보여 주기만 한다.
-      log: [],            // { at, action, outcome } — 되돌아보기용
+      log: [],            // { at, action, outcome, tag } — 되돌아보기용. at 은 순번이다
+      // 되돌리기용. 세션 안에서만 쓴다 — captures 나 제출 데이터에 넣지 않는다.
+      history: [],
+      undosLeft: UNDO_LIMITS[level] ?? Infinity,
     },
   };
 }

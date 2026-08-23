@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git status 2>&1 | head -5; echo \\\"---\\\"; git rev-parse --is-inside-work-tree 2>&1\",\"description\":\"Check if git repo already exists\"}",
-  "error": "Exit code 128\nfatal: not a git repository (or any of the parent directories): .git\n---\nfatal: not a git repository (or any of the parent directories): .git",
-  "timestamp": "2026-08-23T07:33:16.690Z",
-  "retry_count": 1
+  "tool_name": "mcp__claude-in-chrome__computer",
+  "tool_input_preview": "{\"action\":\"screenshot\",\"tabId\":489803046}",
+  "error": "Error capturing screenshot: CDP sendCommand \"Page.captureScreenshot\" timed out after 30000ms on tab 489803046. The renderer may be frozen or unresponsive.",
+  "timestamp": "2026-08-23T07:36:45.008Z",
+  "retry_count": 2
 }

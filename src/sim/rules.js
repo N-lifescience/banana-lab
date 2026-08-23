@@ -13,7 +13,7 @@
  * docs/04-interaction-rules.md 참조.
  */
 
-import { REAGENTS, coverage, excess, focusError, brightness, isTooThick } from './state.js';
+import { REAGENTS, coverage, excess, focusError, brightness, isTooThick, HISTORY_LIMIT } from './state.js';
 import { focusTolerance } from './optics.js';
 
 /** 하드 게이트가 허용되는 단 두 가지 이유 */
@@ -40,6 +40,31 @@ function withScope(state, patch) {
 }
 function withTools(state, patch) {
   return { ...state, tools: { ...state.tools, ...patch } };
+}
+
+/**
+ * 되돌리기용 스냅샷.
+ * history 를 비워서 담는다 — 스냅샷 안에 또 history 가 들어가면 지수적으로 커진다.
+ */
+function snapshot(state) {
+  return { ...state, session: { ...state.session, history: [] } };
+}
+
+/**
+ * 안전 수칙 액션을 만든다.
+ * 마개·손·폐액은 시야에 나타나지 않으므로 결과로 말할 수 없다.
+ * 늦게라도 지키면 위반 기록에서 지운다. 감점은 애초에 없다. docs/04 「안전 규칙만은 예외」 참조.
+ */
+function safetyAction(kind, message) {
+  return function (state) {
+    const { violations } = state.session;
+    if (!violations.includes(kind)) return ok(state);
+    const next = {
+      ...state,
+      session: { ...state.session, violations: violations.filter((v) => v !== kind) },
+    };
+    return happened(next, message, 'safety-recovered');
+  };
 }
 
 /**
@@ -278,6 +303,48 @@ export const ACTIONS = {
       session: { ...state.session, violations: [...state.session.violations, kind] },
     });
   },
+
+  /** 손을 씻는다 */
+  WASH_HANDS: safetyAction('hands-unwashed', '늦었지만 손을 씻었습니다. 위반 기록에서 지웠습니다.'),
+
+  /** 시약병 마개를 닫는다 */
+  CLOSE_CAP: safetyAction('cap-left-open', '늦었지만 마개를 닫았습니다. 위반 기록에서 지웠습니다.'),
+
+  /** 폐액을 처리한다 */
+  DISPOSE_WASTE: safetyAction('waste-left', '늦었지만 폐액을 처리했습니다. 위반 기록에서 지웠습니다.'),
+
+  /** 세부 단계별 관찰 기록 */
+  SAVE_NOTE(state, { step, text = '' }) {
+    if (!step) return happened(state, '어느 단계의 기록인지 알 수 없어 저장하지 않았습니다.');
+    return ok({
+      ...state,
+      session: { ...state.session, notes: { ...state.session.notes, [step]: text } },
+    });
+  },
+
+  /**
+   * 되돌리기. 난이도가 올라갈수록 횟수가 줄어든다 (1단계 무제한 · 2단계 3회 · 3단계 1회).
+   * 횟수를 다 썼거나 되돌릴 것이 없어도 막지 않는다 — 아무 일도 일어나지 않았다고 말할 뿐이다.
+   */
+  UNDO(state) {
+    const { history, undosLeft, log } = state.session;
+    if (undosLeft <= 0) {
+      return happened(state, '되돌릴 수 있는 횟수를 다 썼습니다.', 'undo-exhausted');
+    }
+    if (history.length === 0) {
+      return happened(state, '되돌릴 것이 없습니다.', 'undo-empty');
+    }
+    const prev = history[history.length - 1];
+    return happened({
+      ...prev,
+      session: {
+        ...prev.session,
+        history: history.slice(0, -1),
+        undosLeft: undosLeft - 1,   // Infinity - 1 은 여전히 Infinity 다
+        log,                        // 로그는 되돌리지 않는다. 되돌아보기용 기록이기 때문이다
+      },
+    }, '한 단계 되돌렸습니다.', 'undo');
+  },
 };
 
 /** 단일 진입점. 부수효과 없이 새 상태를 돌려준다. */
@@ -285,12 +352,23 @@ export function reduce(state, action) {
   const fn = ACTIONS[action.type];
   if (!fn) throw new Error(`알 수 없는 액션: ${action.type}`);
   const result = fn(state, action.payload ?? {});
+  const session = result.state.session;
+
+  // UNDO 는 스스로 history 를 되감으므로 여기서 다시 쌓지 않는다.
+  // 상태를 바꾸지 못한 액션도 쌓지 않는다 — 되돌리기가 헛돌게 된다.
+  const changed = result.state !== state;
+  const history = action.type === 'UNDO' || !changed
+    ? session.history
+    : [...session.history, snapshot(state)].slice(-HISTORY_LIMIT);
+
   const logged = {
     ...result.state,
     session: {
-      ...result.state.session,
-      log: [...result.state.session.log, {
-        action: action.type, outcome: result.outcome, tag: result.tag ?? null,
+      ...session,
+      history,
+      // at 은 순번이다. Date.now() 를 쓰면 테스트가 비결정적이 된다.
+      log: [...session.log, {
+        at: session.log.length, action: action.type, outcome: result.outcome, tag: result.tag ?? null,
       }],
     },
   };

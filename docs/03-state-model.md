@@ -42,8 +42,13 @@ session
   notes      { '3b': '관찰 기록…' }
   captures   [ { slide, objective, reagent, drops, seed, focusErr, bubbles, … } ]
   violations [ 'cap-left-open', … ]   # 감점하지 않고 자기 평가에 보여만 준다
-  log        [ { action, outcome, tag } ]
+  log        [ { at, action, outcome, tag } ]   # at 은 순번. Date.now() 를 쓰면 테스트가 비결정적이 된다
+  history    [ state, … ]             # 되돌리기용 스냅샷, 최대 20개
+  undosLeft  int                      # 1단계 Infinity · 2단계 3 · 3단계 1
 ```
+
+`history` 는 **세션 안에서만 쓴다.** `captures` 나 제출 데이터에 절대 넣지 않는다.
+스냅샷은 `history` 를 비운 채로 담는다 — 안 그러면 상태가 지수적으로 커진다.
 
 ## 파생값 — 저장하지 않는다
 
