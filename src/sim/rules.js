@@ -22,7 +22,7 @@ export const BLOCKING_REASONS = {
   BROKEN: 'broken',           // 기구가 파손돼 재제작이 필요함
 };
 
-const ok = (state) => ({ state, outcome: 'ok', message: null });
+const ok = (state) => ({ state, outcome: 'ok', message: null, tag: null });
 const happened = (state, message, tag) => ({ state, outcome: 'happened', message, tag: tag ?? null });
 const blocked = (state, message, reason) => {
   if (!Object.values(BLOCKING_REASONS).includes(reason)) {
@@ -184,7 +184,9 @@ export const ACTIONS = {
     if (bubbles > 0) {
       return happened(next, `기포가 ${bubbles}개 생겼습니다. 45° 기울여 한쪽 끝부터 천천히 내려놓으면 생기지 않습니다.`, 'bubbles');
     }
-    if (s.reactionT < 1) {
+    // 시약을 떨어뜨린 슬라이드만 색이 변한다.
+    // (가) 대조군은 reactionT 가 영원히 0이므로 stain 을 함께 보지 않으면 늘 이르게 덮은 셈이 된다.
+    if (s.stain && s.reactionT < 1) {
       return happened(next, '색 변화가 끝나기 전에 덮었습니다. 반응은 덮개 유리 아래에서 계속됩니다.', 'early-cover');
     }
     return ok(next);

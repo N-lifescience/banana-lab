@@ -7,7 +7,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState, coverage, excess, isFloating, REAGENTS } from '../src/sim/state.js';
+import {
+  initialState, coverage, excess, isFloating, fieldParams,
+  REAGENTS, SLIDE_IDS, HISTORY_LIMIT,
+} from '../src/sim/state.js';
 import { reduce, ACTIONS, bubblesFromAngle, BLOCKING_REASONS } from '../src/sim/rules.js';
 import { observability } from '../src/sim/quality.js';
 
@@ -15,6 +18,16 @@ const S0 = () => initialState(1, 12345);
 
 function run(state, type, payload) {
   return reduce(state, { type, payload });
+}
+
+/** 시약을 떨어뜨린 슬라이드의 색 변화가 끝날 때까지 시간을 돌린다 (R-07) */
+function tickUntilReacted(state) {
+  for (let i = 0; i < 10; i++) {
+    const pending = SLIDE_IDS.some((id) => state.slides[id].stain && state.slides[id].reactionT < 1);
+    if (!pending) return state;
+    state = run(state, 'TICK', { seconds: 1 }).state;
+  }
+  throw new Error('색 변화가 끝나지 않았습니다. TICK 이 reactionT 를 올리지 못하고 있습니다.');
 }
 
 /* ---------------- 방울 수 반응 곡선 ---------------- */
@@ -157,6 +170,277 @@ test('두 방울·초점·400배가 갖춰지면 100점, 조건이 나빠지면 
   assert.equal(lowMag.worst, 'magnification', '무엇부터 고쳐야 하는지 알려 줘야 한다');
 });
 
+/* ---------------- 정상 경로 통합 ---------------- */
+
+test('정상 경로: 껍질부터 캡처 세 장까지 태그 하나 없이 끝난다', () => {
+  let s = S0();
+  const step = (type, payload) => {
+    const r = run(s, type, payload);
+    assert.equal(r.outcome, 'ok', `${type} 에서 정상 경로를 벗어났습니다: ${r.message}`);
+    s = r.state;
+    return r;
+  };
+
+  step('PEEL_BANANA');
+  for (const id of SLIDE_IDS) step('SMEAR', { slide: id, thickness: 0.3 });
+
+  // (나) 아이오딘 두 방울. 씻고 나서 (다) 수단 Ⅲ 두 방울 — 안 씻으면 R-06 이 돈다
+  step('FILL_DROPPER', { reagent: REAGENTS.IKI });
+  step('DROP', { slide: 'B', count: 2 });
+  step('RINSE_DROPPER');
+  step('FILL_DROPPER', { reagent: REAGENTS.SUDAN });
+  step('DROP', { slide: 'C', count: 2 });
+
+  // R-07 색 변화를 기다린다. 건너뛰면 PLACE_COVERSLIP 이 early-cover 를 붙인다
+  s = tickUntilReacted(s);
+
+  for (const id of SLIDE_IDS) {
+    step('PICK_COVERSLIP');
+    step('PLACE_COVERSLIP', { slide: id, angleDeg: 45 });
+  }
+
+  // 슬라이드를 바꿔 가며 저배율 초점 → 400배 → 기록. 세 번 올려야 세 장이 남는다
+  const captureResults = SLIDE_IDS.map((id) => {
+    step('SET_OBJECTIVE', { objective: 4 });
+    step('MOUNT', { slide: id });
+    step('COARSE_FOCUS', { delta: 0 });
+    step('SET_OBJECTIVE', { objective: 40 });
+    return step('CAPTURE');
+  });
+
+  assert.equal(s.session.captures.length, 3);
+  assert.deepEqual(s.session.captures.map((c) => c.slide), ['A', 'B', 'C']);
+  for (const r of captureResults) {
+    assert.equal(r.outcome, 'ok');
+    assert.equal(r.tag, null, '정상 경로에서 태그가 붙으면 그건 정상 경로가 아니다');
+  }
+
+  const tagged = s.session.log.filter((e) => e.tag !== null);
+  assert.deepEqual(tagged, [], '정상 경로 전체에 태그가 하나라도 붙으면 안 된다');
+  assert.deepEqual(s.session.log.map((e) => e.at), s.session.log.map((_, i) => i));
+});
+
+test('되돌리기 기록은 제출 데이터에 들어가지 않는다', () => {
+  let s = S0();
+  s = run(s, 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  s = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 }).state;
+  s = run(s, 'MOUNT', { slide: 'B' }).state;
+  s = run(s, 'CAPTURE').state;
+
+  assert.ok(s.session.history.length > 0, '세션 안에는 남아 있어야 한다');
+  assert.ok(s.session.captures.every((c) => !('history' in c)));
+  assert.ok(!('history' in fieldParams(s, 'B')));
+});
+
+/* ---------------- 실패 경로 — 전부 진행되고 태그로만 답한다 ---------------- */
+
+test('두껍게 문지르면 진행되고 too-thick 이 붙는다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  const r = run(s, 'SMEAR', { slide: 'B', thickness: 0.9 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'too-thick');
+  assert.equal(r.state.slides.B.sample.thickness, 0.9, '막지 말고 실제로 발라야 한다');
+});
+
+test('껍질을 안 벗기고 문지르면 과육이 묻지 않는다', () => {
+  const r = run(S0(), 'SMEAR', { slide: 'B', thickness: 0.3 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.state.slides.B.sample, null);
+});
+
+test('방울이 많으면 excess, 더 많으면 overflow 다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
+
+  const three = run(s, 'DROP', { slide: 'B', count: 3 });
+  assert.equal(three.outcome, 'happened');
+  assert.equal(three.tag, 'excess');
+
+  const five = run(s, 'DROP', { slide: 'B', count: 5 });
+  assert.equal(five.outcome, 'happened');
+  assert.equal(five.tag, 'overflow');
+  assert.equal(isFloating(five.state.slides.B), true, '넘치면 덮개 유리가 뜬다');
+});
+
+test('빈 스포이트로는 아무것도 떨어지지 않는다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  const r = run(s, 'DROP', { slide: 'B', count: 2 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.state.slides.B.drops, 0);
+});
+
+test('덮개 유리를 덮은 뒤 떨어뜨리면 가장자리로 스며든다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  s = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
+  const r = run(s, 'DROP', { slide: 'B', count: 2 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'edge-seep');
+});
+
+test('색 변화 전에 덮으면 early-cover, 대조군은 붙지 않는다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'SMEAR', { slide: 'A', thickness: 0.3 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
+  s = run(s, 'DROP', { slide: 'B', count: 2 }).state;
+
+  s = run(s, 'PICK_COVERSLIP').state;
+  const early = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(early.outcome, 'happened');
+  assert.equal(early.tag, 'early-cover');
+  assert.equal(early.state.slides.B.coverslip.placed, true, '막지 말고 덮어야 한다');
+
+  // (가) 대조군은 시약이 없어 색이 변할 일이 없다. reactionT 만 보면 늘 이르게 덮은 셈이 된다
+  s = run(s, 'PICK_COVERSLIP').state;
+  const control = run(s, 'PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 });
+  assert.equal(control.outcome, 'ok');
+  assert.equal(control.tag, null);
+});
+
+test('덮개 유리를 수직으로 떨어뜨리면 기포가 생긴다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  const r = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 90 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'bubbles');
+  assert.equal(r.state.slides.B.coverslip.bubbles, bubblesFromAngle(90));
+});
+
+test('핀셋 없이 덮으려 하면 미끄러진다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  const r = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.state.slides.B.coverslip.placed, false);
+});
+
+test('조리개를 닫으면 어두워진다 — 막지는 않는다', () => {
+  let s = run(S0(), 'SET_OBJECTIVE', { objective: 40 }).state;
+  const r = run(s, 'SET_DIAPHRAGM', { value: 0.1 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'dark');
+  assert.equal(r.state.microscope.diaphragm, 0.1);
+});
+
+/* ---------------- 안전 수칙 · 기록 ---------------- */
+
+test('안전 수칙은 감점하지 않고, 늦게라도 지키면 기록에서 지운다', () => {
+  let s = run(S0(), 'NOTE_VIOLATION', { kind: 'cap-left-open' }).state;
+  s = run(s, 'NOTE_VIOLATION', { kind: 'hands-unwashed' }).state;
+  assert.deepEqual(s.session.violations, ['cap-left-open', 'hands-unwashed']);
+
+  const closed = run(s, 'CLOSE_CAP');
+  assert.equal(closed.tag, 'safety-recovered');
+  assert.deepEqual(closed.state.session.violations, ['hands-unwashed']);
+
+  const washed = run(closed.state, 'WASH_HANDS');
+  assert.deepEqual(washed.state.session.violations, []);
+
+  assert.equal(run(washed.state, 'DISPOSE_WASTE').outcome, 'ok', '지울 위반이 없으면 조용히 넘어간다');
+});
+
+test('단계별 관찰 기록이 남는다', () => {
+  const r = run(S0(), 'SAVE_NOTE', { step: '3b', text: '청람색 알갱이가 보인다' });
+  assert.equal(r.outcome, 'ok');
+  assert.equal(r.state.session.notes['3b'], '청람색 알갱이가 보인다');
+
+  const noStep = run(S0(), 'SAVE_NOTE', { text: '어느 단계인지 모른다' });
+  assert.equal(noStep.outcome, 'happened');
+  assert.deepEqual(noStep.state.session.notes, {});
+});
+
+test('로그에는 시각이 아니라 순번이 붙는다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'TICK', { seconds: 1 }).state;
+  s = run(s, 'UNDO').state;
+  assert.deepEqual(s.session.log.map((e) => e.at), [0, 1, 2]);
+  assert.deepEqual(s.session.log.map((e) => e.action), ['PEEL_BANANA', 'TICK', 'UNDO']);
+});
+
+/* ---------------- 되돌리기 ---------------- */
+
+test('난이도가 올라갈수록 되돌릴 수 있는 횟수가 줄어든다', () => {
+  assert.equal(initialState(1).session.undosLeft, Infinity);
+  assert.equal(initialState(2).session.undosLeft, 3);
+  assert.equal(initialState(3).session.undosLeft, 1);
+});
+
+test('되돌리면 직전 상태로 돌아가고, 로그는 되돌리지 않는다', () => {
+  let s = initialState(2, 12345);
+  s = run(s, 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+
+  const r = run(s, 'UNDO');
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.tag, 'undo');
+  assert.equal(r.state.slides.B.sample, null, '도포 이전으로 돌아간다');
+  assert.equal(r.state.tools.banana.peeled, true, '그보다 앞선 조작은 남는다');
+  assert.equal(r.state.session.undosLeft, 2);
+  assert.equal(r.state.session.log.at(-1).action, 'UNDO', '되돌아보기용 기록은 남아야 한다');
+  assert.equal(r.state.session.log.length, 3);
+});
+
+test('1단계는 되돌리기가 무제한이다', () => {
+  let s = run(initialState(1, 12345), 'PEEL_BANANA').state;
+  for (let i = 0; i < 5; i++) {
+    s = run(s, 'SMEAR', { slide: 'B', thickness: 0.2 + i * 0.05 }).state;
+  }
+  for (let i = 0; i < 5; i++) {
+    const r = run(s, 'UNDO');
+    assert.equal(r.tag, 'undo', `${i + 1}번째 되돌리기가 실패했습니다`);
+    s = r.state;
+  }
+  assert.equal(s.session.undosLeft, Infinity);
+  assert.equal(s.slides.B.sample, null, '다섯 번 되돌리면 도포 이전이다');
+});
+
+test('되돌리기를 다 써도 막지 않고 알려 준다', () => {
+  let s = run(initialState(3, 12345), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+
+  const first = run(s, 'UNDO');
+  assert.equal(first.tag, 'undo');
+  assert.equal(first.state.session.undosLeft, 0);
+
+  const second = run(first.state, 'UNDO');
+  assert.notEqual(second.outcome, 'blocked', '되돌리기 소진은 하드 게이트가 아니다');
+  assert.equal(second.tag, 'undo-exhausted');
+  assert.equal(second.state.tools.banana.peeled, true, '상태는 그대로 둔다');
+});
+
+test('되돌릴 것이 없어도 막지 않는다', () => {
+  const r = run(S0(), 'UNDO');
+  assert.notEqual(r.outcome, 'blocked');
+  assert.equal(r.tag, 'undo-empty');
+});
+
+test('아무것도 바꾸지 못한 조작은 되돌리기 기록에 쌓이지 않는다', () => {
+  // 껍질을 안 벗기고 문질렀다 — 진행은 됐지만 상태는 그대로다
+  const r = run(S0(), 'SMEAR', { slide: 'B', thickness: 0.3 });
+  assert.equal(r.outcome, 'happened');
+  assert.equal(r.state.session.history.length, 0, '되돌리기가 헛돌면 안 된다');
+});
+
+test('되돌리기 기록은 20개까지만 쌓이고, 스냅샷이 스냅샷을 품지 않는다', () => {
+  let s = run(initialState(1, 12345), 'PEEL_BANANA').state;
+  for (let i = 0; i < 30; i++) {
+    s = run(s, 'SMEAR', { slide: 'B', thickness: 0.1 + i * 0.01 }).state;
+  }
+  assert.equal(s.session.history.length, HISTORY_LIMIT);
+  assert.ok(
+    s.session.history.every((h) => h.session.history.length === 0),
+    '스냅샷이 스냅샷을 품으면 상태가 지수적으로 커진다'
+  );
+});
+
 /* ---------------- 설계 원칙 회귀 테스트 ---------------- */
 
 test('하드 게이트는 두 종류뿐이다', () => {
@@ -179,6 +463,7 @@ test('하드 게이트는 두 종류뿐이다', () => {
     SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
     FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.1 },
     NOTE_VIOLATION: { kind: 'cap-left-open' },
+    SAVE_NOTE: { step: '3b', text: '관찰 기록' },
   };
 
   const allowed = new Set(Object.values(BLOCKING_REASONS));
