@@ -91,6 +91,23 @@ export function rng(seed) {
   };
 }
 
+/**
+ * 위치 해시. `(시드, 정수들)` 의 순수 함수로 0~1 사이 실수를 돌려준다.
+ *
+ * rng() 는 부르는 순서에 값이 매여 있어서, 그리는 순서가 바뀌면 표본이 통째로 달라진다.
+ * 시야를 옮기려면 "이 셀의 모양"이 언제 그리든 같아야 하므로, 순서 대신 좌표로 값을 정한다.
+ * 첫 인자를 채널 번호로 쓰면 같은 좌표에서 서로 다른 값을 여러 개 뽑을 수 있다.
+ */
+export function hash(seed, ...ints) {
+  let h = (seed | 0) ^ 0x9e3779b9;
+  for (let i = 0; i < ints.length; i++) {
+    h = Math.imul(h ^ (ints[i] | 0), 0x27220a95);
+    h ^= h >>> 15;
+  }
+  h = Math.imul(h ^ (h >>> 13), 0x85ebca6b);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
 export function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }

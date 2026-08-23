@@ -13,8 +13,13 @@
  * docs/04-interaction-rules.md 참조.
  */
 
-import { REAGENTS, coverage, excess, focusError, brightness, isTooThick, HISTORY_LIMIT } from './state.js';
+import {
+  REAGENTS, coverage, excess, focusError, brightness, isTooThick,
+  HISTORY_LIMIT, PAN_LIMIT,
+} from './state.js';
 import { focusTolerance } from './optics.js';
+
+export { PAN_LIMIT };
 
 /** 하드 게이트가 허용되는 단 두 가지 이유 */
 export const BLOCKING_REASONS = {
@@ -255,6 +260,18 @@ export const ACTIONS = {
       next = withScope(next, { lowMagFocused: true });
     }
     return ok(next);
+  },
+
+  /**
+   * 재물대를 옮긴다. 시야를 벗어난 곳은 볼 수 없으므로 ±240 px 로 묶는다.
+   * 끝에 닿아도 막지 않는다 — 더 가지 않을 뿐이다.
+   */
+  MOVE_STAGE(state, { dx = 0, dy = 0 }) {
+    const m = state.microscope;
+    return ok(withScope(state, {
+      panX: Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, (m.panX ?? 0) + dx)),
+      panY: Math.max(-PAN_LIMIT, Math.min(PAN_LIMIT, (m.panY ?? 0) + dy)),
+    }));
   },
 
   /** R-14 조리개 */

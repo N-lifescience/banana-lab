@@ -34,6 +34,13 @@ export const UNDO_LIMITS = { 1: Infinity, 2: 3, 3: 1 };
 /** 되돌리기용 상태 스냅샷 보관 개수 */
 export const HISTORY_LIMIT = 20;
 
+/**
+ * 재물대를 옮길 수 있는 범위 (화면 px).
+ * 렌더러도 이 값을 읽는다 — 두 방울이 적신 범위가 여기까지 닿아야 하기 때문이다.
+ * 두 곳에 따로 적으면 어긋나는 순간 시야를 옮겼을 때 염색이 사라진다.
+ */
+export const PAN_LIMIT = 240;
+
 export function initialState(level = 1, seed = 20260823) {
   return {
     slides: Object.fromEntries(
@@ -47,6 +54,8 @@ export function initialState(level = 1, seed = 20260823) {
       diaphragm: 0.6,      // 0 ~ 1
       lamp: true,
       lowMagFocused: false, // 저배율에서 초점을 맞춘 적이 있는가 (막지는 않고 기록만)
+      panX: 0,             // 재물대 위치 (화면 px). 상은 반대로 움직인다
+      panY: 0,
     },
     tools: {
       dropper: { holds: REAGENTS.NONE, level: 1, rinsed: true },
@@ -122,9 +131,12 @@ export function fieldParams(state, slideId) {
     bubbles: s.coverslip.bubbles,
     cracked: s.cracked,
     lensTouched: s.lensTouched,
+    reactionT: s.reactionT,
     objective: m.objective,
     focusErr: focusError(m),
     brightness: brightness(m),
+    panX: m.panX ?? 0,
+    panY: m.panY ?? 0,
     seed: s.seed,
   };
 }
