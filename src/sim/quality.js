@@ -54,7 +54,12 @@ export function lensFactor(lensTouched) {
  */
 export function observability(p) {
   const factors = {
-    drops: dropFactor(p.coverage ?? 1, p.excess ?? 0),
+    // 시약을 쓰지 않는 슬라이드((가) 대조군)는 방울 수로 깎지 않는다.
+    //
+    // 대조군에 아무것도 떨어뜨리지 않는 것이 **맞는 절차**다. 그런데 방울 수를 그대로 재면
+    // 0방울이 55 % 감점이 되고, 화면은 "지금 가장 크게 깎이는 항목: 방울 수" 라고 말한다 —
+    // 제대로 한 학생에게 화면이 틀린 것을 하라고 안내하는 꼴이 된다.
+    drops: p.reagent ? dropFactor(p.coverage ?? 1, p.excess ?? 0) : 1,
     focus: focusFactor(p.focusErr ?? 0, p.objective ?? 40),
     brightness: brightnessFactor(p.brightness ?? 1),
     thickness: thicknessFactor(p.tooThick ?? false),
@@ -63,6 +68,10 @@ export function observability(p) {
     lens: lensFactor(p.lensTouched ?? false),
   };
   const score = Math.round(100 * Object.values(factors).reduce((a, b) => a * b, 1));
-  const worst = Object.entries(factors).sort((a, b) => a[1] - b[1])[0][0];
+  // 아무것도 깎이지 않았으면 "가장 크게 깎이는 항목" 은 없다.
+  // 전부 1.0 일 때 그냥 정렬하면 첫 항목이 뽑혀, 나무랄 것이 없는데도
+  // 화면이 "지금 가장 크게 깎이는 항목: 방울 수" 라고 말한다.
+  const ranked = Object.entries(factors).sort((a, b) => a[1] - b[1]);
+  const worst = ranked[0][1] >= 1 ? null : ranked[0][0];
   return { score, worst, factors };
 }

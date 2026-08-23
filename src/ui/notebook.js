@@ -226,9 +226,11 @@ export function createNotebook(root, store, { onOpenZoom }) {
       const domId = `note-mag-${i}`; // id 에는 '.' 을 안 쓴다 — CSS 선택자에서 클래스로 오해된다
       const saved = st.session.notes[key] ?? '';
       const check = saved !== '' ? gradeMagnification(saved, c.objective) : null;
+      // 제목에는 짧은 이름을 쓴다. UI.slides 는 이름에 시약까지 담고 있어서 뒤에 시약을
+      // 또 붙이면 겹친다 — "(나) 아이오딘–아이오딘화 칼륨 · 아이오딘–아이오딘화 칼륨".
       return `
         <div class="capture-card">
-          <h3>${UI.slides[c.slide]} · ${UI.reagents[c.reagent ?? 'NONE']}</h3>
+          <h3>${UI.slideShort[c.slide]} · ${UI.reagents[c.reagent ?? 'NONE']}</h3>
           <!-- 기록한 시야를 그대로 되살린다. 캡처가 fieldParams 한 벌을 통째로 담고 있으므로
                그때 본 것과 같은 그림이 나온다. idPrefix 를 카드마다 달리 주지 않으면
                모든 카드가 첫 카드의 흐림·잘라내기를 쓴다 — 에러 없이 조용히 틀린다. -->

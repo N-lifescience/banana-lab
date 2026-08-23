@@ -665,7 +665,10 @@ export function createZoom(root, store) {
     fill.style.width = `${q.score}%`;
     value.textContent = q.score;
     // worst 이름 자체는 #quality-worst 로 태그해 둔다 — 기존 hint() 문장을 그대로 재사용한다.
-    hint.innerHTML = UI.observability.hint(`<b id="quality-worst">${UI.observability.worst[q.worst]}</b>`);
+    // 깎인 것이 없으면(worst === null) 나무랄 것이 없다. 잘 됐다고 말한다.
+    hint.innerHTML = q.worst
+      ? UI.observability.hint(`<b id="quality-worst">${UI.observability.worst[q.worst]}</b>`)
+      : UI.observability.allGood;
   }
 
   /** 재물대 이동. 드래그 중에는 transform 만 갱신하고, 놓았을 때 한 번 전체를 동기화한다. */

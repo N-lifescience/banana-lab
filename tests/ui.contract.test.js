@@ -39,8 +39,9 @@ test('observability 가 돌려주는 worst 는 모두 사람이 읽는 말이 �
 
 test('실제로 나올 수 있는 worst 값이 모두 문자열 표에 있다', () => {
   // 항목마다 그 항목만 최악이 되는 상태를 만들어 worst 를 실제로 뽑아 본다.
+  // 방울 수는 **시약을 쓴 슬라이드**에서만 깎인다 — 대조군은 안 넣는 것이 맞는 절차다.
   const cases = [
-    { coverage: 0, excess: 0 },
+    { reagent: 'IKI', coverage: 0, excess: 0 },
     { focusErr: 2, objective: 40 },
     { brightness: 0 },
     { tooThick: true },
@@ -52,6 +53,13 @@ test('실제로 나올 수 있는 worst 값이 모두 문자열 표에 있다', 
     const { worst } = observability(c);
     assert.equal(typeof UI.observability.worst[worst], 'string',
       `worst='${worst}' 에 해당하는 문자열이 없습니다`);
+  }
+  // 아무것도 안 깎였으면 worst 는 없다. 그때 쓸 문구가 따로 있어야 한다 —
+  // 없으면 게이지가 "지금 가장 크게 깎이는 항목: undefined" 를 띄운다.
+  {
+    const perfect = observability({ reagent: 'IKI', coverage: 1, excess: 0, focusErr: 0, brightness: 1, objective: 40 });
+    assert.equal(perfect.worst, null, '완벽한데도 깎인 항목을 지어내면 안 된다');
+    assert.equal(typeof UI.observability.allGood, 'string');
   }
 });
 

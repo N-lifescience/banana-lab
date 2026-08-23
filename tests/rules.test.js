@@ -177,17 +177,38 @@ test('씻지 않은 스포이트로 다른 시약을 쓰면 오염된다', () =>
 /* ---------------- 관찰 가능성 ---------------- */
 
 test('두 방울·초점·400배가 갖춰지면 100점, 조건이 나빠지면 내려간다', () => {
-  const best = observability({ coverage: 1, excess: 0, focusErr: 0, brightness: 1, objective: 40 });
+  // 방울 수를 재는 것은 **시약을 쓰는 슬라이드** 이야기다 (아래 대조군 테스트 참조).
+  const p = { reagent: 'IKI', excess: 0, focusErr: 0, brightness: 1, objective: 40 };
+  const best = observability({ ...p, coverage: 1 });
   assert.equal(best.score, 100);
 
-  const oneDrop = observability({ coverage: 0.5, excess: 0, focusErr: 0, brightness: 1, objective: 40 });
+  const oneDrop = observability({ ...p, coverage: 0.5 });
   assert.ok(oneDrop.score < best.score && oneDrop.score > 50);
 
-  const flooded = observability({ coverage: 1, excess: 1, focusErr: 0, brightness: 1, objective: 40 });
+  const flooded = observability({ ...p, coverage: 1, excess: 1 });
   assert.ok(flooded.score < oneDrop.score);
 
-  const lowMag = observability({ coverage: 1, excess: 0, focusErr: 0, brightness: 1, objective: 4 });
+  const lowMag = observability({ ...p, coverage: 1, objective: 4 });
   assert.equal(lowMag.worst, 'magnification', '무엇부터 고쳐야 하는지 알려 줘야 한다');
+});
+
+test('대조군은 방울 수로 깎이지 않는다', () => {
+  // (가) 에 아무것도 떨어뜨리지 않는 것이 **맞는 절차**다.
+  // 그런데 방울 수를 그대로 재면 0방울이 55 % 감점이 되고, 화면은
+  // "지금 가장 크게 깎이는 항목: 방울 수" 라고 말한다 —
+  // 제대로 한 학생에게 화면이 틀린 것을 하라고 안내하는 꼴이 된다.
+  const control = observability({
+    reagent: null, coverage: 0, excess: 0, focusErr: 0, brightness: 1, objective: 40,
+  });
+  assert.equal(control.score, 100, '시약을 안 쓴 대조군도 온전히 볼 만해야 한다');
+  assert.notEqual(control.worst, 'drops');
+
+  // 시약을 쓴 슬라이드는 여전히 방울 수로 깎인다.
+  const stained = observability({
+    reagent: 'IKI', coverage: 0, excess: 0, focusErr: 0, brightness: 1, objective: 40,
+  });
+  assert.ok(stained.score < 100);
+  assert.equal(stained.worst, 'drops');
 });
 
 /* ---------------- 정상 경로 통합 ---------------- */
