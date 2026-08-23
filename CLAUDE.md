@@ -24,8 +24,22 @@ npm run check    # 커밋 전 필수 — 테스트 + 아트 디렉션 린터
 `tasks/T01-state-machine.md`부터 번호순으로 진행합니다. 카드마다 검증 명령이 있으니
 끝낼 때마다 실제로 실행해서 통과를 확인하고 커밋하세요.
 
-현재 상태: **T01 착수 전.** `src/sim/`, `src/assets/banana.js`, `src/render/fov.js`에
-참조 구현이 들어 있으니 이걸 본보기로 나머지를 채우면 됩니다.
+현재 상태: **T01~T05 완료, T07 진행 중. T06 은 미착수(사람 대기).**
+
+- 진행 기록 — 각 카드에서 무엇을 왜 고쳤는지: `PROGRESS.md`
+- 오케스트레이터 역할과 검토 규칙: `tasks/ORCHESTRATOR.md`
+
+앱은 `index.html`, 개발 하네스(애셋 시트 + 시야 실험대)는 `harness.html` 입니다.
+
+```bash
+npm run dev                      # /  앱,  /harness.html  하네스
+node scripts/check-ui.mjs        # 조작 UI — 화면을 띄워야 아는 것
+node scripts/check-grading.mjs   # 서술형 첨삭 — 바깥에서 던지는 문장
+node scripts/perf-fov.mjs --dom  # 시야 렌더러 성능
+```
+
+`npm run check` 에는 **기계로 확실히 판정되는 것만** 넣습니다. 브라우저 검사와 성능 측정은
+위 스크립트로 뺐습니다 — 커밋 게이트가 한 번이라도 헛발질하면 그 뒤로 아무도 안 믿습니다.
 
 ## 서브에이전트를 쓸 만한 곳
 
