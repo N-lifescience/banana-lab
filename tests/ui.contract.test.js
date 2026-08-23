@@ -1,0 +1,102 @@
+/**
+ * UI 계약 테스트.
+ *
+ * 화면을 띄우지 않고도 확실히 판정되는 것만 검사한다.
+ * 눈으로 봐야 아는 것(배치가 예쁜가, 크기 감각이 맞는가)은 여기 넣지 않는다 —
+ * 애매한 검사가 한 번 헛발질하면 그 뒤로 아무도 `npm run check` 를 믿지 않는다.
+ *
+ * 여기 없는 항목은 사람이 본다: tasks/T04-interaction-ui.md 의 합격 기준.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { observability } from '../src/sim/quality.js';
+import { initialState, UNDO_LIMITS } from '../src/sim/state.js';
+import { UI } from '../src/ui/strings.js';
+
+const UI_DIR = new URL('../src/ui/', import.meta.url);
+
+/** src/ui/ 안의 .js 파일을 전부 읽어 [이름, 내용] 으로 돌려준다 */
+function uiSources() {
+  const dir = new URL('.', UI_DIR);
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => [f, readFileSync(new URL(f, UI_DIR), 'utf8')]);
+}
+
+/* ---------------- 문자열 표가 상태를 전부 덮는가 ---------------- */
+
+test('observability 가 돌려주는 worst 는 모두 사람이 읽는 말이 있다', () => {
+  // 하나라도 빠지면 화면에 undefined 가 뜬다. quality.js 에 항목을 추가하고
+  // strings.js 를 잊는 것이 흔한 실수라 기계가 지킨다.
+  const { factors } = observability({});
+  for (const key of Object.keys(factors)) {
+    assert.equal(typeof UI.observability.worst[key], 'string',
+      `UI.observability.worst.${key} 가 없습니다 — 게이지에 undefined 가 뜹니다`);
+  }
+});
+
+test('실제로 나올 수 있는 worst 값이 모두 문자열 표에 있다', () => {
+  // 항목마다 그 항목만 최악이 되는 상태를 만들어 worst 를 실제로 뽑아 본다.
+  const cases = [
+    { coverage: 0, excess: 0 },
+    { focusErr: 2, objective: 40 },
+    { brightness: 0 },
+    { tooThick: true },
+    { bubbles: 6 },
+    { objective: 4 },
+    { lensTouched: true },
+  ];
+  for (const c of cases) {
+    const { worst } = observability(c);
+    assert.equal(typeof UI.observability.worst[worst], 'string',
+      `worst='${worst}' 에 해당하는 문자열이 없습니다`);
+  }
+});
+
+/* ---------------- 되돌리기 표시 ---------------- */
+
+test('되돌리기 횟수가 무제한일 때 쓸 표기가 있다', () => {
+  // 1단계 undosLeft 는 Infinity 라, 그대로 그리면 "Infinity회 남음" 이 나온다.
+  assert.equal(UNDO_LIMITS[1], Infinity, '1단계는 무제한이어야 합니다');
+  assert.equal(initialState(1).session.undosLeft, Infinity);
+  assert.ok(UI.undo && typeof UI.undo.unlimited === 'string',
+    'UI.undo.unlimited 이 필요합니다 — 화면에 Infinity 가 뜨지 않게 하기 위함입니다');
+  assert.ok(!/Infinity/.test(UI.undo.unlimited));
+});
+
+/* ---------------- 설계 원칙 회귀 테스트 ---------------- */
+
+test('UI 는 포인터 이벤트만 쓴다 — 마우스/터치 전용 이벤트 금지', () => {
+  // 태블릿 대응. mouse* 와 touch* 를 섞으면 한쪽에서만 동작하는 조작이 생긴다.
+  const banned = /\b(mousedown|mousemove|mouseup|touchstart|touchmove|touchend)\b/;
+  for (const [name, src] of uiSources()) {
+    const hit = src.match(banned);
+    assert.equal(hit, null,
+      `src/ui/${name} 에 ${hit?.[0]} 이 있습니다 — pointerdown/pointermove/pointerup 을 쓰세요`);
+  }
+});
+
+test('UI 는 버튼을 disabled 로 막지 않는다', () => {
+  // 이 프로젝트는 잘못된 조작을 막지 않는다. 누를 수 있어야 하고,
+  // 누른 결과가 시야에 나타나는 것이 설계다. AGENTS.md 2.1 참조.
+  for (const [name, src] of uiSources()) {
+    assert.equal(/\bdisabled\b/.test(src), false,
+      `src/ui/${name} 에 disabled 가 있습니다 — 막지 말고 결과로 답하세요 (AGENTS.md 2.1)`);
+  }
+  if (existsSync(new URL('../index.html', import.meta.url))) {
+    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    assert.equal(/\bdisabled\b/.test(html), false, 'index.html 에 disabled 가 있습니다');
+  }
+});
+
+test('UI 는 상태를 직접 고치지 않고 reduce 를 거친다', () => {
+  // src/sim/ 은 DOM 을 모르고, UI 는 상태를 직접 만지지 않는다. 이 경계가 있어야
+  // 규칙을 node --test 로 검증할 수 있다.
+  for (const [name, src] of uiSources()) {
+    if (name === 'strings.js') continue;
+    assert.equal(/\bfrom ['"]\.\.\/sim\/state\.js['"]/.test(src) && /state\.\w+\s*=/.test(src), false,
+      `src/ui/${name} 이 상태를 직접 대입합니다 — reduce(state, action) 을 쓰세요`);
+  }
+});

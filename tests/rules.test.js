@@ -429,6 +429,41 @@ test('아무것도 바꾸지 못한 조작은 되돌리기 기록에 쌓이지 �
   assert.equal(r.state.session.history.length, 0, '되돌리기가 헛돌면 안 된다');
 });
 
+test('시간이 흘러도 되돌리기 기록이 밀리지 않는다', () => {
+  // TICK 은 1초마다 돈다. 이걸 기록에 쌓으면 20칸이 20초 만에 다 밀리고,
+  // 되돌리기 1회짜리 3단계에서는 그 한 번이 TICK 을 무르는 데 쓰여 사라진다.
+  let s = initialState(3, 777);
+  s = run(s, 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  const before = s.session.history.length;
+
+  for (let i = 0; i < 30; i++) s = run(s, 'TICK', { seconds: 1 }).state;
+  assert.equal(s.session.history.length, before, '시간 경과는 조작이 아니다');
+
+  const r = run(s, 'UNDO');
+  assert.equal(r.state.slides.B.sample, null, '되돌리기는 학생의 마지막 조작을 되돌려야 한다');
+  assert.equal(r.state.tools.banana.peeled, true, '그보다 앞선 조작은 남는다');
+});
+
+test('시야를 둘러보는 것은 되돌릴 조작이 아니다', () => {
+  let s = run(S0(), 'PEEL_BANANA').state;
+  const before = s.session.history.length;
+  for (let i = 0; i < 30; i++) s = run(s, 'MOVE_STAGE', { dx: 4, dy: 2 }).state;
+  assert.equal(s.session.history.length, before, '드래그 한 번이 기록을 다 밀어내면 안 된다');
+  assert.notEqual(s.microscope.panX, 0, '상태는 실제로 바뀌어야 한다');
+});
+
+test('연속 조작은 되돌리기 기록에서 하나로 합쳐진다', () => {
+  // 슬라이더를 한 번 끄는 동안 input 이 수십 번 뜬다. 눈금 하나씩 무르는 것은 뜻이 없다.
+  let s = run(S0(), 'PEEL_BANANA').state;
+  const before = s.session.history.length;
+  for (let i = 0; i < 20; i++) s = run(s, 'SET_DIAPHRAGM', { value: 0.9 - i * 0.04 }).state;
+  assert.equal(s.session.history.length, before + 1, '끌기 한 번은 기록 한 칸이다');
+
+  const r = run(s, 'UNDO');
+  assert.equal(r.state.microscope.diaphragm, 0.6, '끌기 전 값으로 돌아간다');
+});
+
 test('되돌리기 기록은 20개까지만 쌓이고, 스냅샷이 스냅샷을 품지 않는다', () => {
   let s = run(initialState(1, 12345), 'PEEL_BANANA').state;
   for (let i = 0; i < 30; i++) {

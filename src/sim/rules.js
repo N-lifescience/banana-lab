@@ -21,6 +21,22 @@ import { focusTolerance } from './optics.js';
 
 export { PAN_LIMIT };
 
+/**
+ * 되돌리기 기록에 쌓지 않는 액션.
+ *
+ * 시간이 흐르는 것과 시야를 둘러보는 것은 학생이 "한" 조작이 아니다.
+ * 이걸 쌓으면 1초마다 도는 TICK 이 20칸짜리 기록을 몇 초 만에 밀어내고,
+ * 되돌리기 1회짜리 3단계에서는 그 한 번이 TICK 을 무르는 데 쓰여 사라진다.
+ */
+export const TRANSIENT_ACTIONS = new Set(['TICK', 'MOVE_STAGE', 'NOTE_VIOLATION']);
+
+/**
+ * 연속 조작 — 슬라이더 한 번 끄는 동안 수십 번 디스패치된다.
+ * 앞선 액션이 같은 종류면 기록을 새로 쌓지 않는다. 이미 쌓인 것이 끌기 전 상태이기 때문이다.
+ * 그래서 되돌리기 한 번이 "끌기 전" 으로 돌아간다. 슬라이더 눈금 하나씩 무르는 것은 뜻이 없다.
+ */
+export const CONTINUOUS_ACTIONS = new Set(['FINE_FOCUS', 'COARSE_FOCUS', 'SET_DIAPHRAGM', 'SAVE_NOTE']);
+
 /** 하드 게이트가 허용되는 단 두 가지 이유 */
 export const BLOCKING_REASONS = {
   IMPOSSIBLE: 'impossible',   // 물리적으로 성립하지 않음 (닫힌 뚜껑 안으로 물체 넣기)
@@ -373,12 +389,22 @@ export function reduce(state, action) {
   const result = fn(state, action.payload ?? {});
   const session = result.state.session;
 
-  // UNDO 는 스스로 history 를 되감으므로 여기서 다시 쌓지 않는다.
-  // 상태를 바꾸지 못한 액션도 쌓지 않는다 — 되돌리기가 헛돌게 된다.
+  // 되돌리기 기록에 쌓을지 정한다. 참조가 달라졌다는 것만으로는 부족하다 —
+  // TICK 은 1초마다 새 객체를 돌려주지만 학생이 한 조작이 아니다.
+  //   · UNDO 는 스스로 되감으므로 다시 쌓지 않는다
+  //   · 상태를 못 바꾼 액션은 쌓지 않는다. 되돌리기가 헛돌게 된다
+  //   · 시간 경과와 시야 둘러보기는 조작이 아니다
+  //   · 연속 조작은 앞선 것과 같은 종류면 합친다. 끌기 전 상태가 이미 쌓여 있다
   const changed = result.state !== state;
-  const history = action.type === 'UNDO' || !changed
-    ? session.history
-    : [...session.history, snapshot(state)].slice(-HISTORY_LIMIT);
+  const prevAction = session.log.length ? session.log[session.log.length - 1].action : null;
+  const coalesced = CONTINUOUS_ACTIONS.has(action.type) && prevAction === action.type;
+  const keep = changed
+    && action.type !== 'UNDO'
+    && !TRANSIENT_ACTIONS.has(action.type)
+    && !coalesced;
+  const history = keep
+    ? [...session.history, snapshot(state)].slice(-HISTORY_LIMIT)
+    : session.history;
 
   const logged = {
     ...result.state,

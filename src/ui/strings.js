@@ -50,4 +50,51 @@ export const UI = {
     { id: '5', title: '덮개 유리', steps: ['(가) 덮기', '(나) 덮기', '(다) 덮기'] },
     { id: '6', title: '현미경 관찰', steps: ['저배율 초점', '고배율 전환', '조리개 조절', '결과 기록 ×3'] },
   ],
+
+  /** T04 — 실험대 위 물건 이름. 토큰의 aria-label 로 쓴다. */
+  bench: {
+    heading: '실험대',
+    items: {
+      banana: '바나나',
+      slideA: '받침 유리 (가)',
+      slideB: '받침 유리 (나)',
+      slideC: '받침 유리 (다)',
+      coverslip: '덮개 유리',
+      dropper: '스포이트',
+      forceps: '핀셋',
+      bottleIKI: '아이오딘–아이오딘화 칼륨 병',
+      bottleSUDAN: '수단 Ⅲ 병',
+      dish: '실험 접시',
+      microscope: '현미경',
+      waste: '폐액통',
+      tissue: '휴지',
+    },
+  },
+
+  /** T04 — 확대 뷰 (슬라이드 제작 / 현미경 관찰) */
+  zoom: {
+    close: '닫기 (Esc)',
+    slideMode: (label) => `${label} — 슬라이드 제작`,
+    scopeMode: '현미경 관찰',
+    emptyStage: '재물대에 슬라이드가 없습니다. 슬라이드를 현미경으로 끌어다 놓으세요.',
+    coverAngle: '덮개 유리를 놓는 각도',
+    placeCoverslip: '덮개 유리 덮기',
+    capture: '결과 기록',
+    coarseGroup: '조동나사',
+    coarseFocusIn: '조동나사 ▲',
+    coarseFocusOut: '조동나사 ▼',
+  },
+
+  /** T04 — 탐구 노트 */
+  notebook: {
+    heading: '탐구 노트',
+    notesLabel: '관찰 기록',
+  },
+
+  /** T04 — 되돌리기. undosLeft 가 Infinity 일 때는 숫자 대신 unlimited 를 쓴다 (1단계). */
+  undo: {
+    label: '되돌리기',
+    unlimited: '무제한',
+    left: (n) => `${n}회 남음`,
+  },
 };
