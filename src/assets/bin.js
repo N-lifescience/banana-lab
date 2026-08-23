@@ -62,29 +62,35 @@ export function render(state = {}) {
     <line x1="170" y1="184" x2="230" y2="184" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
   </g>
 
-  <!-- 버린 고형 폐기물 (투입구에 보이는 쓴 덮개 유리 조각들, 비어 있으면 opacity=0) -->
-  <g id="trash-fill" opacity="${fOpacity}">
-    <!-- 덮개유리 1 (좌측 경사) -->
-    <rect x="170" y="94" width="24" height="24" rx="1.5" transform="rotate(-15 182 106)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <path d="M 172,116 L 192,116 A 1.5,1.5 0 0 0 193.5,114.5 L 193.5,96 L 190.5,99 L 190.5,113 L 175,113 Z" transform="rotate(-15 182 106)" fill="${PALETTE.glass[1]}"/>
-    <!-- 덮개유리 2 (우측 경사) -->
-    <rect x="196" y="92" width="22" height="22" rx="1.5" transform="rotate(20 207 103)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <path d="M 198,112 L 216,112 A 1.5,1.5 0 0 0 217.5,110.5 L 217.5,94 L 214.5,97 L 214.5,109 L 201,109 Z" transform="rotate(20 207 103)" fill="${PALETTE.glass[1]}"/>
-    <!-- 덮개유리 3 (중앙) -->
-    <rect x="184" y="98" width="22" height="22" rx="1.5" transform="rotate(4 195 109)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <path d="M 186,118 L 204,118 A 1.5,1.5 0 0 0 205.5,116.5 L 205.5,100 L 202.5,103 L 202.5,115 L 189,115 Z" transform="rotate(4 195 109)" fill="${PALETTE.glass[1]}"/>
-  </g>
-
   <!-- 우하단 음영 (광원 좌상단 45° — 몸통·뚜껑·베이스 외곽선 안쪽에만 위치) -->
   <g id="trash-shade">
     <!-- 뚜껑 우측 음영 -->
     <path d="M 200,38 C 238,38 260,62 258,96 L 250,97 C 246,68 230,48 200,48 Z" fill="${PALETTE.metal[1]}"/>
-    <!-- 몸통 우측 음영 -->
+    <!-- 몸통 우측 음영 (투입구 아래 몸통 외벽) -->
     <path d="M 200,106 C 230,106 264,102 264,106 L 254,244 C 254,252 230,257 200,257 L 200,243 C 224,243 242,238 242,232 L 250,115 C 236,117 218,118 200,118 Z" fill="${PALETTE.bodyDark[1]}"/>
     <!-- 하단 림 우측 음영 -->
     <path d="M 200,238 L 256,238 L 255,248 C 255,254 230,260 200,260 L 200,252 C 224,252 244,246 244,242 L 246,238 L 200,238 Z" fill="${PALETTE.metal[1]}"/>
     <!-- 페달 우측 음영 -->
     <polygon points="200,258 218,258 214,266 200,266" fill="${PALETTE.metal[1]}"/>
+  </g>
+
+  <!-- 버린 고형 폐기물 (투입구에 수북이 쌓인 쓴 덮개 유리들, 비어 있으면 opacity=0) -->
+  <g id="trash-fill" opacity="${fOpacity}">
+    <!-- 덮개유리 1 (좌측으로 비스듬히 솟은 조각) -->
+    <rect x="156" y="70" width="32" height="32" rx="2" transform="rotate(-20 172 86)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <path d="M 158,100 L 186,100 A 2,2 0 0 0 188,98 L 188,74 L 184,78 L 184,96 L 162,96 Z" transform="rotate(-20 172 86)" fill="${PALETTE.glass[1]}"/>
+
+    <!-- 덮개유리 2 (우측으로 솟아 뚜껑 쪽으로 기댄 조각) -->
+    <rect x="198" y="68" width="30" height="30" rx="2" transform="rotate(22 213 83)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <path d="M 200,96 L 226,96 A 2,2 0 0 0 228,94 L 228,72 L 224,76 L 224,92 L 204,92 Z" transform="rotate(22 213 83)" fill="${PALETTE.glass[1]}"/>
+
+    <!-- 덮개유리 3 (중앙에 꽂힌 조각) -->
+    <rect x="180" y="78" width="28" height="28" rx="2" transform="rotate(5 194 92)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <path d="M 182,104 L 206,104 A 2,2 0 0 0 208,102 L 208,82 L 204,86 L 204,100 L 186,100 Z" transform="rotate(5 194 92)" fill="${PALETTE.glass[1]}"/>
+
+    <!-- 덮개유리 4 (투입구 앞쪽에 걸쳐진 조각) -->
+    <rect x="174" y="90" width="26" height="26" rx="2" transform="rotate(-8 187 103)" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <path d="M 176,114 L 198,114 A 2,2 0 0 0 200,112 L 200,94 L 197,97 L 197,111 L 179,111 Z" transform="rotate(-8 187 103)" fill="${PALETTE.glass[1]}"/>
   </g>
 </svg>`;
 }
