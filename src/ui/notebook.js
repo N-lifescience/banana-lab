@@ -11,6 +11,8 @@
  */
 
 import { SLIDE_IDS } from '../sim/state.js';
+import { ASSETS } from '../assets/index.js';
+import { renderFOV } from '../render/fov.js';
 import { observability } from '../sim/quality.js';
 import { magnification } from '../sim/optics.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
@@ -23,6 +25,17 @@ const N = UI.notebook;
 const LOW_OBSERVABILITY = 60;
 
 const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/**
+ * 관찰 기록 칸에 흐리게 띄울 예시 문구.
+ *
+ * "관찰 기록" 이라고만 써 두면 무엇을 어떻게 적어야 할지 감이 안 온다.
+ * placeholder 라 칸을 누르는 순간 사라지고, 학생이 쓴 글과 섞이지 않는다 — 브라우저가 하는 일이다.
+ * 난이도가 올라갈수록 예시가 짧아진다. 무엇을 적을지 스스로 정하는 것도 이 실험의 일부다.
+ */
+function notePlaceholder(level) {
+  return UI.notebook.notePlaceholders[level] ?? '';
+}
 
 /** STEP(UI.protocol 의 한 원소) 안에서 i번째 세부 단계의 저장 키. '3b' 같은 형태. */
 function substepId(group, i) {
@@ -69,15 +82,24 @@ export function createNotebook(root, store, { onOpenZoom }) {
     return `<p class="stage-text">${N.problem}</p>`;
   }
 
+  /**
+   * 2 준비물 — 이름만 늘어놓으면 실험대에서 그것을 못 찾는다.
+   * **그림 · 이름 · 하는 일** 셋을 나란히 둔다. 그림은 실험대에 놓인 것과 같은 애셋이라
+   * 노트에서 본 것을 실험대에서 그대로 알아본다.
+   */
   function renderStage2() {
-    const I = UI.bench.items;
-    const items = [
-      I.banana, I.slideA, I.slideB, I.slideC, I.coverslip, I.dropper, I.forceps,
-      I.bottleIKI, I.bottleSUDAN, I.microscope,
-    ];
+    const rows = N.materials.map(({ asset, name, role, state = {} }) => `
+      <tr>
+        <td class="mat-fig">${ASSETS[asset].render(state)}</td>
+        <th scope="row">${name}</th>
+        <td>${role}</td>
+      </tr>`).join('');
     return `
       <h3>${N.materialsHeading}</h3>
-      <ul class="materials-list">${items.map((n) => `<li>${n}</li>`).join('')}</ul>
+      <table class="materials-table">
+        <thead><tr><th>${N.matHeadFigure}</th><th>${N.matHeadName}</th><th>${N.matHeadRole}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
       <h3>${N.safetyHeading}</h3>
       <ul class="safety-list">${N.safetyNotes.map((n) => `<li>${n}</li>`).join('')}</ul>`;
   }
@@ -86,13 +108,45 @@ export function createNotebook(root, store, { onOpenZoom }) {
   /* 3 예상 — 채점하지 않는다. 6단계에서 실제 결과와 나란히 보여 줄 뿐이다. */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * 예상은 난이도에 따라 **묻는 방식**이 달라진다.
+   *
+   *   1단계 선택형    — 보기에서 고른다. 무엇을 예상해야 하는지 자체를 배우는 자리다.
+   *   2단계 반주관식  — 보기에서 고르고, 왜 그렇게 생각했는지 한 줄 덧붙인다.
+   *   3단계 완전 주관식 — 빈칸만 있다.
+   *
+   * 어느 쪽이든 답은 `notes['predict.X']` 한 곳에 **글로** 남는다.
+   * 6단계에서 실제 결과와 나란히 놓고 견주기 때문에, 보기를 골랐어도 문장으로 남아야 한다.
+   * 채점하지 않는다 — 예상은 맞히는 것이 아니라 세워 보는 것이다.
+   */
   function renderStage3(st) {
-    return SLIDE_IDS.map((id) => `
-      <div class="predict-block">
-        <h3>${UI.slides[id]}</h3>
-        <label class="notes-label" for="note-predict-${id}">${N.predictLabel}</label>
-        <textarea data-note="predict.${id}" id="note-predict-${id}">${escapeHtml(st.session.notes[`predict.${id}`] ?? '')}</textarea>
-      </div>`).join('');
+    const level = st.session.level;
+    return SLIDE_IDS.map((id) => {
+      const key = `predict.${id}`;
+      const val = st.session.notes[key] ?? '';
+      const whyKey = `predict.why.${id}`;
+      const choices = level >= 3 ? '' : `
+        <div class="predict-choices" role="group" aria-label="${N.predictLabel}">
+          ${N.predictOptions.map((opt) => `
+            <button type="button" class="predict-opt${val === opt ? ' predict-opt--chosen' : ''}"
+              data-choice="${key}" data-value="${escapeHtml(opt)}"
+              aria-pressed="${val === opt}">${opt}</button>`).join('')}
+        </div>`;
+      const free = level === 1 ? '' : `
+        <label class="notes-label" for="note-${level === 2 ? 'why' : 'predict'}-${id}">${
+          level === 2 ? N.predictWhyLabel : N.predictLabel
+        }</label>
+        <textarea data-note="${level === 2 ? whyKey : key}"
+          id="note-${level === 2 ? 'why' : 'predict'}-${id}"
+          placeholder="${level === 2 ? N.predictWhyPlaceholder : N.predictFreePlaceholder}"
+          >${escapeHtml(st.session.notes[level === 2 ? whyKey : key] ?? '')}</textarea>`;
+      return `
+        <div class="predict-block">
+          <h3>${UI.slides[id]}</h3>
+          ${choices}
+          ${free}
+        </div>`;
+    }).join('');
   }
 
   /* ---------------------------------------------------------------- */
@@ -123,7 +177,8 @@ export function createNotebook(root, store, { onOpenZoom }) {
           <li class="substep${hi}">
             <div class="substep-title">${label}</div>
             <label class="notes-label" for="note-${id}">${N.notesLabel}</label>
-            <textarea data-note="${id}" id="note-${id}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
+            <textarea data-note="${id}" id="note-${id}"
+              placeholder="${escapeHtml(notePlaceholder(level))}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
           </li>`;
       }).join('');
       return `
@@ -174,6 +229,10 @@ export function createNotebook(root, store, { onOpenZoom }) {
       return `
         <div class="capture-card">
           <h3>${UI.slides[c.slide]} · ${UI.reagents[c.reagent ?? 'NONE']}</h3>
+          <!-- 기록한 시야를 그대로 되살린다. 캡처가 fieldParams 한 벌을 통째로 담고 있으므로
+               그때 본 것과 같은 그림이 나온다. idPrefix 를 카드마다 달리 주지 않으면
+               모든 카드가 첫 카드의 흐림·잘라내기를 쓴다 — 에러 없이 조용히 틀린다. -->
+          <div class="capture-fov">${renderFOV(c, { idPrefix: `cap${i}-` })}</div>
           <dl class="capture-readout">
             <div><dt>${UI.controls.objective}</dt><dd>${UI.units.mag(magnification(c.objective))}</dd></div>
             <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
@@ -313,6 +372,13 @@ export function createNotebook(root, store, { onOpenZoom }) {
     panelEl.querySelectorAll('[data-note]').forEach((el) => {
       el.addEventListener('change', () => {
         store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });
+      });
+    });
+    // 선택형 예상 — 고른 보기를 **글로** 저장한다. 6단계에서 실제 결과와 나란히 읽히려면
+    // 코드가 아니라 문장이어야 한다.
+    panelEl.querySelectorAll('[data-choice]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        store.dispatch('SAVE_NOTE', { step: btn.dataset.choice, text: btn.dataset.value });
       });
     });
     panelEl.querySelectorAll('[data-reflect]').forEach((btn) => {

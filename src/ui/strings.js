@@ -8,6 +8,25 @@ export const UI = {
   harnessTitle: '개발 확인용 하네스',
   harnessNote: '실제 시뮬레이터 화면이 아니라, 애셋과 시야 렌더러가 살아 있는지 보는 페이지입니다. T04에서 진짜 UI로 교체합니다.',
 
+  /**
+   * 시작 화면 — 난이도 고르기.
+   * 설명은 "무엇이 달라지는가" 를 적는다. 어렵다/쉽다가 아니라 화면이 얼마나 거들어 주는가다.
+   */
+  start: {
+    lead: '어느 단계로 할지 고르세요. 할 수 있는 조작은 세 단계가 모두 같습니다 — 화면이 얼마나 거들어 주는지가 다릅니다.',
+    chooseLabel: '난이도',
+    levels: [
+      { id: 1, name: '1단계 — 처음 해 봅니다',
+        desc: '다음에 할 일을 짚어 주고, 실패하면 무엇을 하면 되는지까지 알려 줍니다. 현미경은 초점과 배율을 맞춰 놓고 시작합니다. 되돌리기는 무제한입니다.' },
+      { id: 2, name: '2단계 — 절차는 알고 있습니다',
+        desc: '절차를 목록으로만 보여 주고, 실패하면 원인만 알려 줍니다. 현미경은 저배율부터 직접 맞춥니다. 되돌리기는 3회입니다.' },
+      { id: 3, name: '3단계 — 스스로 해 봅니다',
+        desc: '단계마다 목표만 주어집니다. 물건에 마우스를 올려도 이름만 뜹니다. 되돌리기는 1회입니다.' },
+    ],
+    go: (name) => `${name.split(' —')[0]}로 시작하기`,
+    note: '주소 끝에 ?level=2 를 붙이면 이 화면을 건너뛰고 바로 그 단계로 들어갑니다.',
+  },
+
   slides: { A: '(가) 대조군', B: '(나) 아이오딘–아이오딘화 칼륨', C: '(다) 수단 Ⅲ' },
 
   /**
@@ -230,6 +249,29 @@ export const UI = {
     ],
     problem: '생물체를 구성하는 물질 중 녹말과 지방을 어떻게 관찰할 수 있을까?',
     materialsHeading: '준비물',
+    matHeadFigure: '생김새',
+    matHeadName: '이름',
+    matHeadRole: '하는 일',
+
+    /**
+     * 준비물 표. 이름만 늘어놓으면 실험대에서 그것을 못 찾는다 —
+     * 그림은 실험대에 놓인 것과 **같은 애셋**을 쓴다. 노트에서 본 것을 실험대에서 알아본다.
+     * `asset` 은 `src/assets/index.js` 의 키이고, `state` 는 그 그림을 어떤 상태로 그릴지다.
+     */
+    materials: [
+      { asset: 'banana', name: '바나나', role: '관찰할 시료. 껍질을 벗겨 과육을 씁니다.', state: { ripe: 0.35, peel: 0.7 } },
+      { asset: 'slide', name: '받침 유리', role: '시료를 얇게 펴 바르는 유리판. 세 장을 씁니다 — (가)(나)(다).', state: { sample: { thickness: 0.3 } } },
+      { asset: 'coverslip', name: '덮개 유리', role: '시료 위를 덮어 평평하게 만듭니다. 한 번 쓰면 버립니다.', state: { angle: 45 } },
+      { asset: 'dropper', name: '스포이트', role: '검출 용액을 한 방울씩 떨어뜨립니다.', state: { holds: 'IKI', level: 1 } },
+      { asset: 'forceps', name: '핀셋', role: '덮개 유리를 집습니다. 얇아서 손으로는 집히지 않습니다.', state: { closed: true, holding: 'coverslip' } },
+      { asset: 'bottle', name: '아이오딘–아이오딘화 칼륨', role: '녹말과 만나면 청람색이 됩니다.', state: { kind: 'IKI', level: 1 } },
+      { asset: 'bottle', name: '수단 Ⅲ', role: '지방과 만나면 선홍색이 됩니다.', state: { kind: 'SUDAN3', level: 1 } },
+      { asset: 'microscope', name: '현미경', role: '저배율에서 초점을 맞춘 뒤 고배율로 올려 봅니다.', state: { objective: 4, diaphragm: 0.6, lamp: true } },
+      { asset: 'sink', name: '개수대', role: '잘못 만든 받침 유리를 씻어 처음으로 되돌립니다.', state: { water: 1 } },
+      { asset: 'bin', name: '쓰레기통', role: '한 번 쓴 덮개 유리를 버립니다.', state: { fill: 1 } },
+      { asset: 'waste', name: '폐액통', role: '스포이트를 헹구고 남은 시약을 버립니다.', state: { level: 0.6 } },
+      { asset: 'tissue', name: '휴지', role: '손을 닦고, 더러워진 대물렌즈를 닦습니다.', state: { used: 0 } },
+    ],
     safetyHeading: '안전 유의 사항',
     safetyNotes: [
       '시약병을 쓴 뒤에는 마개를 바로 닫습니다.',
@@ -237,6 +279,31 @@ export const UI = {
       '남은 시약과 폐액은 폐액통에 버립니다.',
     ],
     predictLabel: '이 슬라이드에서 무엇이 보일 것 같나요?',
+
+    /**
+     * 예상 보기 (1·2단계). 고른 보기가 **그대로 글로** 저장된다 —
+     * 6단계에서 실제 결과와 나란히 읽히려면 코드가 아니라 문장이어야 한다.
+     * 정답은 없다. 채점하지 않는다.
+     */
+    predictOptions: [
+      '색이 변하지 않는다',
+      '청람색 알갱이가 보인다',
+      '선홍색 방울이 보인다',
+      '잘 모르겠다',
+    ],
+    predictWhyLabel: '왜 그렇게 생각했나요?',
+    predictWhyPlaceholder: '예: 바나나는 녹말이 많다고 배웠기 때문에',
+    predictFreePlaceholder: '무엇이, 어떤 색으로, 얼마나 보일지 적어 보세요',
+
+    /**
+     * 관찰 기록 칸의 예시 문구 (난이도별).
+     * placeholder 라 칸을 누르면 사라지고 학생이 쓴 글과 섞이지 않는다.
+     */
+    notePlaceholders: {
+      1: '예: 껍질을 벗기니 안쪽이 연한 노란색이었다',
+      2: '무엇을 했고, 무엇이 보였는지 적어 보세요',
+      3: '',
+    },
     predictHeading: '내가 예상했던 것과 실제 결과를 견주어 보세요',
     actualLabel: '실제 결과',
     goalOnlyLabel: (title) => `이번 절차의 목표: ${title}`,

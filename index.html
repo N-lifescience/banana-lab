@@ -118,7 +118,46 @@
   .stage-text{font-size:14px}
   .stage-empty{color:var(--ink-mute);font-size:13.5px}
   .materials-list,.safety-list,.step-notes-recap{margin:0 0 14px;padding-left:18px;font-size:13px}
+
+  /* 준비물 표 — 생김새 · 이름 · 하는 일 */
+  .materials-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:16px}
+  .materials-table th,.materials-table td{border-bottom:1px solid var(--rule);
+    padding:8px 6px;text-align:left;vertical-align:middle}
+  .materials-table thead th{font-size:11.5px;color:var(--ink-mute);font-weight:600;
+    border-bottom-width:2px}
+  .materials-table tbody th{font-weight:600;white-space:nowrap;width:1%}
+  .mat-fig{width:56px}
+  .mat-fig svg{width:52px;height:auto;display:block}
+
+  /* 예상 — 1·2단계는 보기에서 고른다 */
+  .predict-choices{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+  .predict-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:6px 10px;font-size:12.5px;color:var(--ink-mute)}
+  .predict-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
   .predict-block{margin-bottom:16px}
+
+  /* 결과 카드에 그때 본 시야 */
+  .capture-fov{background:var(--sunk);border-radius:5px;padding:8px;margin:6px 0}
+  .capture-fov svg{width:100%;max-width:200px;height:auto;display:block;margin:0 auto}
+
+  /* 시작 화면 */
+  .start-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:var(--ground)}
+  .start-screen[hidden]{display:none}
+  .start-card{width:100%;max-width:620px;background:var(--surface);border:1px solid var(--rule);
+    border-radius:12px;padding:28px 26px}
+  .start-card h1{font-size:20px;margin:0 0 8px}
+  .start-lead{font-size:13.5px;color:var(--ink-mute);margin:0 0 20px}
+  .start-levels{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+  .start-level{display:block;width:100%;text-align:left;border:1px solid var(--rule);
+    background:var(--sunk);border-radius:8px;padding:14px 16px}
+  .start-level[aria-checked="true"]{border-color:var(--indigo);border-width:2px;padding:13px 15px;
+    background:var(--surface)}
+  .start-level-name{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+  .start-level-desc{display:block;font-size:12.5px;color:var(--ink-mute);line-height:1.5}
+  .start-go{width:100%;background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+    padding:12px;font-size:15px;font-weight:600}
+  .start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
   .predict-compare-row{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px}
   .capture-card{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:12px}
   .capture-readout{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
@@ -225,7 +264,8 @@
 </style>
 </head>
 <body>
-<div id="app">
+<div id="start" class="start-screen"></div>
+<div id="app" hidden>
   <div class="layout">
     <div id="bench" aria-label="실험대"></div>
     <div id="notebook"></div>

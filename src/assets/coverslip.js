@@ -28,11 +28,11 @@ export function render(state = {}) {
   const tfAttr = transform ? ` transform="${transform}"` : '';
 
   return `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" data-asset="coverslip">
-  <!-- 접지 그림자 -->
-  <rect x="144" y="96" width="120" height="120" rx="6" fill="${GROUND_SHADOW.fill}" opacity="${GROUND_SHADOW.opacity}"/>
-
-  <!-- 덮개유리 본체 (회전 가능 그룹) -->
+  <!-- 덮개유리 본체 (회전 가능 그룹)
+       접지 그림자도 이 그룹 **안에** 둔다. 밖에 두면 유리만 기울고 그림자는 제자리에 남아,
+       45°로 세운 순간 유리 옆에 회색 사각형이 따로 떠 있는 것처럼 보인다. -->
   <g id="glass"${tfAttr}>
+    <rect x="144" y="96" width="120" height="120" rx="6" fill="${GROUND_SHADOW.fill}" opacity="${GROUND_SHADOW.opacity}"/>
     <rect width="120" height="120" x="140" y="90" rx="3" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <path id="glass-shade" d="M 146,206 L 254,206 A 3,3 0 0 0 257,203 L 257,96 L 251,102 L 251,200 L 152,200 Z" fill="${PALETTE.glass[1]}"/>
     <line x1="152" y1="102" x2="248" y2="198" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>

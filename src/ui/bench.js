@@ -465,6 +465,17 @@ export function createBench(root, store, { onOpenZoom }) {
     }
   }
 
+  /**
+   * 마지막으로 **포인터로** 탭을 처리한 시각.
+   *
+   * 마우스로 누르면 pointerup 뒤에 click 이벤트가 이어서 온다. 둘 다 처리하면 한 번 눌렀는데
+   * 두 번 일어난다. 그렇다고 click 을 안 들으면, 포인터를 쓰지 않고 `element.click()` 으로
+   * 누르는 길(음성 제어·스크린리더 같은 보조기기)이 통째로 막힌다.
+   * 그래서 click 은 듣되, 방금 포인터로 처리한 것이면 넘긴다.
+   */
+  let pointerTapAt = 0;
+  const POINTER_TAP_GRACE_MS = 500;
+
   /** 탭(포인터로 움직임 없이 누르고 뗌) 또는 키보드 활성화(Enter/Space) 로 여는 동작. */
   function handleTap(item, el) {
     TAPS[item.kind]?.(item, el);
@@ -472,6 +483,12 @@ export function createBench(root, store, { onOpenZoom }) {
 
   function onPointerUp(e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
+    // 손을 뗀 자리를 마지막으로 한 번 더 반영한다.
+    //
+    // 아주 빠르게 끌어 놓으면 중간 이동 이벤트가 한 번도 안 올 수 있다 (기기·브라우저에 따라
+    // 눌렀다 뗀 두 지점만 온다). 그때 이동만 보고 판정하면 실제로 끌었는데도 제자리 탭으로
+    // 처리돼 아무 일도 일어나지 않는다. **누른 곳과 뗀 곳이 얼마나 떨어졌는가**로 가른다.
+    onPointerMove(e);
     const { item, el, moved } = drag;
     el.releasePointerCapture(e.pointerId);
     el.classList.remove('token--dragging');
@@ -481,6 +498,7 @@ export function createBench(root, store, { onOpenZoom }) {
     if (!moved) {
       // 움직이지 않았다면 조작이 아니라 탭이다.
       drag = null;
+      pointerTapAt = performance.now();
       handleTap(item, el);
       renderTokens();
       return;
@@ -541,10 +559,20 @@ export function createBench(root, store, { onOpenZoom }) {
       el.addEventListener('focus', () => showTip(item));
       el.addEventListener('blur', hideTip);
 
-      // 키보드 활성화(Enter/Space). 포인터 탭은 위 pointerup 경로가 이미 처리한다.
+      // 포인터를 거치지 않고 눌리는 경우 — 보조기기의 element.click() 등.
+      // 방금 포인터로 처리했으면 같은 누름이므로 넘긴다.
+      el.addEventListener('click', () => {
+        if (performance.now() - pointerTapAt < POINTER_TAP_GRACE_MS) return;
+        handleTap(item, el);
+      });
+
+      // 키보드 활성화(Enter/Space).
+      // 브라우저는 <button> 에서 Enter/Space 를 click 으로도 바꿔 주지만, 그 전에
+      // Space 가 페이지를 스크롤시킨다. preventDefault 하려면 keydown 을 직접 들어야 한다.
       el.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
+        pointerTapAt = performance.now();   // 뒤따라올 click 을 삼킨다
         handleTap(item, el);
       });
 

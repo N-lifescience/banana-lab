@@ -14,7 +14,7 @@
  */
 
 import {
-  REAGENTS, SLIDE_IDS, coverage, excess, focusError, brightness, isTooThick,
+  REAGENTS, SLIDE_IDS, coverage, excess, focusError, brightness, isTooThick, fieldParams,
   HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
 import { focusTolerance } from './optics.js';
@@ -397,19 +397,14 @@ export const ACTIONS = {
     const m = state.microscope;
     if (!m.stage) return happened(state, '재물대에 슬라이드가 없습니다.');
     const s = state.slides[m.stage];
+    // 기록은 그때 본 시야를 **그대로 다시 그릴 수 있는** 값 한 벌이다.
+    // fieldParams 를 통째로 담으므로 탐구 노트가 캡처마다 시야를 되살릴 수 있고,
+    // 결과 보드(T06)에 보낼 값도 이것과 같다 — 두 벌을 따로 만들면 어긋난다.
     const capture = {
       slide: m.stage,
-      objective: m.objective,
-      reagent: s.stain,
       drops: s.drops,
-      seed: s.seed,
-      focusErr: focusError(m),
-      bubbles: s.coverslip.bubbles,
-      brightness: brightness(m),
-      tooThick: isTooThick(s),
-      coverage: coverage(s),
-      excess: excess(s),
       at: state.session.captures.length,
+      ...fieldParams(state, m.stage),
     };
     const next = {
       ...state,

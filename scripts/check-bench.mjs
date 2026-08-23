@@ -28,8 +28,29 @@ async function drag(from, to) {
   await page.waitForTimeout(120);
 }
 
-/* ---------- 1단계 ---------- */
+/* ---------- 시작 화면 ---------- */
 await page.goto(BASE, { waitUntil: 'networkidle' });
+
+ok(await page.locator('#start .start-card').isVisible(), '시작 화면이 먼저 뜬다');
+ok(await page.locator('.start-level').count() === 3, '난이도 세 단계를 고를 수 있다');
+const startText = await page.locator('#start').innerText();
+ok(!/[A-Za-z]{4,}/.test(startText.replace(/level=\d/g, '')), '시작 화면이 한글이다',
+   JSON.stringify(startText.slice(0, 40)));
+ok(await page.locator('#app').isHidden(), '고르기 전에는 실험대가 안 보인다');
+// 2단계를 골랐다가 다시 1단계로 — 고른 것이 화면에 표시되는가
+await page.locator('.start-level[data-level="2"]').click();
+ok(await page.locator('.start-level[data-level="2"]').getAttribute('aria-checked') === 'true',
+   '고른 단계가 표시된다');
+ok((await page.locator('#start-go').innerText()).includes('2단계'), '시작 버튼이 고른 단계를 말한다');
+await page.locator('.start-level[data-level="1"]').click();
+await page.locator('#start-go').click();
+await page.waitForTimeout(250);
+ok(await page.locator('#app').isVisible() && await page.locator('#start').isHidden(),
+   '시작하면 실험대로 넘어간다');
+ok(await page.evaluate(() => window.__store.getState().session.level) === 1,
+   '고른 단계로 시작한다');
+
+/* ---------- 1단계 ---------- */
 
 // 되돌리기 버튼이 실험대에 있는가
 ok(await page.locator('#bench #undo').count() === 1, '되돌리기 버튼이 실험대에 있다');
@@ -407,7 +428,8 @@ async function checkButtonContrast(page, where) {
 await checkButtonContrast(page, '라이트');
 
 const darkPage = await browser.newPage({ viewport: { width: 1400, height: 900 }, colorScheme: 'dark' });
-await darkPage.goto(BASE, { waitUntil: 'networkidle' });
+// 다크 모드 대비 검사는 실험대부터 본다. 주소로 단계를 주면 시작 화면을 건너뛴다.
+await darkPage.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
 await darkPage.evaluate(() => window.__store.dispatch('MOUNT', { slide: 'A' }));
 await darkPage.locator('[data-id="microscope"]').click();
 await darkPage.waitForTimeout(200);

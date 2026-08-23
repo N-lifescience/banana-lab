@@ -11,6 +11,7 @@ import { createToastQueue } from './ui/toast.js';
 import { createBench } from './ui/bench.js';
 import { createZoom } from './ui/zoom.js';
 import { createNotebook } from './ui/notebook.js';
+import { createStart } from './ui/start.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -48,28 +49,40 @@ function createStore(initial, onMessage) {
  */
 function levelFromUrl() {
   const raw = Number(new URLSearchParams(location.search).get('level'));
-  return raw === 2 || raw === 3 ? raw : 1;
+  return raw === 1 || raw === 2 || raw === 3 ? raw : null;
 }
 
-// getLevel 은 store 를 나중에 참조한다 — 실제로 호출되는 시점(토스트가 뜰 때)에는
-// store 가 이미 만들어져 있으므로 순서상 문제 없다.
-const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
-const store = createStore(
-  initialState(levelFromUrl()),
-  (message, outcome, tag) => toast.push(message, outcome, tag)
-);
-// 검증 스크립트(scripts/check-ui.mjs)가 상태를 만들고 되돌리기 기록을 들여다보는 통로다.
-// 개발 서버에서만 연다 — 배포본에 남기면 누구나 상태를 직접 바꿀 수 있고,
-// 그건 "강제하지 말고 결과로 답한다" 와는 다른 이야기다. 규칙을 건너뛰는 뒷문이 된다.
-if (import.meta.env.DEV) window.__store = store;
+let store = null;
 
-const zoom = createZoom($('#zoom'), store);
-createBench($('#bench'), store, {
-  onOpenZoom: (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool),
-});
-createNotebook($('#notebook'), store, {
-  onOpenZoom: (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool),
-});
+/**
+ * 고른 단계로 실험을 시작한다.
+ *
+ * 상태는 여기서 처음 만들어진다 — `session.level` 은 세션 내내 바뀌지 않는 값이라
+ * 시작 화면에서 정해진 뒤에 만들어야 한다. 도중에 단계를 바꾸는 길은 두지 않는다.
+ */
+function boot(level) {
+  $('#start').hidden = true;
+  $('#app').hidden = false;
+
+  // getLevel 은 store 를 나중에 참조한다 — 실제로 호출되는 시점(토스트가 뜰 때)에는
+  // store 가 이미 만들어져 있으므로 순서상 문제 없다.
+  const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
+  store = createStore(
+    initialState(level),
+    (message, outcome, tag) => toast.push(message, outcome, tag)
+  );
+  // 검증 스크립트(scripts/check-*.mjs)가 상태를 만들고 되돌리기 기록을 들여다보는 통로다.
+  // 개발 서버에서만 연다 — 배포본에 남기면 누구나 상태를 직접 바꿀 수 있고,
+  // 그건 "강제하지 말고 결과로 답한다" 와는 다른 이야기다. 규칙을 건너뛰는 뒷문이 된다.
+  if (import.meta.env.DEV) window.__store = store;
+
+  const zoom = createZoom($('#zoom'), store);
+  const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
+  createBench($('#bench'), store, { onOpenZoom: openZoom });
+  createNotebook($('#notebook'), store, { onOpenZoom: openZoom });
+
+  startClock();
+}
 
 /* ------------------------------------------------------------------ */
 /* 시간 경과 — 반응 진행도. TICK 의 기본값(seconds=1, speed=10)은        */
@@ -82,8 +95,14 @@ createNotebook($('#notebook'), store, {
 /* 오르는 중인 슬라이드가 있을 때만 보낸다.                               */
 /* ------------------------------------------------------------------ */
 
-setInterval(() => {
-  const reacting = Object.values(store.getState().slides)
-    .some((s) => s.stain && s.drops > 0 && s.reactionT < 1);
-  if (reacting) store.dispatch('TICK', {});
-}, 1000);
+function startClock() {
+  setInterval(() => {
+    const reacting = Object.values(store.getState().slides)
+      .some((s) => s.stain && s.drops > 0 && s.reactionT < 1);
+    if (reacting) store.dispatch('TICK', {});
+  }, 1000);
+}
+
+const fromUrl = levelFromUrl();
+if (fromUrl) boot(fromUrl);
+else createStart($('#start'), boot);
