@@ -183,6 +183,19 @@
   .reflect-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
   .reflect-retry{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
     padding:5px 9px;font-size:12.5px;cursor:pointer}
+  /* 자기 평가 — 리커트 5점 척도. 라디오를 쓰므로 화살표 이동은 브라우저가 해 준다. */
+  .likert-row{border:1px solid var(--rule);border-radius:6px;padding:10px 12px 12px;
+    margin:0 0 12px;min-width:0}
+  .likert-row legend{font-size:13px;font-weight:600;padding:0 4px}
+  .likert-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+  .likert-cell{display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 2px;border:1px solid transparent;border-radius:5px;cursor:pointer;text-align:center}
+  .likert-cell:hover{background:var(--sunk)}
+  .likert-cell input{margin:0;accent-color:var(--indigo)}
+  .likert-num{font-size:12.5px;font-weight:600}
+  .likert-word{font-size:10.5px;color:var(--ink-mute);line-height:1.25}
+  .likert-cell:has(input:checked){border-color:var(--indigo);background:var(--sunk)}
+  .likert-cell:has(input:focus-visible){outline:2px solid var(--indigo);outline-offset:1px}
   #self-eval .self-eval-item{margin-bottom:16px}
   #violations{margin:0;padding-left:18px;font-size:13px}
   .no-violations{color:var(--ink-mute)}

@@ -31,9 +31,14 @@ const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<
  *
  * "관찰 기록" 이라고만 써 두면 무엇을 어떻게 적어야 할지 감이 안 온다.
  * placeholder 라 칸을 누르는 순간 사라지고, 학생이 쓴 글과 섞이지 않는다 — 브라우저가 하는 일이다.
- * 난이도가 올라갈수록 예시가 짧아진다. 무엇을 적을지 스스로 정하는 것도 이 실험의 일부다.
+ *
+ * **1단계는 세부 단계마다 다른 예시를 띄운다.** 스무 칸에 같은 문장을 띄우면
+ * 무엇을 적으라는 건지 알려 주지 못하고, 그 자리에서 관찰한 것이 아니라 앞 칸을 베끼게 만든다.
+ * 2단계는 무엇을 적을지만 알려 주는 한 줄, 3단계는 비운다 —
+ * 무엇을 적을지 스스로 정하는 것도 이 실험의 일부다.
  */
-function notePlaceholder(level) {
+function notePlaceholder(level, step) {
+  if (level === 1) return step?.eg ?? '';
   return UI.notebook.notePlaceholders[level] ?? '';
 }
 
@@ -48,7 +53,7 @@ function stepNoteLabel(key) {
   if (!m) return key;
   const group = UI.protocol.find((g) => g.id === m[1]);
   if (!group) return key;
-  const title = m[2] ? group.steps[m[2].charCodeAt(0) - 97] : group.title;
+  const title = m[2] ? group.steps[m[2].charCodeAt(0) - 97]?.label : group.title;
   return `STEP ${group.id} · ${title ?? group.title}`;
 }
 
@@ -170,15 +175,15 @@ export function createNotebook(root, store, { onOpenZoom }) {
       const nextIdx = level === 1
         ? group.steps.findIndex((_, i) => !st.session.notes[substepId(group, i)])
         : -1;
-      const items = group.steps.map((label, i) => {
+      const items = group.steps.map((step, i) => {
         const id = substepId(group, i);
         const hi = i === nextIdx ? ' substep--next' : '';
         return `
           <li class="substep${hi}">
-            <div class="substep-title">${label}</div>
+            <div class="substep-title">${step.label}</div>
             <label class="notes-label" for="note-${id}">${N.notesLabel}</label>
             <textarea data-note="${id}" id="note-${id}"
-              placeholder="${escapeHtml(notePlaceholder(level))}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
+              placeholder="${escapeHtml(notePlaceholder(level, step))}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
           </li>`;
       }).join('');
       return `
@@ -343,19 +348,50 @@ export function createNotebook(root, store, { onOpenZoom }) {
   /* 7 자기 평가 — session.violations 를 그대로 보여 준다. 감점하지 않는다. */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * 7 자기 평가.
+   *
+   * 척도는 **난이도와 무관하게 세 단계 모두 똑같다.** 자기를 돌아보는 일에 난이도를 매길 이유가 없다.
+   * 점수를 합산하지도, 등급을 내지도 않는다 — 학생이 스스로를 어디쯤으로 보는지가 남을 뿐이다.
+   *
+   * 라디오 버튼을 쓴다. 커스텀 버튼으로 만들면 화살표 이동·그룹 읽기를 직접 구현해야 하는데,
+   * 브라우저가 이미 표준으로 해 주는 일이다.
+   */
   function renderStage7(st) {
-    const items = N.selfEvalItems.map(({ key, label }) => `
+    const scale = N.likertScale;
+    const rows = N.selfEvalItems.map(({ key, label }) => {
+      const saved = st.session.notes[`selfeval.${key}`] ?? '';
+      const cells = scale.map(({ value, label: vLabel }) => `
+        <label class="likert-cell">
+          <input type="radio" name="selfeval.${key}" value="${value}"
+            data-note="selfeval.${key}"${saved === value ? ' checked' : ''}>
+          <span class="likert-num">${value}</span>
+          <span class="likert-word">${vLabel}</span>
+        </label>`).join('');
+      return `
+        <fieldset class="likert-row">
+          <legend>${label}</legend>
+          <div class="likert-scale">${cells}</div>
+        </fieldset>`;
+    }).join('');
+
+    const reflections = N.reflectionItems.map(({ key, label, eg }) => `
       <div class="self-eval-item">
-        <label class="notes-label" for="note-eval-${key}">${label}</label>
-        <textarea data-note="selfeval.${key}" id="note-eval-${key}">${escapeHtml(st.session.notes[`selfeval.${key}`] ?? '')}</textarea>
+        <label class="notes-label" for="note-reflect-${key}">${label}</label>
+        <textarea data-note="reflect.${key}" id="note-reflect-${key}"
+          placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`reflect.${key}`] ?? '')}</textarea>
       </div>`).join('');
+
     const violations = st.session.violations;
     const violationItems = violations.length
       ? violations.map((v) => `<li>${escapeHtml(N.violations[v] ?? v)}</li>`).join('')
       : `<li class="no-violations">${N.noViolations}</li>`;
     return `
       <div id="self-eval">
-        ${items}
+        <h3>${N.likertHeading}</h3>
+        ${rows}
+        <h3>${N.reflectionHeading}</h3>
+        ${reflections}
         <div class="self-eval-item">
           <h3>${N.valuesLabel}</h3>
           <ul id="violations">${violationItems}</ul>

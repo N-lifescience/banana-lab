@@ -108,3 +108,42 @@ test('UI 는 상태를 직접 고치지 않고 reduce 를 거친다', () => {
       `src/ui/${name} 이 상태를 직접 대입합니다 — reduce(state, action) 을 쓰세요`);
   }
 });
+
+test('탐구 과정의 예시 문구가 세부 단계마다 다르다', () => {
+  // 스무 칸에 같은 문장을 띄우면 무엇을 적으라는 건지 알려 주지 못하고,
+  // 그 자리에서 관찰한 것이 아니라 앞 칸을 베끼게 만든다. 실제로 그랬다.
+  const egs = UI.protocol.flatMap((g) => g.steps.map((s) => s.eg));
+  for (const [i, eg] of egs.entries()) {
+    assert.equal(typeof eg, 'string', `${i}번째 세부 단계에 예시 문구가 없습니다`);
+    assert.ok(eg.trim().length > 0, `${i}번째 세부 단계의 예시 문구가 비었습니다`);
+  }
+  assert.equal(new Set(egs).size, egs.length,
+    `예시 문구가 겹칩니다 — ${egs.length}칸에 서로 다른 ${new Set(egs).size}개뿐입니다`);
+  // 세부 단계 이름도 함께 확인한다. 구조를 { label, eg } 로 바꿨으므로 label 이 있어야 한다.
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      assert.equal(typeof s.label, 'string', `STEP ${g.id} 에 label 없는 세부 단계가 있습니다`);
+    }
+  }
+});
+
+test('자기 평가는 난이도와 무관하게 같다', () => {
+  // 자기를 돌아보는 일에 난이도를 매길 이유가 없다. 점수를 합산하지도 등급을 내지도 않는다.
+  assert.equal(UI.notebook.likertScale.length, 5, '리커트 5점 척도여야 한다');
+  const values = UI.notebook.likertScale.map((s) => s.value);
+  assert.deepEqual(values, ['1', '2', '3', '4', '5']);
+  for (const s of UI.notebook.likertScale) {
+    assert.ok(s.label && s.label.trim(), `척도 ${s.value} 에 사람이 읽는 말이 없습니다`);
+  }
+  assert.ok(UI.notebook.selfEvalItems.length >= 3, '자기 평가 문항이 너무 적습니다');
+  for (const it of UI.notebook.selfEvalItems) {
+    assert.ok(it.key && it.label, '자기 평가 문항에 key 나 label 이 없습니다');
+  }
+  // 척도로는 안 남는 것 — 소감을 서술로 받는 자리가 있어야 한다.
+  assert.ok(UI.notebook.reflectionItems.length >= 1, '느낀 점을 적을 자리가 없습니다');
+  for (const it of UI.notebook.reflectionItems) {
+    assert.ok(it.key && it.label && it.eg, '느낀 점 문항에 key·label·eg 가 모두 있어야 합니다');
+  }
+  const keys = UI.notebook.reflectionItems.map((i) => i.key);
+  assert.equal(new Set(keys).size, keys.length, '느낀 점 문항 키가 겹칩니다');
+});
