@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바나나 탐구 시뮬레이터 — 개발 하네스</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 28px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  .stage{background:var(--sunk);border-radius:5px;padding:10px;display:flex;justify-content:center}
+  .stage svg{width:100%;max-width:320px;height:auto;display:block}
+  .ctrl{display:flex;flex-direction:column;gap:5px}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;font-weight:600;
+    letter-spacing:.04em;color:var(--ink-mute)}
+  .ctrl .lab span{font-family:ui-monospace,monospace;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--indigo)}
+  input[type=range]:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .seg{display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .seg button{flex:1;border:none;background:var(--surface);color:var(--ink-mute);
+    font:inherit;font-size:13px;padding:6px 4px;cursor:pointer;border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  .seg button[aria-pressed="true"]{background:var(--indigo);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .meter{display:flex;flex-direction:column;gap:5px}
+  .meter .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .meter .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
+  .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
+  .hint{font-size:12.5px;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>바나나 탐구 시뮬레이터 — 개발 하네스</h1>
+  <p class="note" id="harness-note"></p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>애셋 — 바나나 (라인 + 플랫)</h2>
+      <div class="stage" id="banana-slot"></div>
+      <div class="ctrl">
+        <div class="lab"><label for="ripe">익은 정도</label><span id="v-ripe"></span></div>
+        <input type="range" id="ripe" min="0" max="100" value="35">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="peel">껍질 벗김</label><span id="v-peel"></span></div>
+        <input type="range" id="peel" min="0" max="100" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="thickness">시료 두께</label><span id="v-thickness"></span></div>
+        <input type="range" id="thickness" min="0" max="100" value="30">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>현미경 시야</h2>
+      <div class="stage" id="fov-slot"></div>
+
+      <div class="ctrl">
+        <div class="lab"><span>검출 용액</span></div>
+        <div class="seg" id="reagent" role="group" aria-label="검출 용액 선택">
+          <button type="button" data-value="NONE">없음 (가)</button>
+          <button type="button" data-value="IKI" aria-pressed="true">아이오딘 (나)</button>
+          <button type="button" data-value="SUDAN3">수단 Ⅲ (다)</button>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><label for="drops">떨어뜨린 방울 수</label><span id="v-drops"></span></div>
+        <input type="range" id="drops" min="0" max="6" step="1" value="2">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="objective">대물렌즈</label><span id="v-objective"></span></div>
+        <input type="range" id="objective" min="0" max="2" step="1" value="2">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="focus">초점 (미동나사)</label><span id="v-focus"></span></div>
+        <input type="range" id="focus" min="-200" max="200" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="diaphragm">조리개</label><span id="v-diaphragm"></span></div>
+        <input type="range" id="diaphragm" min="0" max="100" value="80">
+      </div>
+
+      <div class="meter">
+        <div class="bar"><div class="fill" id="q-fill"></div></div>
+        <div class="cap"><span>관찰 가능성</span><b id="q-value"></b></div>
+        <div class="hint" id="q-hint"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
