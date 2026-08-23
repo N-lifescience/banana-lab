@@ -92,6 +92,63 @@ test('panX 만 바꾸면 SVG 가 달라진다', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* 1b. 한 화면에 여러 장 — 결과 보드(T06)가 설 자리                    */
+/* ------------------------------------------------------------------ */
+
+/** 문서 안에서 `filter="url(#X)"` 로 가리켜진 필터의 stdDeviation 을 찾아 돌려준다 */
+function blurUsedBy(doc, sceneId) {
+  const scene = doc.match(new RegExp(`<g id="${sceneId}"[^>]*>`));
+  assert.ok(scene, `${sceneId} 를 찾을 수 없습니다`);
+  // 그 시야를 감싼 <g filter="url(#...)"> 를 찾는다
+  const before = doc.slice(0, doc.indexOf(scene[0]));
+  const filterRefs = [...before.matchAll(/filter="url\(#([^)]+)\)"/g)];
+  const filterId = filterRefs[filterRefs.length - 1][1];
+  const std = doc.match(new RegExp(`<filter id="${filterId}"[^>]*>\\s*<feGaussianBlur stdDeviation="([\\d.]+)"`));
+  assert.ok(std, `${filterId} 필터를 찾을 수 없습니다`);
+  return { filterId, stdDeviation: Number(std[1]) };
+}
+
+test('한 문서에 시야를 둘 그리면 각자의 흐림을 쓴다', () => {
+  // 결과 보드는 한 화면에 시야 카드를 여러 장 늘어놓는다.
+  // 같은 문서에 같은 id 가 둘이면 브라우저는 먼저 나온 것만 쓴다 —
+  // 모든 카드가 첫 카드의 흐림을 쓰게 되어 초점이 다른 카드가 같게 보인다.
+  // 에러가 나지 않으므로 이 테스트가 없으면 조용히 틀린 채로 배포된다.
+  const sharp = renderFOV(P({ focusErr: 0 }), { idPrefix: 'a-' });
+  const blurry = renderFOV(P({ focusErr: 0.2 }), { idPrefix: 'b-' });
+  const doc = `<div>${sharp}${blurry}</div>`;
+
+  const a = blurUsedBy(doc, 'a-fov-scene');
+  const b = blurUsedBy(doc, 'b-fov-scene');
+
+  assert.notEqual(a.filterId, b.filterId, '두 시야가 같은 필터를 가리킵니다');
+  assert.notEqual(a.stdDeviation, b.stdDeviation,
+    `초점이 다른데 같은 흐림을 씁니다 (둘 다 ${a.stdDeviation})`);
+  assert.equal(a.stdDeviation, 0, '초점이 맞은 쪽은 흐리지 않아야 합니다');
+  assert.ok(b.stdDeviation > 0, '초점이 어긋난 쪽은 흐려야 합니다');
+});
+
+test('접두사를 주면 모든 id 와 참조에 붙는다', () => {
+  const svg = renderFOV(P({ coverage: 0.5, objective: 4 }), { idPrefix: 'card2-' });
+  const ids = [...svg.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(ids.length > 0);
+  for (const id of ids) {
+    assert.ok(id.startsWith('card2-'), `접두사가 안 붙은 id: ${id}`);
+  }
+  // 가리키는 쪽도 전부 접두사를 따라가야 한다. 하나라도 빠지면 옆 카드 것을 쓴다.
+  for (const m of svg.matchAll(/url\(#([^)]+)\)/g)) {
+    assert.ok(m[1].startsWith('card2-'), `접두사가 안 붙은 참조: url(#${m[1]})`);
+  }
+});
+
+test('접두사를 안 주면 지금까지와 똑같다', () => {
+  // 화면 하나에 시야가 하나뿐인 경우(확대 뷰)는 바뀌면 안 된다.
+  const svg = renderFOV(P());
+  for (const name of ['fov-clip', 'fov-blur', 'fov-vig', 'fov-scene', 'fov-dark']) {
+    assert.ok(svg.includes(`id="${name}"`), `${name} 이 없습니다 — zoom.js 가 이 이름으로 찾습니다`);
+  }
+});
+
+/* ------------------------------------------------------------------ */
 /* 2. 시약 × coverage 여섯 조합                                        */
 /* ------------------------------------------------------------------ */
 

@@ -69,10 +69,28 @@ function reactionStage(reactionT) {
  * 나머지(시약·방울·배율·반응·오염·기포·파손·시드)는 그림 자체가 달라지므로 다시 만든다.
  * 대신 이것들은 드래그가 아니라 한 번씩 일어나는 조작이라 60 ms 를 치러도 된다.
  *
+ * 한 화면에 시야를 여러 개 그릴 때는 `idPrefix` 를 서로 다르게 줘야 한다.
+ *
+ * 이 SVG 는 `<clipPath>` · `<filter>` · `<radialGradient>` · `<pattern>` 을 id 로 참조한다.
+ * 같은 문서에 같은 id 가 둘 이상 있으면 브라우저는 **먼저 나온 것 하나만** 쓴다.
+ * 결과 보드처럼 시야 카드를 여러 장 늘어놓으면 모든 카드가 첫 카드의 흐림과 잘라내기를
+ * 쓰게 되어, 초점이 다른 카드가 같은 흐림으로 보인다. **에러 없이 조용히 틀린다.**
+ *
+ *   renderFOV(a, { idPrefix: 'card1-' })
+ *   renderFOV(b, { idPrefix: 'card2-' })
+ *
+ * 기본값은 빈 문자열이라 한 장만 그릴 때는 지금까지와 똑같다.
+ * 속성만 갱신하는 쪽(`src/ui/zoom.js`)도 같은 접두사로 찾아야 한다.
+ *
  * @param {object} p  state.fieldParams() 의 결과
+ * @param {{idPrefix?: string}} [opts]
  * @returns {string} SVG 문자열
  */
-export function renderFOV(p) {
+export function renderFOV(p, { idPrefix = '' } = {}) {
+  /** 이 시야만의 id. 같은 문서 안 다른 시야와 겹치지 않는다. */
+  const id = (name) => `${idPrefix}${name}`;
+  /** 위 id 를 가리키는 참조 */
+  const ref = (name) => `url(#${idPrefix}${name})`;
   const { size: FS, radius: R, cx: CX, cy: CY } = FOV;
   const seed = p.seed || 1;
   const r = rng(seed);
@@ -183,12 +201,12 @@ export function renderFOV(p) {
       `<ellipse cx="${(T * 0.78).toFixed(2)}" cy="${(T * 0.74).toFixed(2)}" rx="${(granR * 0.9).toFixed(2)}" ry="${(granR * 0.9 / 1.58).toFixed(2)}" transform="rotate(-38 ${(T * 0.78).toFixed(2)} ${(T * 0.74).toFixed(2)})" fill="${f}" stroke="${l}" stroke-width="${psw}"/>`;
     const stained = isIKI && stage > 0 && sfr > 0;
     defsExtra =
-      `<pattern id="gp-plain" width="${T.toFixed(2)}" height="${T.toFixed(2)}" patternUnits="userSpaceOnUse" patternTransform="rotate(17)">${tile(PLAIN_FILL, PLAIN_LINE)}</pattern>` +
-      (stained ? `<pattern id="gp-stain" width="${T.toFixed(2)}" height="${T.toFixed(2)}" patternUnits="userSpaceOnUse" patternTransform="rotate(17)">${tile(stainTop[0], stainTop[1])}</pattern>` : '');
+      `<pattern id="${id('gp-plain')}" width="${T.toFixed(2)}" height="${T.toFixed(2)}" patternUnits="userSpaceOnUse" patternTransform="rotate(17)">${tile(PLAIN_FILL, PLAIN_LINE)}</pattern>` +
+      (stained ? `<pattern id="${id('gp-stain')}" width="${T.toFixed(2)}" height="${T.toFixed(2)}" patternUnits="userSpaceOnUse" patternTransform="rotate(17)">${tile(stainTop[0], stainTop[1])}</pattern>` : '');
     // 배경 텍스처는 보이는 창만 덮는다. 패턴이 userSpaceOnUse 라 창을 옮겨도 무늬가 이어진다.
-    body += `<rect x="${panX.toFixed(1)}" y="${panY.toFixed(1)}" width="${FS}" height="${FS}" fill="url(#gp-plain)"/>`;
+    body += `<rect x="${panX.toFixed(1)}" y="${panY.toFixed(1)}" width="${FS}" height="${FS}" fill="${ref('gp-plain')}"/>`;
     if (stained) {
-      body += `<circle cx="${sfx}" cy="${sfy}" r="${sfr.toFixed(1)}" fill="url(#gp-stain)"/>`;
+      body += `<circle cx="${sfx}" cy="${sfy}" r="${sfr.toFixed(1)}" fill="${ref('gp-stain')}"/>`;
       // 배율이 낮을수록 알갱이가 뭉쳐 하나의 색면으로 보인다
       body += `<circle cx="${sfx}" cy="${sfy}" r="${sfr.toFixed(1)}" fill="${stainTop[0]}" opacity="${(0.30 * Math.min(1, 20 / cell)).toFixed(2)}"/>`;
     }
@@ -276,7 +294,7 @@ export function renderFOV(p) {
   // 상은 재물대와 반대로 움직인다.
   // 기포와 금 간 선은 슬라이드에 붙은 것이라 함께 움직인다 — 렌즈에 붙은 얼룩(smudge)만 고정이다.
   // 여기서 갈라 두지 않으면 기포가 접안렌즈에 붙어 있는 것처럼 보인다.
-  const scene = `<g id="fov-scene" transform="translate(${(-panX).toFixed(1)},${(-panY).toFixed(1)})">${body}${bubbles}${cracks}</g>`;
+  const scene = `<g id="${id('fov-scene')}" transform="translate(${(-panX).toFixed(1)},${(-panY).toFixed(1)})">${body}${bubbles}${cracks}</g>`;
 
   // 넘친 용액이 배경까지 물들인다
   let wash = '';
@@ -299,22 +317,22 @@ export function renderFOV(p) {
 
   const blur = (p.focusErr || 0) * 22 + (p.floating ? 2.4 : 0);
   const ghost = p.floating
-    ? `<g transform="translate(8,6)" opacity="0.48" filter="url(#fov-blur)">${scene}</g>` : '';
+    ? `<g transform="translate(8,6)" opacity="0.48" filter="${ref('fov-blur')}">${scene}</g>` : '';
   const dark = 1 - clamp(p.brightness ?? 1, 0, 1);
 
   return `<svg viewBox="0 0 ${FS} ${FS}" role="img" aria-label="현미경 시야">
   <defs>
-    <clipPath id="fov-clip"><circle cx="${CX}" cy="${CY}" r="${R}"/></clipPath>
-    <filter id="fov-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${blur.toFixed(2)}"/></filter>
-    <radialGradient id="fov-vig"><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></radialGradient>
+    <clipPath id="${id('fov-clip')}"><circle cx="${CX}" cy="${CY}" r="${R}"/></clipPath>
+    <filter id="${id('fov-blur')}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${blur.toFixed(2)}"/></filter>
+    <radialGradient id="${id('fov-vig')}"><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></radialGradient>
     ${defsExtra}
   </defs>
   <circle cx="${CX}" cy="${CY}" r="${R}" fill="${BG[key]}"/>
-  <g clip-path="url(#fov-clip)">
-    <g filter="url(#fov-blur)">${scene}</g>
+  <g clip-path="${ref('fov-clip')}">
+    <g filter="${ref('fov-blur')}">${scene}</g>
     ${ghost}${wash}${thick}${smudge}
-    <rect id="fov-dark" x="0" y="0" width="${FS}" height="${FS}" fill="#000" opacity="${(dark * 0.55).toFixed(2)}"/>
-    <circle cx="${CX}" cy="${CY}" r="${R}" fill="url(#fov-vig)"/>
+    <rect id="${id('fov-dark')}" x="0" y="0" width="${FS}" height="${FS}" fill="#000" opacity="${(dark * 0.55).toFixed(2)}"/>
+    <circle cx="${CX}" cy="${CY}" r="${R}" fill="${ref('fov-vig')}"/>
   </g>
   <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="4"/>
   <text x="${CX}" y="${FS - 6}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="rgba(0,0,0,.42)">시야 지름 약 ${Math.round(fieldDiameterUm(p.objective))} µm</text>

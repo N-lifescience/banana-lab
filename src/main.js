@@ -58,7 +58,10 @@ const store = createStore(
   initialState(levelFromUrl()),
   (message, outcome, tag) => toast.push(message, outcome, tag)
 );
-window.__store = store; // scripts/check-ui.mjs 가 되돌리기 기록 검사에 쓴다.
+// 검증 스크립트(scripts/check-ui.mjs)가 상태를 만들고 되돌리기 기록을 들여다보는 통로다.
+// 개발 서버에서만 연다 — 배포본에 남기면 누구나 상태를 직접 바꿀 수 있고,
+// 그건 "강제하지 말고 결과로 답한다" 와는 다른 이야기다. 규칙을 건너뛰는 뒷문이 된다.
+if (import.meta.env.DEV) window.__store = store;
 
 const zoom = createZoom($('#zoom'), store);
 createBench($('#bench'), store, {

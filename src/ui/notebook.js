@@ -134,9 +134,33 @@ export function createNotebook(root, store, { onOpenZoom }) {
         <section class="note-step" data-step-group="${group.id}">
           <h3>STEP ${group.id} · ${group.title}</h3>
           <ul class="substep-list">${items}</ul>
+          ${group.id === '4' ? questionA(st) : ''}
         </section>`;
     }).join('');
     return `<div id="note-step-4">${stepsHtml}</div>`;
+  }
+
+  /**
+   * 질문 ⓐ — STEP 4 직후에 묻는다. **순서가 곧 논증이다** (`docs/06`).
+   *
+   * (가) 대조군과 (나)(다)의 색 차이를 눈으로 본 **직후**에 물어야 답이 나온다.
+   * 6단계까지 미뤄서 물으면 학생은 그때 본 것을 기억으로 더듬어야 하고,
+   * "왜 용액을 쓰는가" 가 눈앞의 관찰이 아니라 지식 회상 문제가 된다.
+   *
+   * 여기서 받은 답은 `notes['q.a']` 한 곳에 저장되고, 6단계에서는 같은 값을 이어 쓴다 —
+   * 다시 묻지 않는다.
+   */
+  function questionA(st) {
+    const val = st.session.notes['q.a'] ?? '';
+    const g = val.trim() ? gradeQuestion('qa', val) : null;
+    return `
+      <div class="grade-block question-a">
+        <h4>${N.questionA.heading}</h4>
+        <p class="stage-text">${N.questionA.prompt}</p>
+        <label class="notes-label" for="note-qa-step4">${N.questionA.label}</label>
+        <textarea data-note="q.a" id="note-qa-step4">${escapeHtml(val)}</textarea>
+        ${g ? `<p class="grade-line" id="grade-qa" data-grade="${g.status}">${g.message ?? N.gradeOk}</p>` : ''}
+      </div>`;
   }
 
   /* ---------------------------------------------------------------- */
@@ -237,7 +261,11 @@ export function createNotebook(root, store, { onOpenZoom }) {
       ${renderStepNotesRecap(st)}
       ${renderPredictCompare(st)}
       <section class="grade-block">
-        <label class="notes-label" for="note-qa">${N.qaLabel}</label>
+        <!-- 질문 ⓐ 는 STEP 4 직후에 이미 물었다 (docs/06 — 순서가 곧 논증이다).
+             여기서 다시 묻지 않고, 그때 쓴 답을 그대로 이어 쓰게 한다.
+             같은 notes['q.a'] 를 쓰므로 어느 쪽에서 고쳐도 한 벌이다. -->
+        <label class="notes-label" for="note-qa">${N.qaContinueLabel}</label>
+        <p class="stage-empty">${qa.trim() ? N.qaCarried : N.qaNotYet}</p>
         <textarea data-note="q.a" id="note-qa">${escapeHtml(qa)}</textarea>
         <p id="grade-qa" class="grade-line" data-grade="${gA.status}">${gA.message ?? ''}</p>
       </section>
