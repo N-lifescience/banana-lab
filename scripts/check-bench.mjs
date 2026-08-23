@@ -148,6 +148,57 @@ await page.waitForTimeout(120);
 const viol = await page.evaluate(() => window.__store.getState().session.violations);
 ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것으로 기록된다', JSON.stringify(viol));
 
+/* ---------- 키보드만으로 끌어다 놓기 ---------- */
+
+// 끌어다 놓는 조작에 키보드 경로가 없으면, 마우스를 쓰지 못하는 사람은 실험을 시작조차 못 한다.
+// 포커스로 말풍선이 뜰 때 **놓을 곳 버튼**이 함께 나오고, Enter 로 놓인다.
+{
+  const kb = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await kb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await kb.waitForTimeout(250);
+  const state = () => kb.evaluate(() => window.__store.getState());
+  const put = async (who, onto) => {
+    await kb.locator(`[data-id="${who}"]`).focus();
+    await kb.waitForTimeout(200);
+    const btn = kb.locator(`#bench-tip [data-onto="${onto}"]`);
+    if (!(await btn.count())) return false;
+    await btn.focus();
+    await kb.keyboard.press('Enter');
+    await kb.waitForTimeout(260);
+    return true;
+  };
+
+  await kb.locator('[data-id="banana"]').focus();
+  await kb.keyboard.press('Enter');
+  await kb.waitForTimeout(150);
+  ok((await state()).tools.banana.peeled, '키보드 — Enter 로 껍질을 벗긴다');
+
+  ok(await put('banana', 'slideB'), '키보드 — 말풍선에 놓을 곳 버튼이 나온다');
+  ok((await state()).slides.B.sample !== null, '키보드 — 받침 유리에 문질러 바른다',
+     JSON.stringify((await state()).slides.B.sample));
+  await put('dropper', 'bottleIKI');
+  ok((await state()).tools.dropper.holds === 'IKI', '키보드 — 스포이트를 채운다');
+  await put('forceps', 'coverslip1');
+  ok((await state()).tools.forceps.holding === 'coverslip', '키보드 — 핀셋으로 집는다');
+  await put('slideB', 'microscope');
+  ok((await state()).microscope.stage === 'B', '키보드 — 재물대에 올린다');
+  // 받침 유리는 재물대에 올라가면 화면에서 사라진다. 그때는 놓은 자리로 옮겨야 한다 —
+  // 그냥 두면 포커스가 <body> 로 빠져 처음부터 Tab 해 돌아와야 한다.
+  ok(await kb.evaluate(() => document.activeElement?.dataset?.id) === 'microscope',
+     '키보드 — 놓은 물건이 사라지면 놓은 자리로 포커스가 간다');
+
+  // 3단계도 조작은 똑같이 된다 — 줄어드는 것은 설명뿐이다.
+  const kb3 = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await kb3.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+  await kb3.waitForTimeout(250);
+  await kb3.locator('[data-id="banana"]').focus();
+  await kb3.waitForTimeout(200);
+  ok(await kb3.locator('#bench-tip [data-onto]').count() === 3,
+     '3단계에서도 놓을 곳 버튼은 그대로 나온다');
+  await kb3.close();
+  await kb.close();
+}
+
 /* ---------- 슬라이드 제작 확대 뷰 ---------- */
 
 // 빗나간 슬라이드는 제자리로 돌아가는가 (현미경 위에 얹혀 "올라간 것처럼" 보이지 않는가)

@@ -357,12 +357,66 @@ export function createBench(root, store, { onOpenZoom }) {
   /* 안내 말풍선 — 이름과 지금 할 수 있는 조작                          */
   /* ---------------------------------------------------------------- */
 
-  function showTip(item) {
+  /**
+   * 키보드로 끌어다 놓기.
+   *
+   * 끌어다 놓는 조작에는 키보드 경로가 없었다 — 문지르기·채우기·집기·올리기가 전부
+   * 마우스 전용이라, 마우스를 쓰지 못하면 실험을 시작조차 할 수 없었다.
+   *
+   * 포커스로 말풍선이 떴을 때만 **놓을 곳 버튼**을 함께 낸다. Tab 으로 들어가 Enter 로 놓는다.
+   * 마우스로는 손짓이 정하던 값(문지른 정도·덮는 각도)을 키보드로는 정할 수 없으므로
+   * 가운뎃값을 쓴다 — 정할 수 있는 것과 아예 못 하는 것 사이의 격차는 남지만,
+   * 못 하는 쪽보다는 낫다. 말풍선에 그 값을 적어 둔다.
+   */
+  const KEYBOARD_SMEAR_MM = SMEAR_FULL_MM / 2;
+  const KEYBOARD_ANGLE_DEG = 45;
+
+  function dropTargetsFor(item) {
+    const accepts = DROPS[item.kind] ?? {};
+    return items.filter((o) => o.id !== item.id && !isHidden(o) && accepts[o.kind]);
+  }
+
+  function runDrop(item, target) {
+    const run = DROPS[item.kind]?.[target.kind];
+    if (!run) return;
+    // 손짓이 정하던 값의 자리에 가운뎃값을 넣는다.
+    const rad = (KEYBOARD_ANGLE_DEG * Math.PI) / 180;
+    run(item, target, {
+      smearMm: KEYBOARD_SMEAR_MM,
+      lastDx: Math.cos(rad) * 10,
+      lastDy: Math.sin(rad) * 10,
+    });
+    renderTokens();
+    // 놓고 나면 그 물건으로 포커스를 돌려준다. 그러지 않으면 포커스가 <body> 로 빠져
+    // 키보드로 쓰는 사람은 매번 처음부터 Tab 해서 돌아와야 한다.
+    // focus() 가 focus 이벤트를 쏘고, 그 핸들러가 말풍선을 다시 낸다 — 여기서 또 부르지 않는다.
+    // 놓은 물건이 화면에서 사라졌으면(재물대에 올라간 받침 유리) **놓은 자리**로 옮긴다.
+    // 그냥 두면 포커스가 <body> 로 빠져, 키보드로 쓰는 사람은 처음부터 Tab 해 돌아와야 한다.
+    (elFor(item.id) ?? elFor(target.id))?.focus();
+  }
+
+  function showTip(item, withActions = false) {
     if (drag) return;
+    clearTimeout(hideTimer);   // 옆 물건으로 옮겨 오는 중이었다면 예약된 닫기를 취소한다
+    hideTimer = 0;
     const level = store.getState().session.level;
     const lines = UI.bench.hints[item.kind]?.[level] ?? [];
+    const targets = withActions ? dropTargetsFor(item) : [];
+    const actions = targets.length ? `
+      <div class="tip-actions">
+        <span class="tip-actions-label">${UI.bench.keyboardPut}</span>
+        ${targets.map((t) => `<button type="button" data-put="${item.id}" data-onto="${t.id}"
+          >${t.label}</button>`).join('')}
+      </div>` : '';
     tipEl.innerHTML =
-      `<b>${item.label}</b>${lines.map((t) => `<span>${t}</span>`).join('')}`;
+      `<b>${item.label}</b>${lines.map((t) => `<span>${t}</span>`).join('')}${actions}`;
+    tipEl.querySelectorAll('[data-put]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const from = items.find((i) => i.id === b.dataset.put);
+        const onto = items.find((i) => i.id === b.dataset.onto);
+        if (from && onto) runDrop(from, onto);
+      });
+    });
     // 무대 밖으로 밀려나지 않게 가로 위치를 안쪽으로 묶는다.
     const centerMm = item.x + CONTRACT[item.asset].realSizeMm / 2;
     tipEl.style.left = `${clamp(xPct(centerMm), 12, 88)}%`;
@@ -373,9 +427,25 @@ export function createBench(root, store, { onOpenZoom }) {
     tipEl.hidden = false;
   }
 
+  /** 닫기 예약. 새 포커스가 오면 showTip 이 취소한다. */
+  let hideTimer = 0;
+
   function hideTip() {
+    clearTimeout(hideTimer);
+    hideTimer = 0;
     tipEl.hidden = true;
   }
+
+  function hideTipSoon() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideTip, 0);
+  }
+
+  // 말풍선 안 버튼에서 포커스가 완전히 빠져나가면 닫는다.
+  tipEl.addEventListener('focusout', (e) => {
+    if (tipEl.contains(e.relatedTarget) || layer.contains(e.relatedTarget)) return;
+    hideTip();
+  });
 
   /* ---------------------------------------------------------------- */
   /* 드래그                                                            */
@@ -555,9 +625,13 @@ export function createBench(root, store, { onOpenZoom }) {
       el.addEventListener('pointercancel', onPointerUp);
 
       el.addEventListener('pointerenter', () => showTip(item));
-      el.addEventListener('pointerleave', hideTip);
-      el.addEventListener('focus', () => showTip(item));
-      el.addEventListener('blur', hideTip);
+      el.addEventListener('pointerleave', () => hideTip());
+      // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
+      el.addEventListener('focus', () => showTip(item, true));
+      // 포커스가 옮겨 갈 때 blur 가 focus 보다 먼저 온다. 여기서 곧바로 닫으면
+      // 옆 물건으로 Tab 한 순간 말풍선이 닫혔다가 다시 열리며 서로를 지운다.
+      // 닫기를 한 프레임 미루고, 그 사이 새 포커스가 오면 취소한다.
+      el.addEventListener('blur', () => hideTipSoon());
 
       // 포인터를 거치지 않고 눌리는 경우 — 보조기기의 element.click() 등.
       // 방금 포인터로 처리했으면 같은 누름이므로 넘긴다.
