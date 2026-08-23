@@ -1,0 +1,319 @@
+/**
+ * 탐구 노트 — 7단계 패널.
+ *
+ * docs/06-lab-notebook.md 의 7단계(문제 인식~자기 평가)를 최상위 탭으로, T04 까지 탭으로
+ * 쓰던 6개 조작 절차(바나나 준비~현미경 관찰)는 4단계 「탐구 과정」 안의 STEP 으로 내린다.
+ * strings.js 의 UI.protocol 이 이미 그 6개 STEP 의 제목/세부 단계 텍스트를 갖고 있으므로
+ * 그대로 재사용하고, 세부 단계 id(1a, 1b, 2a…)는 배열 순서에서 글자를 붙여 만든다.
+ *
+ * 결과를 바꾸는 조작은 전부 store.dispatch('SAVE_NOTE', …) 를 거쳐 reduce() 로 간다 — 이 파일은
+ * session.notes 를 직접 대입하지 않는다.
+ */
+
+import { SLIDE_IDS } from '../sim/state.js';
+import { observability } from '../sim/quality.js';
+import { magnification } from '../sim/optics.js';
+import { gradeQuestion, gradeMagnification } from './grading.js';
+import { UI } from './strings.js';
+
+const N = UI.notebook;
+
+/** 흐림 판정 기준 점수. observability().score 가 이보다 낮으면 성찰 문항이 붙는다. */
+// ponytail: 임계값 추정치. docs/06 에 정확한 수치가 없다 — 체감상 어긋나면 이 숫자만 바꾸면 된다.
+const LOW_OBSERVABILITY = 60;
+
+const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+/** STEP(UI.protocol 의 한 원소) 안에서 i번째 세부 단계의 저장 키. '3b' 같은 형태. */
+function substepId(group, i) {
+  return `${group.id}${String.fromCharCode(97 + i)}`;
+}
+
+/** notes 키 '3b' 를 "STEP 3 · 색 변화 관찰" 같은 사람이 읽는 문장으로. */
+function stepNoteLabel(key) {
+  const m = /^([1-6])([a-z])?$/.exec(key);
+  if (!m) return key;
+  const group = UI.protocol.find((g) => g.id === m[1]);
+  if (!group) return key;
+  const title = m[2] ? group.steps[m[2].charCodeAt(0) - 97] : group.title;
+  return `STEP ${group.id} · ${title ?? group.title}`;
+}
+
+export function createNotebook(root, store, { onOpenZoom }) {
+  root.innerHTML = `
+    <h1>${N.heading}</h1>
+    <div class="undo-row">
+      <button type="button" id="undo">${UI.undo.label}</button>
+      <span id="undo-left"></span>
+    </div>
+    <div id="note-tabs" class="note-tabs" role="tablist"></div>
+    <div id="note-panel" class="note-panel"></div>`;
+
+  const tabsEl = root.querySelector('#note-tabs');
+  const panelEl = root.querySelector('#note-panel');
+  let activeStage = N.stages[0].id;
+
+  for (const stage of N.stages) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'note-tab';
+    tab.textContent = `${stage.id}. ${stage.title}`;
+    tab.setAttribute('role', 'tab');
+    tab.dataset.stage = stage.id;
+    tab.addEventListener('click', () => { activeStage = stage.id; render(); });
+    tabsEl.appendChild(tab);
+  }
+  root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
+
+  /* ---------------------------------------------------------------- */
+  /* 1 문제 인식 · 2 준비물                                             */
+  /* ---------------------------------------------------------------- */
+
+  function renderStage1() {
+    return `<p class="stage-text">${N.problem}</p>`;
+  }
+
+  function renderStage2() {
+    const I = UI.bench.items;
+    const items = [
+      I.banana, I.slideA, I.slideB, I.slideC, I.coverslip, I.dropper, I.forceps,
+      I.bottleIKI, I.bottleSUDAN, I.microscope,
+    ];
+    return `
+      <h3>${N.materialsHeading}</h3>
+      <ul class="materials-list">${items.map((n) => `<li>${n}</li>`).join('')}</ul>
+      <h3>${N.safetyHeading}</h3>
+      <ul class="safety-list">${N.safetyNotes.map((n) => `<li>${n}</li>`).join('')}</ul>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 3 예상 — 채점하지 않는다. 6단계에서 실제 결과와 나란히 보여 줄 뿐이다. */
+  /* ---------------------------------------------------------------- */
+
+  function renderStage3(st) {
+    return SLIDE_IDS.map((id) => `
+      <div class="predict-block">
+        <h3>${UI.slides[id]}</h3>
+        <label class="notes-label" for="note-predict-${id}">${N.predictLabel}</label>
+        <textarea data-note="predict.${id}" id="note-predict-${id}">${escapeHtml(st.session.notes[`predict.${id}`] ?? '')}</textarea>
+      </div>`).join('');
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 4 탐구 과정 — STEP 1~6. 난이도별로 절차 제시만 달리한다 (docs/06 표). */
+  /* ---------------------------------------------------------------- */
+
+  function renderStage4(st) {
+    const level = st.session.level;
+    const stepsHtml = UI.protocol.map((group) => {
+      if (level >= 3) {
+        // 3단계 — 목표만, 절차 없음
+        const val = st.session.notes[group.id] ?? '';
+        return `
+          <section class="note-step" data-step-group="${group.id}">
+            <h3>STEP ${group.id} · ${group.title}</h3>
+            <label class="notes-label" for="note-${group.id}">${N.goalOnlyLabel(group.title)}</label>
+            <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>
+          </section>`;
+      }
+      // 1단계 — 다음(아직 기록이 없는) 세부 단계를 하이라이트. 2단계 — 목록만.
+      const nextIdx = level === 1
+        ? group.steps.findIndex((_, i) => !st.session.notes[substepId(group, i)])
+        : -1;
+      const items = group.steps.map((label, i) => {
+        const id = substepId(group, i);
+        const hi = i === nextIdx ? ' substep--next' : '';
+        return `
+          <li class="substep${hi}">
+            <div class="substep-title">${label}</div>
+            <label class="notes-label" for="note-${id}">${N.notesLabel}</label>
+            <textarea data-note="${id}" id="note-${id}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
+          </li>`;
+      }).join('');
+      return `
+        <section class="note-step" data-step-group="${group.id}">
+          <h3>STEP ${group.id} · ${group.title}</h3>
+          <ul class="substep-list">${items}</ul>
+        </section>`;
+    }).join('');
+    return `<div id="note-step-4">${stepsHtml}</div>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 5 결과 — 캡처 자동 첨부 + 배율 직접 입력                            */
+  /* ---------------------------------------------------------------- */
+
+  function renderStage5(st) {
+    const caps = st.session.captures;
+    if (caps.length === 0) return `<p class="stage-empty">${N.noCaptures}</p>`;
+    return `<div class="capture-list">${caps.map((c, i) => {
+      const key = `mag.${i}`;
+      const domId = `note-mag-${i}`; // id 에는 '.' 을 안 쓴다 — CSS 선택자에서 클래스로 오해된다
+      const saved = st.session.notes[key] ?? '';
+      const check = saved !== '' ? gradeMagnification(saved, c.objective) : null;
+      return `
+        <div class="capture-card">
+          <h3>${UI.slides[c.slide]} · ${UI.reagents[c.reagent ?? 'NONE']}</h3>
+          <dl class="capture-readout">
+            <div><dt>${UI.controls.objective}</dt><dd>${UI.units.mag(magnification(c.objective))}</dd></div>
+            <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
+          </dl>
+          <label class="notes-label" for="${domId}">${N.magInput}</label>
+          <input type="text" inputmode="numeric" placeholder="${N.magPlaceholder}"
+            data-note="${key}" id="${domId}" value="${escapeHtml(saved)}">
+          ${check ? `<p class="grade-line" data-grade="${check.status}">${check.message ?? ''}</p>` : ''}
+        </div>`;
+    }).join('')}</div>`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 6 정리 — 서술형 3문항 + 첨삭, 세부 단계 기록·예상 재복습, 성찰 문항  */
+  /* ---------------------------------------------------------------- */
+
+  function actualSummary(st, slideId) {
+    const cap = [...st.session.captures].reverse().find((c) => c.slide === slideId);
+    if (cap) return `${UI.reagents[cap.reagent ?? 'NONE']} · ${UI.observability.label} ${observability(cap).score}`;
+    const s = st.slides[slideId];
+    if (s.stain) return `${UI.reagents[s.stain]} · 반응 진행도 ${Math.round(s.reactionT * 100)}%`;
+    return UI.reagents.NONE;
+  }
+
+  function renderStepNotesRecap(st) {
+    const rows = Object.entries(st.session.notes)
+      .filter(([k, v]) => /^[1-6][a-z]?$/.test(k) && v && v.trim())
+      .map(([k, v]) => `<li><b>${stepNoteLabel(k)}</b> — ${escapeHtml(v)}</li>`);
+    if (rows.length === 0) return '';
+    return `<section><h3>${N.stepNotesHeading}</h3><ul class="step-notes-recap">${rows.join('')}</ul></section>`;
+  }
+
+  function renderPredictCompare(st) {
+    const rows = SLIDE_IDS.map((id) => `
+      <div class="predict-compare-row">
+        <h4>${UI.slides[id]}</h4>
+        <div>${N.predictLabel} ${escapeHtml(st.session.notes[`predict.${id}`] ?? '—')}</div>
+        <div>${N.actualLabel}: ${actualSummary(st, id)}</div>
+      </div>`).join('');
+    return `<section><h3>${N.predictHeading}</h3>${rows}</section>`;
+  }
+
+  function blurryCaptures(st) {
+    const bySlide = new Map();
+    for (const c of st.session.captures) {
+      if (observability(c).score < LOW_OBSERVABILITY) bySlide.set(c.slide, c); // 최근 것으로 덮어씀
+    }
+    return [...bySlide.values()];
+  }
+
+  function renderReflect(st) {
+    const blurry = blurryCaptures(st);
+    if (blurry.length === 0) return '';
+    const items = blurry.map((c) => {
+      const key = `reflect.${c.slide}`;
+      const chosen = st.session.notes[key];
+      const options = Object.keys(UI.observability.worst).map((k) => `
+        <button type="button" class="reflect-opt${chosen === k ? ' reflect-opt--chosen' : ''}"
+          data-reflect="${key}" data-value="${k}">${UI.observability.worst[k]}</button>`).join('');
+      const retry = chosen
+        ? `<button type="button" class="reflect-retry" data-retry="${c.slide}">${N.reflectRetry}</button>`
+        : '';
+      return `
+        <div class="reflect-item" data-slide="${c.slide}">
+          <p>${N.reflectQuestion(UI.slides[c.slide])}</p>
+          <div class="reflect-options" role="group">${options}</div>
+          ${retry}
+        </div>`;
+    }).join('');
+    return `<section id="reflect">${items}</section>`;
+  }
+
+  function renderStage6(st) {
+    const qa = st.session.notes['q.a'] ?? '';
+    const q2 = st.session.notes.q2 ?? '';
+    const q3 = st.session.notes.q3 ?? '';
+    const gA = gradeQuestion('qa', qa);
+    const g2 = gradeQuestion('q2', q2);
+    const g3 = gradeQuestion('q3', q3);
+    return `
+      ${renderStepNotesRecap(st)}
+      ${renderPredictCompare(st)}
+      <section class="grade-block">
+        <label class="notes-label" for="note-qa">${N.qaLabel}</label>
+        <textarea data-note="q.a" id="note-qa">${escapeHtml(qa)}</textarea>
+        <p id="grade-qa" class="grade-line" data-grade="${gA.status}">${gA.message ?? ''}</p>
+      </section>
+      <section class="grade-block">
+        <label class="notes-label" for="note-q2">${N.q2Label}</label>
+        <textarea data-note="q2" id="note-q2">${escapeHtml(q2)}</textarea>
+        <p id="grade-q2" class="grade-line" data-grade="${g2.status}">${g2.message ?? ''}</p>
+      </section>
+      <section class="grade-block">
+        <label class="notes-label" for="note-q3">${N.q3Label}</label>
+        <textarea data-note="q3" id="note-q3">${escapeHtml(q3)}</textarea>
+        <p id="grade-q3" class="grade-line" data-grade="${g3.status}">${g3.message ?? ''}</p>
+      </section>
+      ${renderReflect(st)}`;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 7 자기 평가 — session.violations 를 그대로 보여 준다. 감점하지 않는다. */
+  /* ---------------------------------------------------------------- */
+
+  function renderStage7(st) {
+    const items = N.selfEvalItems.map(({ key, label }) => `
+      <div class="self-eval-item">
+        <label class="notes-label" for="note-eval-${key}">${label}</label>
+        <textarea data-note="selfeval.${key}" id="note-eval-${key}">${escapeHtml(st.session.notes[`selfeval.${key}`] ?? '')}</textarea>
+      </div>`).join('');
+    const violations = st.session.violations;
+    const violationItems = violations.length
+      ? violations.map((v) => `<li>${escapeHtml(N.violations[v] ?? v)}</li>`).join('')
+      : `<li class="no-violations">${N.noViolations}</li>`;
+    return `
+      <div id="self-eval">
+        ${items}
+        <div class="self-eval-item">
+          <h3>${N.valuesLabel}</h3>
+          <ul id="violations">${violationItems}</ul>
+        </div>
+      </div>`;
+  }
+
+  const STAGE_RENDERERS = {
+    1: renderStage1, 2: renderStage2, 3: renderStage3, 4: renderStage4,
+    5: renderStage5, 6: renderStage6, 7: renderStage7,
+  };
+
+  /* ---------------------------------------------------------------- */
+
+  function bindPanel() {
+    panelEl.querySelectorAll('[data-note]').forEach((el) => {
+      el.addEventListener('change', () => {
+        store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });
+      });
+    });
+    panelEl.querySelectorAll('[data-reflect]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        store.dispatch('SAVE_NOTE', { step: btn.dataset.reflect, text: btn.dataset.value });
+      });
+    });
+    panelEl.querySelectorAll('[data-retry]').forEach((btn) => {
+      btn.addEventListener('click', () => onOpenZoom('scope', btn.dataset.retry, btn));
+    });
+  }
+
+  function render() {
+    const st = store.getState();
+    tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
+      tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));
+    });
+    panelEl.innerHTML = STAGE_RENDERERS[activeStage](st);
+    bindPanel();
+
+    const undosLeft = st.session.undosLeft;
+    root.querySelector('#undo-left').textContent =
+      undosLeft === Infinity ? UI.undo.unlimited : UI.undo.left(undosLeft);
+  }
+
+  store.subscribe(render);
+  render();
+}

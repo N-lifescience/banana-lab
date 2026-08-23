@@ -85,10 +85,56 @@ export const UI = {
     coarseFocusOut: '조동나사 ▼',
   },
 
-  /** T04 — 탐구 노트 */
+  /**
+   * 탐구 노트. T04 에서 만든 heading/notesLabel 은 그대로 두고 T05 가 7단계 구조를 더한다.
+   */
   notebook: {
     heading: '탐구 노트',
     notesLabel: '관찰 기록',
+
+    stages: [
+      { id: '1', title: '문제 인식' },
+      { id: '2', title: '준비물' },
+      { id: '3', title: '예상' },
+      { id: '4', title: '탐구 과정' },
+      { id: '5', title: '결과' },
+      { id: '6', title: '정리' },
+      { id: '7', title: '자기 평가' },
+    ],
+    problem: '생물체를 구성하는 물질 중 녹말과 지방을 어떻게 관찰할 수 있을까?',
+    materialsHeading: '준비물',
+    safetyHeading: '안전 유의 사항',
+    safetyNotes: [
+      '시약병을 쓴 뒤에는 마개를 바로 닫습니다.',
+      '실험이 끝나면 손을 씻습니다.',
+      '남은 시약과 폐액은 폐액통에 버립니다.',
+    ],
+    predictLabel: '이 슬라이드에서 무엇이 보일 것 같나요?',
+    predictHeading: '내가 예상했던 것과 실제 결과를 견주어 보세요',
+    actualLabel: '실제 결과',
+    goalOnlyLabel: (title) => `이번 절차의 목표: ${title}`,
+    noCaptures: '아직 기록된 결과가 없습니다. 현미경 확대 뷰에서 결과 기록 버튼을 눌러 보세요.',
+    magInput: '배율 입력',
+    magPlaceholder: '예: 400',
+    qaLabel: 'ⓐ 아이오딘–아이오딘화 칼륨 용액과 수단 Ⅲ 용액을 떨어뜨리는 까닭은 무엇인가?',
+    q2Label: '2. (나)와 (다)에서 관찰한 녹말과 지방의 분포를 비교해 써 보세요.',
+    q3Label: '3. 다른 모둠의 결과와 비교해 써 보세요.',
+    stepNotesHeading: '탐구 과정에서 적은 기록',
+    reflectQuestion: (label) => `${label} 슬라이드의 상이 흐렸습니다. 무엇 때문이었을까요?`,
+    reflectRetry: '다시 관찰하기',
+    selfEvalItems: [
+      { key: 'process', label: '절차를 순서대로 정확히 수행했는가' },
+      { key: 'evidence', label: '관찰한 근거를 들어 결과를 설명했는가' },
+    ],
+    valuesLabel: '가치·태도 — 안전 규칙 준수',
+    noViolations: '기록된 위반이 없습니다.',
+
+    /** 자기 평가에 그대로 보여 줄 위반 기록 이름 (감점 없음) */
+    violations: {
+      'hands-unwashed': '손을 씻지 않았습니다.',
+      'cap-left-open': '시약병 마개를 열어 두었습니다.',
+      'waste-left': '폐액을 처리하지 않았습니다.',
+    },
   },
 
   /** T04 — 되돌리기. undosLeft 가 Infinity 일 때는 숫자 대신 unlimited 를 쓴다 (1단계). */

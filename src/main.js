@@ -7,10 +7,10 @@
 
 import { initialState } from './sim/state.js';
 import { reduce } from './sim/rules.js';
-import { UI } from './ui/strings.js';
 import { createToastQueue } from './ui/toast.js';
 import { createBench } from './ui/bench.js';
 import { createZoom } from './ui/zoom.js';
+import { createNotebook } from './ui/notebook.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -47,63 +47,9 @@ const zoom = createZoom($('#zoom'), store);
 createBench($('#bench'), store, {
   onOpenZoom: (mode, slideId, opener) => zoom.open(mode, slideId, opener),
 });
-
-/* ------------------------------------------------------------------ */
-/* 탐구 노트 — 절차 탭 + 관찰 기록 + 되돌리기                            */
-/* ------------------------------------------------------------------ */
-
-const notebook = $('#notebook');
-notebook.innerHTML = `
-  <h1>${UI.notebook.heading}</h1>
-  <div class="undo-row">
-    <button type="button" id="undo">${UI.undo.label}</button>
-    <span id="undo-left"></span>
-  </div>
-  <div class="protocol-tabs" role="tablist"></div>
-  <div class="protocol-panels"></div>`;
-
-const tabsEl = notebook.querySelector('.protocol-tabs');
-const panelsEl = notebook.querySelector('.protocol-panels');
-let activeStep = UI.protocol[0].id;
-
-for (const group of UI.protocol) {
-  const tab = document.createElement('button');
-  tab.type = 'button';
-  tab.className = 'protocol-tab';
-  tab.textContent = group.title;
-  tab.setAttribute('role', 'tab');
-  tab.dataset.step = group.id;
-  tab.addEventListener('click', () => { activeStep = group.id; renderNotebook(); });
-  tabsEl.appendChild(tab);
-}
-
-function renderNotebook() {
-  const st = store.getState();
-  tabsEl.querySelectorAll('.protocol-tab').forEach((tab) => {
-    tab.setAttribute('aria-selected', String(tab.dataset.step === activeStep));
-  });
-
-  const group = UI.protocol.find((g) => g.id === activeStep);
-  panelsEl.innerHTML = `
-    <ul class="protocol-steps">
-      ${group.steps.map((s) => `<li><label><input type="checkbox">${s}</label></li>`).join('')}
-    </ul>
-    <label class="notes-label" for="notes-input">${UI.notebook.notesLabel}</label>
-    <textarea id="notes-input">${st.session.notes[activeStep] ?? ''}</textarea>`;
-
-  panelsEl.querySelector('#notes-input').addEventListener('change', (e) => {
-    store.dispatch('SAVE_NOTE', { step: activeStep, text: e.target.value });
-  });
-
-  const undosLeft = st.session.undosLeft;
-  notebook.querySelector('#undo-left').textContent =
-    undosLeft === Infinity ? UI.undo.unlimited : UI.undo.left(undosLeft);
-}
-
-notebook.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
-
-store.subscribe(() => renderNotebook());
-renderNotebook();
+createNotebook($('#notebook'), store, {
+  onOpenZoom: (mode, slideId, opener) => zoom.open(mode, slideId, opener),
+});
 
 /* ------------------------------------------------------------------ */
 /* 시간 경과 — 반응 진행도. TICK 의 기본값(seconds=1, speed=10)은        */
