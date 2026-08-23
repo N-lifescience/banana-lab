@@ -3,7 +3,7 @@
  * 스크린샷 도구.
  *
  *   npm run dev            # 다른 터미널에서 먼저 띄운다
- *   npm run shot           # shots/harness.png
+ *   npm run shot           # shots/harness.png (index.html — 실제 앱)
  *   npm run shot -- '#fov-slot' fov   # 특정 요소만
  *   SHOT_SCHEME=dark npm run shot -- '#sheet-panel' sheet-dark   # 다크 모드
  *
@@ -13,7 +13,7 @@
 
 import { mkdirSync } from 'node:fs';
 
-const url = process.env.SHOT_URL ?? 'http://localhost:5173';
+const url = process.env.SHOT_URL ?? 'http://localhost:5173';   // 하네스는 SHOT_URL=http://localhost:5173/harness.html
 const selector = process.argv[2] ?? null;
 const name = process.argv[3] ?? 'harness';
 
