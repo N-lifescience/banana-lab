@@ -194,6 +194,9 @@ export const ACTIONS = {
    */
   PLACE_COVERSLIP(state, { slide, angleDeg = 45 }) {
     const s = state.slides[slide];
+    if (state.tools.forceps.holding === 'usedCoverslip') {
+      return happened(state, '한 번 쓴 덮개 유리는 다시 쓰지 않습니다. 실험 접시에 버리고 새것을 집으세요.', 'coverslip-used');
+    }
     if (state.tools.forceps.holding !== 'coverslip') {
       // 예전 문구는 "손으로 집으려 하니 미끄러집니다. 핀셋을 쓰세요" 였는데,
       // 여기까지 오는 유일한 길이 **핀셋을 가져다 대는 것**이라 닿을 수 없는 말이었다.
@@ -239,8 +242,9 @@ export const ACTIONS = {
    * 덮은 덮개 유리를 핀셋으로 다시 들어낸다.
    *
    * 기포가 잔뜩 생겼거나 덮는 순서를 틀렸을 때 되돌아갈 길이다.
-   * 실제 실험에서도 들어내고 다시 덮는다 — 막을 이유가 없다.
-   * 들어낸 덮개 유리는 핀셋에 남으므로 그대로 다시 덮을 수 있다.
+   *
+   * 들어낸 것은 **쓴 덮개 유리**다. 시료가 묻었고 얇아서 닦아 쓰지 않는다 —
+   * 실제 실험실에서도 버린다. 핀셋에 물린 채로 남으니 실험 접시에 버리고 새것을 집는다.
    */
   LIFT_COVERSLIP(state, { slide }) {
     const s = state.slides[slide];
@@ -249,9 +253,17 @@ export const ACTIONS = {
     }
     const next = withTools(
       withSlide(state, slide, { coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 } }),
-      { forceps: { holding: 'coverslip' } }
+      { forceps: { holding: 'usedCoverslip' } }
     );
-    return ok(next);
+    return happened(next, '덮개 유리를 들어냈습니다. 한 번 쓴 것이니 실험 접시에 버리세요.', 'coverslip-lifted');
+  },
+
+  /** 쓴 덮개 유리를 실험 접시에 버린다. */
+  DISCARD_COVERSLIP(state) {
+    if (!state.tools.forceps.holding) {
+      return happened(state, '핀셋이 비어 있습니다.');
+    }
+    return ok(withTools(state, { forceps: { holding: null } }));
   },
 
   /**

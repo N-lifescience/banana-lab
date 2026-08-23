@@ -150,18 +150,26 @@ await drag('[data-id="slideB"]', '[data-id="dish"]');
 const washed = await page.evaluate(() => window.__store.getState().slides.B.sample);
 ok(washed === null, '받침 유리를 실험 접시에 대면 씻긴다', `sample=${JSON.stringify(washed)}`);
 
-// 다시 바르고 — 한 번에 한 방울인가
+// 다시 바르고, 스포이트를 채워 받침 유리에 댄다 → 확대 뷰가 열려야 한다
 await drag('[data-id="banana"]', '[data-id="slideB"]');
 await drag('[data-id="dropper"]', '[data-id="bottleIKI"]');
 await drag('[data-id="dropper"]', '[data-id="slideB"]');
+await page.waitForTimeout(200);
+ok(await page.locator('#zoom .zoom-panel').isVisible(),
+   '스포이트를 받침 유리에 대면 확대 뷰가 열린다');
+const dropsBefore = await page.evaluate(() => window.__store.getState().slides.B.drops);
+ok(dropsBefore === 0, '대기만 해서는 방울이 떨어지지 않는다', `${dropsBefore}방울`);
+
+// 고무를 누를 때마다 한 방울
+await page.locator('#squeeze').click();
+await page.waitForTimeout(120);
 const drops1 = await page.evaluate(() => window.__store.getState().slides.B.drops);
-await drag('[data-id="dropper"]', '[data-id="slideB"]');
+await page.locator('#squeeze').click();
+await page.waitForTimeout(120);
 const drops2 = await page.evaluate(() => window.__store.getState().slides.B.drops);
-ok(drops1 === 1 && drops2 === 2, '한 번 가져다 대면 한 방울이다', `${drops1} → ${drops2}`);
+ok(drops1 === 1 && drops2 === 2, '고무를 누를 때마다 한 방울씩 떨어진다', `${drops1} → ${drops2}`);
 
 // 슬라이드 제작 뷰 — 제목이 시약 이름을 미리 알려 주지 않는가
-await page.locator('[data-id="slideB"]').click();
-await page.waitForTimeout(150);
 const title = await page.locator('.zoom-body h2').innerText();
 ok(title === '(나) 슬라이드 제작', '제목이 무엇을 떨어뜨릴지 미리 알려 주지 않는다', JSON.stringify(title));
 
@@ -169,41 +177,79 @@ ok(title === '(나) 슬라이드 제작', '제목이 무엇을 떨어뜨릴지 �
 const smearOpacity = await page.locator('#slide-stage #smear').getAttribute('fill-opacity');
 ok(Number(smearOpacity) >= 0.5, '얇게 발라도 시료가 보인다', `fill-opacity=${smearOpacity}`);
 
-// 덮개 유리를 비스듬히 끌어 내린다 → 기포 0
-const chip = await box('#cover-chip');
+// 핀셋이 잡은 덮개 유리 — 처음부터 45°, 좌우로 움직이면 기울기가 바뀐다
+const startHint = await page.locator('#cover-hint').innerText();
+ok(/45°/.test(startHint), '핀셋을 잡으면 45° 에서 시작한다', JSON.stringify(startHint));
+
+const tool = await box('#cover-tool');
 const stageBox = await box('#slide-stage');
-await page.mouse.move(...center(chip));
+const [tx0, ty0] = center(tool);
+await page.mouse.move(tx0, ty0);
 await page.mouse.down();
-// 시작점에서 오른쪽·아래로 같은 거리 = 45°
-const [cx0, cy0] = center(chip);
-const dxy = Math.max(stageBox.y + stageBox.height / 2 - cy0, 60);
-await page.mouse.move(cx0 + dxy, cy0 + dxy, { steps: 10 });
-const hintText = await page.locator('#cover-hint').innerText();
-const hintGood = await page.locator('#cover-hint').getAttribute('data-good');
-ok(/\d+°/.test(hintText), '끄는 동안 기울기가 숫자로 보인다', JSON.stringify(hintText));
-ok(hintGood === 'true', '45° 부근이면 기포가 안 생긴다고 알려 준다', `data-good=${hintGood}`);
+await page.mouse.move(tx0 + 80, ty0, { steps: 8 });   // 좌우만 — 각도만 바뀌어야 한다
+const tiltedHint = await page.locator('#cover-hint').innerText();
+const tiltedDeg = Number((tiltedHint.match(/(\d+)°/) ?? [])[1]);
+ok(tiltedDeg > 45, '좌우로 움직이면 기울기가 바뀐다', `45° → ${tiltedDeg}°`);
+ok(await page.locator('#cover-hint').getAttribute('data-good') === 'false',
+   '기포가 생기는 각도라고 알려 준다', `${tiltedDeg}°`);
+
+// 다시 45° 로 돌린 뒤 **곧장 아래로만** 내린다 — 가로로 움직이지 않으므로 각도가 유지돼야 한다
+await page.mouse.move(tx0, ty0, { steps: 6 });
+await page.mouse.move(tx0, stageBox.y + stageBox.height / 2, { steps: 10 });
+const dropHint = await page.locator('#cover-hint').innerText();
+ok(/\d+°/.test(dropHint), '내리는 동안에도 기울기가 숫자로 보인다', JSON.stringify(dropHint));
 await page.mouse.up();
-await page.waitForTimeout(150);
+await page.waitForTimeout(200);
 const cov = await page.evaluate(() => window.__store.getState().slides.B.coverslip);
-ok(cov.placed && cov.bubbles === 0, '비스듬히 끌어 내리면 기포 없이 덮인다', JSON.stringify(cov));
+ok(cov.placed && cov.bubbles === 0, '45° 부근으로 내리면 기포 없이 덮인다', JSON.stringify(cov));
 
 // 덮여도 시료가 비치는가
 const csFill = await page.locator('#slide-stage #coverslip rect').getAttribute('fill-opacity');
 ok(csFill !== null && Number(csFill) < 1, '덮개 유리가 비쳐 시료가 계속 보인다', `fill-opacity=${csFill}`);
 
-// 들어내기
+// 들어내기 — 쓴 덮개 유리는 핀셋에 남고 재활용되지 않는다
 await page.locator('#cover-lift').click();
-await page.waitForTimeout(150);
-const lifted = await page.evaluate(() => window.__store.getState().slides.B.coverslip.placed);
-ok(lifted === false, '덮개 유리를 다시 들어낼 수 있다');
+await page.waitForTimeout(200);
+const after = await page.evaluate(() => ({
+  placed: window.__store.getState().slides.B.coverslip.placed,
+  holding: window.__store.getState().tools.forceps.holding,
+}));
+ok(after.placed === false && after.holding === 'usedCoverslip',
+   '들어낸 덮개 유리는 핀셋에 물린 채 남는다', JSON.stringify(after));
+const usedHint = await page.locator('#cover-hint').innerText();
+ok(usedHint.includes('실험 접시'), '쓴 것은 버리라고 알려 준다', JSON.stringify(usedHint));
 
 await page.keyboard.press('Escape');
-await page.waitForTimeout(120);
+await page.waitForTimeout(150);
+
+// 실험 접시에 버린다
+await drag('[data-id="forceps"]', '[data-id="dish"]');
+const discarded = await page.evaluate(() => window.__store.getState().tools.forceps.holding);
+ok(discarded === null, '쓴 덮개 유리를 실험 접시에 버린다', `holding=${discarded}`);
 
 // 재물대 버튼이 어느 유리인지 말하는가
 await drag('[data-id="slideB"]', '[data-id="microscope"]');
 const unmountLabel = await page.locator('#unmount').innerText();
 ok(unmountLabel.includes('(나)'), '내리기 버튼이 어느 받침 유리인지 말한다', JSON.stringify(unmountLabel));
+
+// 결과 기록이 됐다고 말하는가
+await page.locator('[data-id="microscope"]').click();
+await page.waitForTimeout(200);
+await page.locator('#capture').click();
+await page.waitForTimeout(200);
+const savedNote = await page.locator('#capture-note').innerText().catch(() => '');
+ok(savedNote.includes('탐구 노트'), '기록하면 어디서 볼 수 있는지 알려 준다', JSON.stringify(savedNote));
+
+// 고배율에서 조동나사를 돌리면 깨지고, 화면이 그 사실을 말한다
+await page.evaluate(() => {
+  window.__store.dispatch('SET_OBJECTIVE', { objective: 40 });
+  window.__store.dispatch('COARSE_FOCUS', { delta: 0.3 });
+});
+await page.waitForTimeout(250);
+const emptyWhy = await page.locator('[data-why="cracked"]').innerText().catch(() => '');
+ok(emptyWhy.includes('금이'), '깨져서 내려간 것을 확대 뷰가 설명한다', JSON.stringify(emptyWhy));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
 
 /* ---------- 버튼이 눈에 보이는가 (다크 모드에서 흰 바탕 흰 글씨였다) ---------- */
 
@@ -226,12 +272,19 @@ async function checkButtonContrast(page, where) {
     };
     const out = [];
     for (const el of document.querySelectorAll('button')) {
-      if (!el.offsetParent || !el.textContent.trim()) continue;
+      if (!el.offsetParent) continue;
+      // SVG 안의 글자는 CSS color 가 아니라 애셋이 정한 fill 로 칠해진다.
+      // 그걸 CSS 색으로 재면 실제로 잘 보이는 글자를 못 읽는다고 말하게 된다 —
+      // 검사가 한 번 헛발질하면 그 뒤로 아무도 안 믿는다. HTML 글자만 잰다.
+      const htmlText = [...el.childNodes]
+        .filter((n) => n.nodeType === 3 || (n.nodeType === 1 && n.tagName.toLowerCase() !== 'svg'))
+        .map((n) => n.textContent).join('').trim();
+      if (!htmlText) continue;
       const fg = parse(getComputedStyle(el).color);
       const bg = solidBg(el);
       const [a, b] = [lum(fg) + 0.05, lum(bg) + 0.05].sort((x, y) => y - x);
       const ratio = a / b;
-      if (ratio < 3) out.push(`${el.id || el.className || el.textContent.trim()}=${ratio.toFixed(2)}`);
+      if (ratio < 3) out.push(`${el.id || el.className || htmlText}=${ratio.toFixed(2)}`);
     }
     return out;
   });

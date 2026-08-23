@@ -34,11 +34,18 @@
      따로 놀면 창 크기가 바뀔 때 물건이 선반에서 떠오른다. */
   #bench{position:relative;overflow:auto;background:var(--sunk);display:flex;
     flex-direction:column;gap:10px;padding:12px}
-  .bench-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  /* 실험대는 세로로 길어 패널을 넘칠 수 있다. 그때 도구 막대가 위로 밀려 사라지면
+     재물대에 무엇이 올라가 있는지, 되돌릴 수 있는지를 볼 방법이 없어진다. 붙여 둔다. */
+  .bench-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    position:sticky;top:-12px;z-index:10;background:var(--sunk);padding:12px 0 8px;margin-top:-12px}
   .bench-bar button{border:1px solid var(--rule);background:var(--surface);border-radius:5px;
     padding:7px 12px;cursor:pointer;font-size:13px}
   .bench-bar span{font-size:12.5px;color:var(--ink-mute);font-family:ui-monospace,monospace}
-  .bench-stage{position:relative;width:100%;aspect-ratio:4/3}
+  /* 실험실 벽. 애셋(실험대)은 아래쪽만 채우므로, 바탕을 깔지 않으면 위쪽이 페이지 배경이 된다 —
+     다크 모드에서는 검은 허공에 선반이 떠 있는 것처럼 보인다.
+     물건은 테마를 타지 않는 색으로 그려져 있으므로 벽도 두 테마에서 같은 색으로 둔다. */
+  .bench-stage{position:relative;width:100%;aspect-ratio:4/3;
+    background:#DDE3DA;border-radius:6px}
   .bench-bg{position:absolute;inset:0}
   .bench-bg svg{width:100%;height:100%;display:block}
   .bench-tokens{position:absolute;inset:0}
@@ -48,7 +55,10 @@
     touch-action:none;line-height:0;border-radius:6px}
   .token svg{width:100%;height:auto;display:block;pointer-events:none;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  /* 끄는 물건은 살짝 비친다. 바나나(180 mm)처럼 큰 것을 끌 때 아래에 있는
+     받침 유리의 강조 표시가 가려지면, 어디에 놓이는지 보이지 않는다. */
   .token:active,.token--dragging{cursor:grabbing;z-index:5}
+  .token--dragging{opacity:.72}
   .token:hover::after,.token:focus-visible::after{background:rgba(255,255,255,.18)}
 
   /* 손가락으로 집을 수 있는 최소 크기를 그림과 분리한다.
@@ -73,6 +83,9 @@
   .smear-meter i{display:block;height:100%;background:var(--indigo);width:0}
 
   /* 안내 말풍선 — 이름과 지금 할 수 있는 조작 */
+  /* 기본은 물건 위. 선반처럼 화면 맨 위에 있는 물건은 말풍선을 아래로 내린다 —
+     위로 띄우면 실험대 밖으로 나가 잘린다. */
+  .bench-tip[data-below="true"]{transform:translate(-50%,10px)}
   .bench-tip{position:absolute;transform:translate(-50%,calc(-100% - 10px));
     z-index:20;pointer-events:none;max-width:min(280px,60%);
     background:var(--surface);color:var(--ink);border:1px solid var(--rule);
@@ -156,13 +169,21 @@
   .zoom-action{width:100%;background:var(--indigo);color:var(--surface);
     border-color:var(--indigo);padding:10px 14px;font-size:13.5px;font-weight:600}
 
-  /* 덮개 유리를 끌어 내려 덮는 자리. 받침 유리 위쪽에 놓고 아래로 끌게 한다. */
-  .zoom-slide-workspace{position:relative;padding-top:74px}
-  .cover-chip{position:absolute;top:0;left:8px;width:62px;height:62px;padding:0;
-    background:none;border:none;border-radius:4px;cursor:grab;touch-action:none;line-height:0;
-    transform-origin:50% 50%}
-  .cover-chip svg{width:100%;height:100%;display:block;pointer-events:none}
-  .cover-chip--dragging{cursor:grabbing;z-index:3}
+  /* 핀셋에 물린 덮개 유리. 받침 유리 위쪽에서 좌우로 기울이고 아래로 내린다. */
+  .zoom-slide-workspace{position:relative;padding-top:104px}
+  /* 받침 유리 한가운데 바로 위에 둔다. 옆에 두면 받침 유리까지 내려오는 동안
+     가로로 움직일 수밖에 없고, 가로 움직임이 곧 기울기라 각도가 딸려 바뀐다. */
+  .cover-tool{position:absolute;top:0;left:calc(50% - 75px);width:150px;height:112px;padding:0;
+    background:none;border:none;cursor:grab;touch-action:none;line-height:0}
+  .cover-tool svg{width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
+  .cover-tool--dragging{cursor:grabbing;z-index:3}
+
+  /* 스포이트 — 고무를 누를 때마다 한 방울 */
+  .dropper-bay{display:flex;align-items:center;gap:14px;margin-top:12px}
+  .dropper-bay--empty{font-size:12.5px;color:var(--ink-mute)}
+  .dropper-svg{width:34px;height:110px;flex:none}
+  .dropper-line{font-size:12.5px;color:var(--ink-mute);margin:0 0 8px}
+  .zoom-action--small{width:auto;padding:8px 14px}
   .cover-hint{font-size:12.5px;color:var(--ink-mute);margin:8px 0 0}
   .cover-hint[data-good="true"]{color:var(--good)}
   .cover-hint[data-good="false"]{color:var(--warn)}

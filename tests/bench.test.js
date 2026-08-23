@@ -104,35 +104,26 @@ test('문지른 거리가 시료 두께가 된다', () => {
   }
 });
 
-test('한 번 가져다 대면 한 방울이다 — 난이도와 무관하게', () => {
-  // 예전에는 1단계에서 한 번에 두 방울이 됐다. 그러면 이 실험의 변인인 "몇 방울인가" 가
-  // 학생 손을 떠나고, 세어 볼 일 자체가 없어진다.
-  for (const level of LEVELS) {
-    const store = fakeStore(level);
-    dropTable(store).dropper.slide({ kind: 'dropper' }, { kind: 'slide', slide: 'B' }, {});
-    assert.deepEqual(store.calls, [{ type: 'DROP', payload: { slide: 'B', count: 1 } }],
-      `${level}단계에서 한 번에 한 방울이 아니다`);
+test('손끝으로 하는 일은 실험대에서 곧장 일어나지 않고 확대 뷰를 연다', () => {
+  // 방울 수와 덮는 각도는 이 실험의 변인이다. 실험대에서 끌어다 대는 것만으로 정해지면
+  // 학생이 정할 수 있는 것이 없다 — 가져다 대면 알아서 두 방울이 떨어지던 것이 그랬다.
+  // 확대 뷰를 열어 거기서 고무를 누르고 핀셋을 기울인다.
+  for (const tool of ['dropper', 'forceps']) {
+    const store = fakeStore();
+    const opened = [];
+    dropTable(store, (...a) => opened.push(a))[tool]
+      .slide({ kind: tool }, { kind: 'slide', slide: 'B' }, { lastDx: 10, lastDy: 10 });
+    assert.deepEqual(store.calls, [], `${tool} 가 실험대에서 곧장 조작을 일으킨다`);
+    assert.deepEqual(opened, [['slide', 'B']], `${tool} 를 대도 확대 뷰가 열리지 않는다`);
   }
 });
 
-test('빈 핀셋을 덮인 받침 유리에 대면 덮는 게 아니라 들어낸다', () => {
-  const covered = (s) => ({
-    ...s,
-    slides: { ...s.slides, B: { ...s.slides.B, coverslip: { placed: true, angleAtDrop: 90, bubbles: 4 } } },
-  });
-  const drag = { lastDx: 10, lastDy: 10 };
-
-  const empty = fakeStore(1, covered);
-  dropTable(empty).forceps.slide({ kind: 'forceps' }, { kind: 'slide', slide: 'B' }, drag);
-  assert.deepEqual(empty.calls.map((c) => c.type), ['LIFT_COVERSLIP'],
-    '기포가 잔뜩 생겼을 때 되돌아갈 길이 이것뿐이다');
-
-  // 덮개 유리를 들고 있으면 여전히 덮는다.
-  const holding = fakeStore(1, (s) => ({
-    ...covered(s), tools: { ...s.tools, forceps: { holding: 'coverslip' } },
+test('쓴 덮개 유리는 실험 접시에 버린다', () => {
+  const store = fakeStore(1, (s) => ({
+    ...s, tools: { ...s.tools, forceps: { holding: 'usedCoverslip' } },
   }));
-  dropTable(holding).forceps.slide({ kind: 'forceps' }, { kind: 'slide', slide: 'B' }, drag);
-  assert.deepEqual(holding.calls.map((c) => c.type), ['PLACE_COVERSLIP']);
+  dropTable(store).forceps.dish({ kind: 'forceps' }, { kind: 'dish' }, {});
+  assert.deepEqual(store.calls.map((c) => c.type), ['DISCARD_COVERSLIP']);
 });
 
 test('받침 유리를 실험 접시에 대면 씻는다', () => {

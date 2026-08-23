@@ -18,6 +18,20 @@ export const NODES = [
 export const COVERSLIP_FILL = PALETTE.glass[0];
 export const COVERSLIP_INK = INK;
 
+/** 확대 뷰의 스포이트에 담긴 시약 색. 시약병·시야와 같은 색을 쓴다. */
+export const REAGENT_TINT = { IKI: PALETTE.iodine[0], SUDAN3: PALETTE.sudan[0] };
+
+/**
+ * 확대 뷰의 손도구(핀셋 · 스포이트 관) 색.
+ *
+ * `INK` 는 어두운 잉크라 실험대 위(밝은 애셋 안)에서는 잘 보이지만,
+ * 확대 뷰의 빈 바탕에 홀로 그리면 다크 모드에서 배경에 묻힌다.
+ * 금속색을 쓰면 두 테마에서 모두 읽힌다 — 실제로도 핀셋은 금속이다.
+ */
+export const TOOL_METAL = PALETTE.metal[0];
+export const TOOL_METAL_SHADE = PALETTE.metal[1];
+export const RUBBER = PALETTE.rubber[0];
+
 /**
  * 시료 및 시약 반응에 따른 도말(smear) 채움 색상을 결정합니다.
  */

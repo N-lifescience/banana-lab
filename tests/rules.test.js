@@ -360,13 +360,22 @@ test('덮개 유리는 다시 들어내고 덮을 수 있다', () => {
   assert.ok(bad.state.slides.B.coverslip.bubbles > 0);
 
   const lifted = run(bad.state, 'LIFT_COVERSLIP', { slide: 'B' });
-  assert.equal(lifted.outcome, 'ok');
   assert.equal(lifted.state.slides.B.coverslip.placed, false);
   assert.equal(lifted.state.slides.B.coverslip.bubbles, 0, '들어내면 기포도 함께 사라진다');
-  assert.equal(lifted.state.tools.forceps.holding, 'coverslip', '들어낸 것은 핀셋에 남는다');
+  assert.equal(lifted.state.tools.forceps.holding, 'usedCoverslip', '들어낸 것은 핀셋에 남는다');
 
-  const again = run(lifted.state, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
-  assert.equal(again.outcome, 'ok', '집으러 다시 갈 필요 없이 그대로 다시 덮는다');
+  // 한 번 쓴 덮개 유리는 다시 쓰지 않는다 — 막지는 않고 그렇게 답한다.
+  const reuse = run(lifted.state, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(reuse.outcome, 'happened');
+  assert.equal(reuse.tag, 'coverslip-used');
+  assert.equal(reuse.state.slides.B.coverslip.placed, false);
+
+  // 버리고 새것을 집으면 다시 덮인다.
+  let s2 = run(lifted.state, 'DISCARD_COVERSLIP').state;
+  assert.equal(s2.tools.forceps.holding, null);
+  s2 = run(s2, 'PICK_COVERSLIP').state;
+  const again = run(s2, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  assert.equal(again.outcome, 'ok');
   assert.equal(again.state.slides.B.coverslip.bubbles, 0);
 
   assert.equal(run(S0(), 'LIFT_COVERSLIP', { slide: 'A' }).outcome, 'happened',

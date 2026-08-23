@@ -91,17 +91,19 @@ function defaultItems() {
   const I = UI.bench.items;
   return [
     // 상단 선반
+    // 받침 유리 사이를 120 mm 씩 벌려 둔다. 바나나가 180 mm 라 90 mm 간격에서는
+    // 끄는 동안 바나나 그림이 이웃한 유리 두 장을 함께 덮어, 어디에 발리는지 보이지 않았다.
     shelf(40, { id: 'banana', asset: 'banana', kind: 'banana', label: I.banana }),
-    shelf(260, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', label: I.slideA }),
-    shelf(350, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', label: I.slideB }),
-    shelf(440, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', label: I.slideC }),
-    shelf(545, { id: 'coverslip1', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
-    shelf(580, { id: 'coverslip2', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
-    shelf(615, { id: 'coverslip3', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
-    shelf(680, { id: 'dropper', asset: 'dropper', kind: 'dropper', label: I.dropper }),
-    shelf(850, { id: 'forceps', asset: 'forceps', kind: 'forceps', label: I.forceps }),
-    shelf(1000, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', label: I.bottleIKI }),
-    shelf(1130, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', label: I.bottleSUDAN }),
+    shelf(290, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', label: I.slideA }),
+    shelf(410, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', label: I.slideB }),
+    shelf(530, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', label: I.slideC }),
+    shelf(660, { id: 'coverslip1', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
+    shelf(700, { id: 'coverslip2', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
+    shelf(740, { id: 'coverslip3', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
+    shelf(820, { id: 'dropper', asset: 'dropper', kind: 'dropper', label: I.dropper }),
+    shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', label: I.forceps }),
+    shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', label: I.bottleIKI }),
+    shelf(1250, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', label: I.bottleSUDAN }),
     // 작업면
     surface(80, { id: 'dish', asset: 'dish', kind: 'dish', label: I.dish }),
     surface(400, { id: 'microscope', asset: 'microscope', kind: 'microscope', label: I.microscope }),
@@ -121,7 +123,7 @@ function defaultItems() {
  * 이 표 하나가 세 곳에 함께 쓰인다 — 실제 실행, 드래그 중 대상 하이라이트, 안내 문구 유무.
  * 셋을 따로 적으면 조작을 하나 늘릴 때마다 세 곳이 어긋난다.
  */
-export function dropTable(store) {
+export function dropTable(store, openZoom = () => {}) {
   return {
     banana: {
       slide: (item, target, d) => {
@@ -131,29 +133,17 @@ export function dropTable(store) {
     },
     dropper: {
       bottle: (item, target) => store.dispatch('FILL_DROPPER', { reagent: target.reagent }),
-      // 한 번 가져다 대면 한 방울이다. 두 방울을 놓으려면 두 번 한다.
-      // 예전에는 1단계에서 한 번에 두 방울이 되게 해 뒀는데, 그러면 "두 방울" 이라는
-      // 이 실험의 변인이 학생 손을 떠난다 — 몇 방울인지 세어 볼 일 자체가 없어진다.
-      slide: (item, target) => store.dispatch('DROP', { slide: target.slide, count: 1 }),
+      // 받침 유리에 대면 확대 뷰가 열린다 — 방울은 거기서 고무를 눌러 한 방울씩 떨어뜨린다.
+      slide: (item, target) => openZoom('slide', target.slide),
       waste: () => store.dispatch('RINSE_DROPPER', {}),
     },
     forceps: {
       coverslip: () => store.dispatch('PICK_COVERSLIP', {}),
-      slide: (item, target, d) => {
-        const st = store.getState();
-        // 빈 핀셋을 이미 덮인 받침 유리에 대는 것은 "덮기" 가 아니라 "들어내기" 다.
-        // (어떤 종류끼리 무슨 일이 일어나는가는 위 표가 정하고, 그 안에서 무엇을 할지는
-        //  상태를 봐도 된다 — 걸러 내는 것이 아니라 고르는 것이기 때문이다.)
-        if (st.slides[target.slide].coverslip.placed && st.tools.forceps.holding !== 'coverslip') {
-          store.dispatch('LIFT_COVERSLIP', { slide: target.slide });
-          return;
-        }
-        // 마지막 이동 방향으로 놓는 각도를 정한다. 대각선으로 내려놓을수록 45°에 가깝다.
-        const angleDeg = clamp(
-          (Math.atan2(Math.abs(d.lastDy), Math.abs(d.lastDx)) * 180) / Math.PI, 0, 90
-        );
-        store.dispatch('PLACE_COVERSLIP', { slide: target.slide, angleDeg });
-      },
+      // 덮는 것도 들어내는 것도 손끝 일이다. 실험대에서 끌어다 대는 것으로는 각도를 못 정하고,
+      // 덮인 유리를 집어 드는 것은 더 어렵다. 대면 확대 뷰가 열리고 거기서 한다.
+      slide: (item, target) => openZoom('slide', target.slide),
+      // 쓴 덮개 유리를 버린다.
+      dish: () => store.dispatch('DISCARD_COVERSLIP', {}),
     },
     slide: {
       microscope: (item) => {
@@ -221,7 +211,7 @@ export function createBench(root, store, { onOpenZoom }) {
   root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
   unmountBtn.addEventListener('click', () => store.dispatch('UNMOUNT', {}));
 
-  const DROPS = dropTable(store);
+  const DROPS = dropTable(store, (mode, id) => onOpenZoom(mode, id, elFor(`slide${id}`)));
 
   const TAPS = tapTable(store, onOpenZoom);
 
@@ -334,7 +324,10 @@ export function createBench(root, store, { onOpenZoom }) {
     // 무대 밖으로 밀려나지 않게 가로 위치를 안쪽으로 묶는다.
     const centerMm = item.x + CONTRACT[item.asset].realSizeMm / 2;
     tipEl.style.left = `${clamp(xPct(centerMm), 12, 88)}%`;
-    tipEl.style.top = `${yPct(item.y)}%`;
+    // 위쪽에 있는 물건은 말풍선을 아래로 — 위로 띄우면 실험대 밖으로 나간다.
+    const below = yPct(item.y) < 26;
+    tipEl.dataset.below = String(below);
+    tipEl.style.top = `${yPct(below ? item.y + heightMm(item.asset) : item.y)}%`;
     tipEl.hidden = false;
   }
 
