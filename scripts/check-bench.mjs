@@ -160,14 +160,56 @@ ok(await page.locator('#zoom .zoom-panel').isVisible(),
 const dropsBefore = await page.evaluate(() => window.__store.getState().slides.B.drops);
 ok(dropsBefore === 0, '대기만 해서는 방울이 떨어지지 않는다', `${dropsBefore}방울`);
 
-// 고무를 누를 때마다 한 방울
-await page.locator('#squeeze').click();
-await page.waitForTimeout(120);
+ok(await page.locator('#dropper-tool').count() === 1, '들고 온 스포이트가 확대 뷰에 있다');
+ok(await page.locator('#cover-tool').count() === 0, '들고 오지 않은 핀셋은 나오지 않는다');
+
+// 받침 유리 위로 옮기지 않은 채 고무를 눌러도 떨어지지 않는다
+const bulbTap = async () => {
+  const d = await box('#dropper-tool');
+  await page.mouse.move(d.x + d.width / 2, d.y + d.height * 0.16);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+};
+await bulbTap();
+ok(await page.evaluate(() => window.__store.getState().slides.B.drops) === 0,
+   '받침 유리 밖에서 누르면 떨어지지 않는다');
+
+// 스포이트를 받침 유리 위로 옮긴다
+const dtool = await box('#dropper-tool');
+const sBox = await box('#slide-stage');
+await page.mouse.move(dtool.x + dtool.width / 2, dtool.y + dtool.height * 0.6);
+await page.mouse.down();
+await page.mouse.move(sBox.x + sBox.width / 2, sBox.y + sBox.height / 2, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(150);
+const overHint = await page.locator('#cover-hint').innerText();
+ok(overHint.includes('고무를 누르면'), '받침 유리 위로 오면 누르라고 알려 준다', JSON.stringify(overHint));
+
+await bulbTap();
 const drops1 = await page.evaluate(() => window.__store.getState().slides.B.drops);
-await page.locator('#squeeze').click();
-await page.waitForTimeout(120);
+await bulbTap();
 const drops2 = await page.evaluate(() => window.__store.getState().slides.B.drops);
 ok(drops1 === 1 && drops2 === 2, '고무를 누를 때마다 한 방울씩 떨어진다', `${drops1} → ${drops2}`);
+// 한 방울 뒤에도 손은 그 자리에 있어야 한다 — 매번 다시 끌고 오게 하면 조작이 아니다.
+ok(await page.locator('#dropper-tool').getAttribute('data-over') === 'true',
+   '한 방울 떨어뜨려도 스포이트가 받침 유리 위에 남는다');
+
+// 도구 없이 열면 아무 도구도 안 나온다
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
+await page.locator('[data-id="slideC"]').click();
+await page.waitForTimeout(150);
+const bare = await page.evaluate(() => ({
+  dropper: document.querySelectorAll('#dropper-tool').length,
+  forceps: document.querySelectorAll('#cover-tool').length,
+}));
+ok(bare.dropper === 0 && bare.forceps === 0,
+   '도구를 안 들고 열면 도구가 뜨지 않는다', JSON.stringify(bare));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
+await drag('[data-id="forceps"]', '[data-id="slideB"]');
+await page.waitForTimeout(150);
 
 // 슬라이드 제작 뷰 — 제목이 시약 이름을 미리 알려 주지 않는가
 const title = await page.locator('.zoom-body h2').innerText();
@@ -231,16 +273,58 @@ ok(discarded === null, '쓴 덮개 유리를 실험 접시에 버린다', `holdi
 await drag('[data-id="slideB"]', '[data-id="microscope"]');
 const unmountLabel = await page.locator('#unmount').innerText();
 ok(unmountLabel.includes('(나)'), '내리기 버튼이 어느 받침 유리인지 말한다', JSON.stringify(unmountLabel));
+ok(await page.evaluate(() => window.__store.getState().microscope.objective) === 4,
+   '올리는 것만으로 배율이 정해지지 않는다');
 
-// 결과 기록이 됐다고 말하는가
+/* ---------- 현미경 확대 뷰 ---------- */
+
 await page.locator('[data-id="microscope"]').click();
+await page.waitForTimeout(250);
+ok(await page.locator('#scope-figure svg').count() === 1, '확대 뷰에 현미경 그림이 있다');
+ok(await page.locator('#dial-coarse').count() === 1 && await page.locator('#dial-fine').count() === 1,
+   '조동·미동나사가 돌리는 다이얼이다');
+ok(await page.locator('[data-obj="40"]').count() === 1, '배율은 1단계에서도 직접 고른다');
+ok(await page.locator('#scope-unmount').count() === 1, '확대 뷰 안에서 받침 유리를 내릴 수 있다');
+
+// 겹치지 않는가 — 현미경 그림과 시야
+const figBox = await box('#scope-figure');
+const fovBox = await box('#fov-slot svg');
+ok(figBox.x + figBox.width <= fovBox.x + 1, '현미경 그림과 시야가 겹치지 않는다',
+   `그림 끝 ${(figBox.x + figBox.width).toFixed(0)} / 시야 시작 ${fovBox.x.toFixed(0)}`);
+
+// 다이얼을 돌리면 초점이 바뀌고 재물대가 움직인다
+const stageBefore = await page.locator('#scope-figure #stage').getAttribute('transform');
+const dial = await box('#dial-coarse');
+const [dx0, dy0] = center(dial);
+await page.mouse.move(dx0, dy0 - 22);
+await page.mouse.down();
+for (const a of [0, 45, 90, 135, 180]) {
+  const r = 22, rad = ((a - 90) * Math.PI) / 180;
+  await page.mouse.move(dx0 + r * Math.cos(rad), dy0 + r * Math.sin(rad));
+}
+await page.mouse.up();
 await page.waitForTimeout(200);
+const coarseAfter = await page.evaluate(() => window.__store.getState().microscope.coarse);
+const stageAfter = await page.locator('#scope-figure #stage').getAttribute('transform');
+ok(Math.abs(coarseAfter) > 0.01, '다이얼을 돌리면 조동나사가 움직인다', `coarse=${coarseAfter?.toFixed(3)}`);
+ok(stageBefore !== stageAfter, '나사를 돌리면 재물대 높이가 바뀐다',
+   `${stageBefore} → ${stageAfter}`);
+
+// 결과 기록 → 확인 문구 → 탐구 노트 5단계에 실제로 보이는가
 await page.locator('#capture').click();
-await page.waitForTimeout(200);
+await page.waitForTimeout(250);
 const savedNote = await page.locator('#capture-note').innerText().catch(() => '');
 ok(savedNote.includes('탐구 노트'), '기록하면 어디서 볼 수 있는지 알려 준다', JSON.stringify(savedNote));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+await page.locator('.note-tab[data-stage="5"]').click();
+await page.waitForTimeout(200);
+const cards = await page.locator('#notebook .capture-card').count();
+ok(cards >= 1, '기록한 결과가 탐구 노트 5단계에 보인다', `카드 ${cards}장`);
 
 // 고배율에서 조동나사를 돌리면 깨지고, 화면이 그 사실을 말한다
+await page.locator('[data-id="microscope"]').click();
+await page.waitForTimeout(200);
 await page.evaluate(() => {
   window.__store.dispatch('SET_OBJECTIVE', { objective: 40 });
   window.__store.dispatch('COARSE_FOCUS', { delta: 0.3 });

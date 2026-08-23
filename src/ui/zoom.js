@@ -15,6 +15,7 @@ import { bubblesFromAngle } from '../sim/rules.js';
 import { observability } from '../sim/quality.js';
 import { fieldParams, focusError, brightness, isFloating, PAN_LIMIT, SLIDE_IDS } from '../sim/state.js';
 import { UI } from './strings.js';
+import { ASSETS } from '../assets/index.js';
 import * as slideModule from '../assets/slide.js';
 import { REAGENT_TINT } from '../assets/slide.js';
 
@@ -42,6 +43,16 @@ export function createZoom(root, store) {
   let panDrag = null;
   /** 결과를 기록한 직후 화면에 남길 확인 문구. 열 때마다 지운다. */
   let captureNotice = null;
+  /** 실험대에서 들고 온 도구. 이것만 확대 뷰에 나온다. */
+  let zoomTool = null;
+  /**
+   * 손에 쥔 도구의 자리와 기울기.
+   *
+   * 화면을 다시 그릴 때마다 도구가 처음 자리로 튕겨 돌아가면, 한 방울 떨어뜨릴 때마다
+   * 다시 끌고 와야 한다 — 쥐고 있다는 느낌이 사라진다. 손은 그대로 있어야 한다.
+   */
+  let toolPos = { x: 0, y: 0 };
+  let coverDeg = 45;
   // 재물대를 끌거나 슬라이더를 쥐고 있는 동안에는 구독으로 들어오는 전체 다시 그리기를
   // 건너뛴다. TICK 처럼 사용자와 무관한 상태 변경이 body.innerHTML 을 새로 만들면
   // 드래그 중인 요소(#fov-slot, <input type=range>)가 통째로 사라져 조작이 끊긴다.
@@ -68,10 +79,21 @@ export function createZoom(root, store) {
   closeBtn.addEventListener('click', close);
   root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
 
-  function open(openMode, openSlideId, openerEl) {
+  /**
+   * @param {string} openMode 'slide' | 'scope'
+   * @param {string|null} openSlideId
+   * @param {HTMLElement} openerEl
+   * @param {'forceps'|'dropper'|null} tool 실험대에서 **들고 온** 도구.
+   *   들고 온 것만 화면에 나온다 — 바나나만 문질렀는데 핀셋과 스포이트가 함께 떠 있으면
+   *   내가 무엇을 하고 있는지 알 수 없다.
+   */
+  function open(openMode, openSlideId, openerEl, tool = null) {
     mode = openMode;
     slideId = openSlideId;
+    zoomTool = tool;
     captureNotice = null;
+    toolPos = { x: 0, y: 0 };
+    coverDeg = COVER_START_DEG;
     opener = openerEl ?? document.activeElement;
     openerId = opener?.dataset?.id ?? null;
     root.hidden = false;
@@ -96,13 +118,15 @@ export function createZoom(root, store) {
     body.innerHTML = `
       <h2>${UI.zoom.slideMode(UI.slideShort[slideId])}</h2>
       <div class="zoom-slide-workspace">
-        ${canCover(s) ? `
+        ${zoomTool === 'forceps' && canCover(s) ? `
           <button type="button" class="cover-tool" id="cover-tool"
             aria-label="${UI.zoom.coverToolLabel}"></button>` : ''}
+        ${zoomTool === 'dropper' ? `
+          <button type="button" class="dropper-tool" id="dropper-tool"
+            aria-label="${UI.zoom.dropperLabel}"></button>` : ''}
         <div class="zoom-slide-stage" id="slide-stage"></div>
       </div>
-      <p class="cover-hint" id="cover-hint">${coverHintText(s)}</p>
-      ${renderDropperBay(store.getState().tools.dropper)}
+      <p class="cover-hint" id="cover-hint">${toolHintText(s)}</p>
       <dl class="zoom-readout">
         <div><dt>${UI.controls.reagent}</dt><dd>${UI.reagents[s.stain ?? 'NONE']}</dd></div>
         <div><dt>${UI.controls.drops}</dt><dd>${UI.units.drops(s.drops)}</dd></div>
@@ -114,9 +138,8 @@ export function createZoom(root, store) {
         ? `<button type="button" class="zoom-action" id="cover-lift">${UI.zoom.liftCoverslip}</button>`
         : ''}`;
 
-    body.querySelector('#squeeze')?.addEventListener('click', () => {
-      store.dispatch('DROP', { slide: slideId, count: 1 });
-    });
+    const dropper = body.querySelector('#dropper-tool');
+    if (dropper) bindDropperTool(dropper);
 
     body.querySelector('#slide-stage').innerHTML = slideModule.render({
       sample: s.sample, stain: s.stain, reaction: s.reactionT,
@@ -140,30 +163,87 @@ export function createZoom(root, store) {
     return !s.coverslip.placed && store.getState().tools.forceps.holding !== 'usedCoverslip';
   }
 
-  function coverHintText(s) {
+  /** 지금 손에 든 도구가 무엇이냐에 따라 다른 말을 한다. 도구를 안 들고 열었으면 아무 말도 안 한다. */
+  function toolHintText(s) {
+    if (zoomTool === 'dropper') {
+      const d = store.getState().tools.dropper;
+      return d.holds ? UI.zoom.dropperHint(UI.reagents[d.holds]) : UI.zoom.dropperEmpty;
+    }
+    if (zoomTool !== 'forceps') return UI.zoom.noToolHint;
     if (s.coverslip.placed) return UI.zoom.coverPlaced;
     if (store.getState().tools.forceps.holding === 'usedCoverslip') return UI.zoom.coverUsed;
     return UI.zoom.coverDragHint;
   }
 
   /**
-   * 스포이트. 실험대에서 채워 온 것을 여기서 쓴다.
+   * 스포이트를 손에 쥔다. 받침 유리 위로 옮기고 **고무를 누를 때마다 한 방울**.
    *
-   * 고무를 누를 때마다 한 방울이다 — 실험대에서 가져다 대기만 하면 알아서 떨어지던 것을
-   * 여기로 옮겼다. 몇 방울인지가 이 실험의 변인인데, 그걸 누르는 손이 정해야 한다.
+   * 버튼 하나로 떨어뜨리게 두면 스포이트가 어디에 있든 상관이 없어져, 조작이 아니라
+   * 계산기 두드리기가 된다. 핀셋과 같은 방식으로 쥐고 옮긴다.
    */
-  function renderDropperBay(dropper) {
-    if (!dropper.holds) {
-      return `<p class="dropper-bay dropper-bay--empty">${UI.zoom.dropperEmpty}</p>`;
+  function bindDropperTool(el) {
+    const hint = body.querySelector('#cover-hint');
+    const stage = body.querySelector('#slide-stage');
+    let drag = null;
+
+    function paint() {
+      const d = store.getState().tools.dropper;
+      el.innerHTML = dropperSvg(d);
+      const over = overlaps(el, stage);
+      el.dataset.over = String(over);
+      if (!d.holds) hint.textContent = UI.zoom.dropperEmpty;
+      else hint.textContent = over ? UI.zoom.dropperOver : UI.zoom.dropperHint(UI.reagents[d.holds]);
+      hint.dataset.good = String(over && Boolean(d.holds));
     }
-    return `
-      <div class="dropper-bay">
-        ${dropperSvg(dropper)}
-        <div>
-          <p class="dropper-line">${UI.zoom.dropperHint(UI.reagents[dropper.holds])}</p>
-          <button type="button" class="zoom-action zoom-action--small" id="squeeze">${UI.zoom.squeeze}</button>
-        </div>
-      </div>`;
+
+    // 다시 그려져도 손은 있던 자리에 있다.
+    el.style.transform = `translate(${toolPos.x}px, ${toolPos.y}px)`;
+
+    el.addEventListener('pointerdown', (e) => {
+      el.setPointerCapture(e.pointerId);
+      drag = {
+        id: e.pointerId, x0: e.clientX, y0: e.clientY,
+        tx: toolPos.x, ty: toolPos.y, moved: false,
+        onBulb: Boolean(e.target.closest?.('[data-bulb]')) || e.offsetY < el.clientHeight * 0.34,
+      };
+      busy = true;
+      el.classList.add('cover-tool--dragging');
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x0;
+      const dy = e.clientY - drag.y0;
+      if (Math.hypot(dx, dy) > 4) drag.moved = true;
+      toolPos = { x: drag.tx + dx, y: drag.ty + dy };
+      el.style.transform = `translate(${toolPos.x}px, ${toolPos.y}px)`;
+      paint();
+    });
+
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      el.releasePointerCapture(e.pointerId);
+      el.classList.remove('cover-tool--dragging');
+      const squeeze = !drag.moved && drag.onBulb;
+      drag = null;
+      busy = false;
+      // 고무를 눌렀고, 스포이트 끝이 받침 유리 위에 있으면 한 방울.
+      if (squeeze && overlaps(el, stage)) store.dispatch('DROP', { slide: slideId, count: 1 });
+      else paint();
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      store.dispatch('DROP', { slide: slideId, count: 1 });
+    });
+
+    paint();
+    // 방금 넣은 받침 유리 그림은 아직 제 높이를 갖기 전이라, 여기서 바로 재면
+    // 스포이트가 유리 위에 있는데도 "옮기세요" 라고 말한다. 한 프레임 뒤에 다시 잰다.
+    requestAnimationFrame(() => { if (el.isConnected) paint(); });
   }
 
   function dropperSvg(dropper) {
@@ -172,7 +252,7 @@ export function createZoom(root, store) {
     const h = (34 * level).toFixed(1);
     const M = slideModule.TOOL_METAL;
     return `<svg viewBox="0 0 44 140" class="dropper-svg" aria-hidden="true">
-      <rect x="11" y="6" width="22" height="34" rx="11"
+      <rect data-bulb="1" x="11" y="6" width="22" height="34" rx="11"
         fill="${slideModule.RUBBER}" stroke="${M}" stroke-width="3"/>
       <rect x="15" y="40" width="14" height="64" rx="3"
         fill="${slideModule.COVERSLIP_FILL}" fill-opacity="0.35" stroke="${M}" stroke-width="3"/>
@@ -220,11 +300,13 @@ export function createZoom(root, store) {
   function bindCoverTool(tool) {
     const hint = body.querySelector('#cover-hint');
     const stage = body.querySelector('#slide-stage');
-    let deg = COVER_START_DEG;
     let drag = null;
+    // 다시 그려져도 기울기와 자리를 그대로 이어받는다.
+    tool.style.transform = `translate(${toolPos.x}px, ${toolPos.y}px)`;
 
     function paint() {
-      tool.innerHTML = coverToolSvg(deg);
+      tool.innerHTML = coverToolSvg(coverDeg);
+      const deg = coverDeg;
       const bubbles = bubblesFromAngle(deg);
       hint.textContent =
         `${UI.zoom.coverAngle} ${UI.zoom.coverAngleDeg(deg)} · ` +
@@ -238,12 +320,12 @@ export function createZoom(root, store) {
       if (store.getState().tools.forceps.holding !== 'coverslip') {
         store.dispatch('PICK_COVERSLIP', {});
       }
-      store.dispatch('PLACE_COVERSLIP', { slide: slideId, angleDeg: deg });
+      store.dispatch('PLACE_COVERSLIP', { slide: slideId, angleDeg: coverDeg });
     }
 
     tool.addEventListener('pointerdown', (e) => {
       tool.setPointerCapture(e.pointerId);
-      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, deg0: deg, moved: false };
+      drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, deg0: coverDeg, tx: toolPos.x, ty: toolPos.y, moved: false };
       busy = true;
       tool.classList.add('cover-tool--dragging');
     });
@@ -253,8 +335,9 @@ export function createZoom(root, store) {
       const dx = e.clientX - drag.x0;
       const dy = e.clientY - drag.y0;
       if (Math.hypot(dx, dy) > 4) drag.moved = true;
-      deg = clamp(Math.round(drag.deg0 + dx * COVER_DEG_PER_PX), 0, 90);
-      tool.style.transform = `translate(${dx}px, ${dy}px)`;
+      coverDeg = clamp(Math.round(drag.deg0 + dx * COVER_DEG_PER_PX), 0, 90);
+      toolPos = { x: drag.tx + dx, y: drag.ty + dy };
+      tool.style.transform = `translate(${toolPos.x}px, ${toolPos.y}px)`;
       paint();
     });
 
@@ -268,7 +351,6 @@ export function createZoom(root, store) {
       busy = false;
       if (!moved || !touched) {
         // 받침 유리에 닿지 않았다. 손만 움직였을 뿐 아무 일도 일어나지 않는다.
-        tool.style.transform = '';
         return;
       }
       place();
@@ -279,7 +361,7 @@ export function createZoom(root, store) {
     // 키보드 — 좌우로 각도, Enter 로 덮기. 끌기만 되면 마우스 없이는 못 덮는다.
     tool.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        deg = clamp(deg + (e.key === 'ArrowRight' ? 5 : -5), 0, 90);
+        coverDeg = clamp(coverDeg + (e.key === 'ArrowRight' ? 5 : -5), 0, 90);
         paint();
       } else if (e.key === 'Enter' || e.key === ' ') {
         place();
@@ -322,19 +404,25 @@ export function createZoom(root, store) {
       return;
     }
     const p = fieldParams(st, slideId);
-    // T07 1단계 — 배율 선택 UI 를 내주지 않는다(고정 400배). 대신 색만으로 용액을 구분하지
-    // 않도록 어느 슬라이드·용액인지 글자로 밝혀 둔다(청람/선홍 색맹 대응).
-    const objectivePicker = st.session.level === 1 ? '' : `
+    // 배율은 어느 단계에서나 학생이 고른다.
+    //
+    // 1단계에서 올리자마자 400배로 맞춰 주던 것을 걷어냈다. 그러면 `SET_OBJECTIVE` 가
+    // "저배율에서 초점을 맞추지 않고 올렸습니다" 라고 경고하는데, 정작 학생은 아무것도
+    // 하지 않았고 초점은 이미 맞아 있는 것처럼 보인다 — 화면과 문구가 서로 다른 말을 했다.
+    // 저배율부터 올라가는 것이 이 실험에서 배우는 절차이므로 그 손을 뺏지 않는다.
+    const objectivePicker = `
         <div class="ctrl-group" role="group" aria-label="${UI.controls.objective}">
           <span>${UI.controls.objective}</span>
-          <button type="button" data-obj="4">${UI.units.mag(40)}</button>
-          <button type="button" data-obj="10">${UI.units.mag(100)}</button>
-          <button type="button" data-obj="40">${UI.units.mag(400)}</button>
+          ${[4, 10, 40].map((o) => `<button type="button" data-obj="${o}"
+            aria-pressed="${st.microscope.objective === o}">${UI.units.mag(o * 10)}</button>`).join('')}
         </div>`;
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
       <p class="zoom-slide-label">${UI.slideShort[slideId]} · ${UI.reagents[p.reagent ?? 'NONE']}</p>
-      <div class="zoom-fov" id="fov-slot" tabindex="0"></div>
+      <div class="scope-stage">
+        <div class="scope-figure" id="scope-figure" aria-hidden="true"></div>
+        <div class="zoom-fov" id="fov-slot" tabindex="0"></div>
+      </div>
       <div class="zoom-gauge" id="quality">
         <div class="bar"><div class="fill" id="zoom-gauge-fill"></div></div>
         <div class="cap"><span>${UI.observability.label}</span><b id="quality-score"></b></div>
@@ -342,33 +430,31 @@ export function createZoom(root, store) {
       </div>
       <div class="zoom-scope-controls">
         ${objectivePicker}
-        <div class="ctrl-group">
-          <span>${UI.zoom.coarseGroup}</span>
-          <button type="button" id="coarse-out">${UI.zoom.coarseFocusOut}</button>
-          <button type="button" id="coarse-in">${UI.zoom.coarseFocusIn}</button>
-        </div>
-        <div class="ctrl-group">
-          <label for="zoom-fine-focus">${UI.controls.focus}</label>
-          <input type="range" id="zoom-fine-focus" min="-0.2" max="0.2" step="0.002" value="${st.microscope.fine}">
+        <div class="dial-row">
+          ${dialHtml('coarse', UI.zoom.coarseGroup, st.microscope.coarse)}
+          ${dialHtml('fine', UI.controls.focus, st.microscope.fine)}
         </div>
         <div class="ctrl-group">
           <label for="zoom-diaphragm">${UI.controls.diaphragm}</label>
           <input type="range" id="zoom-diaphragm" min="0" max="1" step="0.02" value="${st.microscope.diaphragm}">
         </div>
         <button type="button" class="zoom-action" id="capture">${UI.zoom.capture}</button>
+        <button type="button" id="scope-unmount">${UI.bench.unmount(UI.slideShort[slideId])}</button>
       </div>
       ${captureNotice ? `<p class="capture-note" id="capture-note">${captureNotice}</p>` : ''}`;
 
     const fovWrap = body.querySelector('#fov-slot');
     fovWrap.innerHTML = renderFOV(p);
+    paintScopeFigure();
     updateGauge();
     bindPan(fovWrap);
 
     body.querySelectorAll('[data-obj]').forEach((b) => {
       b.addEventListener('click', () => store.dispatch('SET_OBJECTIVE', { objective: Number(b.dataset.obj) }));
     });
-    body.querySelector('#coarse-in').addEventListener('click', () => store.dispatch('COARSE_FOCUS', { delta: 0.08 }));
-    body.querySelector('#coarse-out').addEventListener('click', () => store.dispatch('COARSE_FOCUS', { delta: -0.08 }));
+    body.querySelector('#scope-unmount').addEventListener('click', () => store.dispatch('UNMOUNT', {}));
+    bindDial('coarse', 'COARSE_FOCUS', 0.5);
+    bindDial('fine', 'FINE_FOCUS', 0.16);
     // 기록이 됐다는 말은 규칙이 아니라 화면이 한다.
     // reduce() 쪽에서 말하게 하면 성공한 조작에 결과 태그가 붙어, 정상 경로가
     // "태그 하나 없이 끝난다" 는 계약이 깨진다 (tests/rules.test.js).
@@ -381,18 +467,6 @@ export function createZoom(root, store) {
       renderBody();
     });
 
-    const fineInput = body.querySelector('#zoom-fine-focus');
-    let lastFine = st.microscope.fine;
-    fineInput.addEventListener('pointerdown', () => { busy = true; });
-    fineInput.addEventListener('input', () => {
-      const val = Number(fineInput.value);
-      store.dispatch('FINE_FOCUS', { delta: val - lastFine }, { skipNotify: true });
-      lastFine = val;
-      updateBlur();
-      updateGauge();
-    });
-    fineInput.addEventListener('change', () => { busy = false; });
-
     const diaInput = body.querySelector('#zoom-diaphragm');
     let lastDia = st.microscope.diaphragm;
     diaInput.addEventListener('pointerdown', () => { busy = true; });
@@ -404,6 +478,136 @@ export function createZoom(root, store) {
       updateGauge();
     });
     diaInput.addEventListener('change', () => { busy = false; });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 나사 다이얼 · 현미경 그림                                          */
+  /* ---------------------------------------------------------------- */
+
+  function dialHtml(name, label, value) {
+    return `
+      <div class="dial-cell">
+        <div class="dial" id="dial-${name}" role="slider" tabindex="0"
+          aria-label="${label}" aria-valuenow="${value.toFixed(3)}">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r="27"
+              fill="${slideModule.TOOL_METAL}" stroke="${slideModule.TOOL_METAL_SHADE}" stroke-width="3"/>
+            <g class="dial-mark">
+              <!-- 손잡이 홈. 돌리는 물건이라는 것이 눈에 보여야 돌려 볼 생각을 한다. -->
+              ${Array.from({ length: 12 }, (_, i) => {
+                const a = (i * 30 * Math.PI) / 180;
+                const x1 = 32 + 21 * Math.sin(a), y1 = 32 - 21 * Math.cos(a);
+                const x2 = 32 + 26 * Math.sin(a), y2 = 32 - 26 * Math.cos(a);
+                return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+                  stroke="${slideModule.TOOL_METAL_SHADE}" stroke-width="2" stroke-linecap="round"/>`;
+              }).join('')}
+              <line x1="32" y1="32" x2="32" y2="10"
+                stroke="${slideModule.TOOL_METAL_SHADE}" stroke-width="4" stroke-linecap="round"/>
+            </g>
+          </svg>
+        </div>
+        <span class="dial-label">${label}</span>
+      </div>`;
+  }
+
+  /**
+   * 나사를 돌린다. 다이얼 한가운데를 축으로 삼아, 포인터가 돈 각도만큼 값을 바꾼다.
+   *
+   * 슬라이더나 ▲▼ 버튼이 아니라 **돌리는 것**이어야 하는 이유는 실물이 그렇기 때문이다.
+   * 한 바퀴가 `perTurn` 만큼 움직인다 — 조동나사는 크게, 미동나사는 잘게.
+   */
+  function bindDial(name, action, perTurn) {
+    const el = body.querySelector(`#dial-${name}`);
+    if (!el) return;
+    const mark = el.querySelector('.dial-mark');
+    let drag = null;
+    let spin = 0;   // 화면에서 돌아간 각도. 값이 한계에 걸려도 손은 계속 돌 수 있다.
+
+    const angleAt = (e) => {
+      const r = el.getBoundingClientRect();
+      return (Math.atan2(e.clientY - (r.top + r.height / 2),
+        e.clientX - (r.left + r.width / 2)) * 180) / Math.PI;
+    };
+
+    /** 값이 바뀌면 시야를 다시 그리지 않고 필요한 속성만 손본다 (fov.js 머리말 참조). */
+    function apply(delta) {
+      const r = store.dispatch(action, { delta }, { skipNotify: true });
+      // 고배율에서 조동나사를 돌리면 슬라이드에 금이 가고 재물대에서 내려간다.
+      // 이건 속성 몇 개로 될 일이 아니다 — 손을 놓고 화면을 새로 그린다.
+      if (r.tag === 'cracked') {
+        drag = null;
+        busy = false;
+        renderBody();
+        return false;
+      }
+      updateBlur();
+      updateGauge();
+      paintScopeFigure();
+      return true;
+    }
+
+    el.addEventListener('pointerdown', (e) => {
+      el.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, last: angleAt(e) };
+      busy = true;
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const now = angleAt(e);
+      let step = now - drag.last;
+      if (step > 180) step -= 360;
+      if (step < -180) step += 360;
+      drag.last = now;
+      spin += step;
+      mark.setAttribute('transform', `rotate(${spin.toFixed(1)} 32 32)`);
+      if (!apply((step / 360) * perTurn)) return;
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      el.releasePointerCapture(e.pointerId);
+      drag = null;
+      busy = false;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+
+    // 키보드 — 다이얼을 마우스로만 돌릴 수 있으면 초점을 맞출 길이 하나뿐이다.
+    el.addEventListener('keydown', (e) => {
+      const dir = (e.key === 'ArrowUp' || e.key === 'ArrowRight') ? 1
+        : (e.key === 'ArrowDown' || e.key === 'ArrowLeft') ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      spin += dir * 15;
+      mark.setAttribute('transform', `rotate(${spin.toFixed(1)} 32 32)`);
+      apply((dir * 15 / 360) * perTurn);
+    });
+  }
+
+  /**
+   * 확대 뷰 안의 현미경 그림. 나사를 돌리면 **재물대가 위아래로 움직인다.**
+   *
+   * 초점이 왜 맞고 안 맞는지는 시야만 봐서는 알 수 없다 — 재물대와 대물렌즈 사이가
+   * 얼마나 떨어졌는지가 원인이기 때문이다. 그림이 그 원인을 보여 준다.
+   */
+  function paintScopeFigure() {
+    const fig = body.querySelector('#scope-figure');
+    if (!fig) return;
+    const m = store.getState().microscope;
+    // 초점이 맞은 자리를 0 으로 두고, 어긋난 만큼 재물대를 내린다 (애셋 viewBox 단위).
+    const stageY = clamp((m.coarse + m.fine) * 26, -18, 18);
+    const svg = fig.querySelector('svg');
+    if (!svg) {
+      fig.innerHTML = ASSETS.microscope.render({
+        objective: m.objective, coarse: m.coarse, fine: m.fine,
+        diaphragm: m.diaphragm, lamp: m.lamp, stage: m.stage, stageY,
+      });
+      return;
+    }
+    // 이미 그려져 있으면 계약된 노드만 손본다 (docs/02).
+    ASSETS.microscope.applyState(svg, {
+      objective: m.objective, coarse: m.coarse, fine: m.fine,
+      diaphragm: m.diaphragm, lamp: m.lamp, stage: m.stage, stageY,
+    });
   }
 
   /** #fov-scene 의 transform 만 갱신한다 — renderFOV 를 다시 부르지 않는다. */

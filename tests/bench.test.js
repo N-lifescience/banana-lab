@@ -108,13 +108,26 @@ test('손끝으로 하는 일은 실험대에서 곧장 일어나지 않고 확�
   // 방울 수와 덮는 각도는 이 실험의 변인이다. 실험대에서 끌어다 대는 것만으로 정해지면
   // 학생이 정할 수 있는 것이 없다 — 가져다 대면 알아서 두 방울이 떨어지던 것이 그랬다.
   // 확대 뷰를 열어 거기서 고무를 누르고 핀셋을 기울인다.
+  // 들고 온 도구가 무엇인지도 함께 넘겨야 한다 — 확대 뷰는 들고 온 것만 보여 준다.
+  // 바나나만 문질렀는데 핀셋과 스포이트가 함께 떠 있으면 무엇을 하는 화면인지 알 수 없다.
   for (const tool of ['dropper', 'forceps']) {
     const store = fakeStore();
     const opened = [];
     dropTable(store, (...a) => opened.push(a))[tool]
       .slide({ kind: tool }, { kind: 'slide', slide: 'B' }, { lastDx: 10, lastDy: 10 });
     assert.deepEqual(store.calls, [], `${tool} 가 실험대에서 곧장 조작을 일으킨다`);
-    assert.deepEqual(opened, [['slide', 'B']], `${tool} 를 대도 확대 뷰가 열리지 않는다`);
+    assert.deepEqual(opened, [['slide', 'B', tool]], `${tool} 를 들고 온 것이 전해지지 않는다`);
+  }
+});
+
+test('받침 유리를 현미경에 올리는 것으로 배율이 정해지지 않는다', () => {
+  // 올리자마자 400배로 맞춰 주면 "저배율에서 초점을 맞추지 않고 올렸습니다" 경고가
+  // 학생이 아무것도 안 했는데 뜬다. 저배율부터 올라가는 것이 이 실험에서 배우는 절차다.
+  for (const level of LEVELS) {
+    const store = fakeStore(level);
+    dropTable(store).slide.microscope({ kind: 'slide', slide: 'B' }, { kind: 'microscope' }, {});
+    assert.deepEqual(store.calls.map((c) => c.type), ['MOUNT'],
+      `${level}단계에서 올리는 것 말고 다른 일이 함께 일어난다`);
   }
 });
 

@@ -65,10 +65,10 @@ if (import.meta.env.DEV) window.__store = store;
 
 const zoom = createZoom($('#zoom'), store);
 createBench($('#bench'), store, {
-  onOpenZoom: (mode, slideId, opener) => zoom.open(mode, slideId, opener),
+  onOpenZoom: (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool),
 });
 createNotebook($('#notebook'), store, {
-  onOpenZoom: (mode, slideId, opener) => zoom.open(mode, slideId, opener),
+  onOpenZoom: (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool),
 });
 
 /* ------------------------------------------------------------------ */

@@ -178,12 +178,27 @@
   .cover-tool svg{width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
   .cover-tool--dragging{cursor:grabbing;z-index:3}
 
-  /* 스포이트 — 고무를 누를 때마다 한 방울 */
-  .dropper-bay{display:flex;align-items:center;gap:14px;margin-top:12px}
-  .dropper-bay--empty{font-size:12.5px;color:var(--ink-mute)}
-  .dropper-svg{width:34px;height:110px;flex:none}
-  .dropper-line{font-size:12.5px;color:var(--ink-mute);margin:0 0 8px}
-  .zoom-action--small{width:auto;padding:8px 14px}
+  /* 스포이트 — 쥐고 옮긴 뒤 고무를 누른다 */
+  .dropper-tool{position:absolute;top:0;left:calc(50% - 22px);width:44px;height:104px;padding:0;
+    background:none;border:none;cursor:grab;touch-action:none;line-height:0}
+  .dropper-tool svg{width:100%;height:100%;display:block;pointer-events:none}
+  .dropper-tool[data-over="true"]{filter:drop-shadow(0 0 6px var(--indigo))}
+  .dropper-svg{width:100%;height:100%}
+
+  /* 현미경 그림과 시야를 나란히. 시야 원을 줄여 그림과 겹치지 않게 한다. */
+  .scope-stage{display:flex;align-items:flex-start;gap:14px}
+  .scope-figure{flex:0 0 176px}
+  .scope-figure svg{width:100%;height:auto;display:block}
+  .zoom-fov{flex:1;min-width:0}
+  .zoom-fov svg{max-width:290px;margin:0 auto}
+
+  /* 조동·미동나사 — 실물처럼 돌린다 */
+  .dial-row{display:flex;gap:22px;align-items:flex-start}
+  .dial-cell{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .dial{width:58px;height:58px;cursor:grab;touch-action:none;line-height:0;border-radius:50%}
+  .dial:active{cursor:grabbing}
+  .dial svg{width:100%;height:100%;display:block;pointer-events:none}
+  .dial-label{font-size:11.5px;color:var(--ink-mute)}
   .cover-hint{font-size:12.5px;color:var(--ink-mute);margin:8px 0 0}
   .cover-hint[data-good="true"]{color:var(--good)}
   .cover-hint[data-good="false"]{color:var(--warn)}

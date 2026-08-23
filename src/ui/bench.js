@@ -134,25 +134,23 @@ export function dropTable(store, openZoom = () => {}) {
     dropper: {
       bottle: (item, target) => store.dispatch('FILL_DROPPER', { reagent: target.reagent }),
       // 받침 유리에 대면 확대 뷰가 열린다 — 방울은 거기서 고무를 눌러 한 방울씩 떨어뜨린다.
-      slide: (item, target) => openZoom('slide', target.slide),
+      // 무엇을 들고 왔는지 함께 넘긴다. 들고 온 도구만 그 화면에 나온다.
+      slide: (item, target) => openZoom('slide', target.slide, 'dropper'),
       waste: () => store.dispatch('RINSE_DROPPER', {}),
     },
     forceps: {
       coverslip: () => store.dispatch('PICK_COVERSLIP', {}),
       // 덮는 것도 들어내는 것도 손끝 일이다. 실험대에서 끌어다 대는 것으로는 각도를 못 정하고,
       // 덮인 유리를 집어 드는 것은 더 어렵다. 대면 확대 뷰가 열리고 거기서 한다.
-      slide: (item, target) => openZoom('slide', target.slide),
+      slide: (item, target) => openZoom('slide', target.slide, 'forceps'),
       // 쓴 덮개 유리를 버린다.
       dish: () => store.dispatch('DISCARD_COVERSLIP', {}),
     },
     slide: {
-      microscope: (item) => {
-        store.dispatch('MOUNT', { slide: item.slide });
-        // T07 1단계 — 배율도 고정한다: 대물렌즈 선택 UI 를 안 주는 대신 400배로 맞춰 둔다.
-        if (store.getState().session.level === 1) {
-          store.dispatch('SET_OBJECTIVE', { objective: 40 });
-        }
-      },
+      // 올리기만 한다. 배율은 확대 뷰에서 학생이 고른다 —
+      // 1단계에서 올리자마자 400배로 맞춰 주던 것을 걷어냈다. 그러면 아무것도 안 했는데
+      // "저배율에서 초점을 맞추지 않고 올렸습니다" 라는 경고가 뜨고, 화면은 초점이 맞아 보였다.
+      microscope: (item) => store.dispatch('MOUNT', { slide: item.slide }),
       dish: (item) => store.dispatch('RINSE_SLIDE', { slide: item.slide }),
     },
   };
@@ -211,7 +209,7 @@ export function createBench(root, store, { onOpenZoom }) {
   root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
   unmountBtn.addEventListener('click', () => store.dispatch('UNMOUNT', {}));
 
-  const DROPS = dropTable(store, (mode, id) => onOpenZoom(mode, id, elFor(`slide${id}`)));
+  const DROPS = dropTable(store, (mode, id, tool) => onOpenZoom(mode, id, elFor(`slide${id}`), tool));
 
   const TAPS = tapTable(store, onOpenZoom);
 

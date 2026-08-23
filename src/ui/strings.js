@@ -185,8 +185,9 @@ export const UI = {
     dropperLabel: '스포이트',
     dropperEmpty: '스포이트가 비어 있습니다. 실험대에서 시약병에 가져다 대어 채우세요.',
     // 조사(이/가)는 시약 이름의 끝소리에 따라 달라진다. 문장을 바꿔서 조사를 피한다.
-    dropperHint: (reagent) => `담긴 시약 — ${reagent}. 고무를 누를 때마다 한 방울씩 떨어집니다.`,
-    squeeze: '고무 누르기',
+    dropperHint: (reagent) => `담긴 시약 — ${reagent}. 스포이트를 받침 유리 위로 옮기세요.`,
+    dropperOver: '고무를 누르면 한 방울 떨어집니다.',
+    noToolHint: '실험대에서 도구를 가져와 이 받침 유리에 대면 여기서 손질할 수 있습니다.',
     capture: '결과 기록',
     coarseGroup: '조동나사',
     coarseFocusIn: '조동나사 ▲',
