@@ -17,6 +17,7 @@
     "shot": "node scripts/shot.mjs"
   },
   "devDependencies": {
+    "playwright": "^1.62.1",
     "vite": ">=6"
   }
 }

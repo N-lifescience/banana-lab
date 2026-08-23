@@ -5,6 +5,7 @@
  *   npm run dev            # 다른 터미널에서 먼저 띄운다
  *   npm run shot           # shots/harness.png
  *   npm run shot -- '#fov-slot' fov   # 특정 요소만
+ *   SHOT_SCHEME=dark npm run shot -- '#sheet-panel' sheet-dark   # 다크 모드
  *
  * 에이전트가 "눈으로 확인" 단계를 실제로 수행할 수 있게 하는 용도다.
  * Playwright 가 없으면 안내만 하고 조용히 끝난다.
@@ -27,7 +28,11 @@ try {
 mkdirSync('shots', { recursive: true });
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1100, height: 900 }, deviceScaleFactor: 2 });
+// 애셋은 라이트/다크 양쪽에서 확인해야 한다. AGENTS.md §4 참조.
+const colorScheme = process.env.SHOT_SCHEME === 'dark' ? 'dark' : 'light';
+const page = await browser.newPage({
+  viewport: { width: 1100, height: 900 }, deviceScaleFactor: 2, colorScheme,
+});
 
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));

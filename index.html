@@ -46,6 +46,14 @@
   .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
   .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
   .hint{font-size:12.5px;color:var(--ink-mute)}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet{margin-top:18px}
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:760px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:6px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -108,6 +116,11 @@
         <div class="hint" id="q-hint"></div>
       </div>
     </div>
+  </div>
+
+  <div class="panel sheet" id="sheet-panel">
+    <h2>애셋 시트 — 전 종 대조</h2>
+    <div class="sheet-grid" id="sheet"></div>
   </div>
 </div>
 <script type="module" src="/src/main.js"></script>

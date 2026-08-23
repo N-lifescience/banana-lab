@@ -7,6 +7,7 @@
  */
 
 import * as banana from './assets/banana.js';
+import { ASSETS, SAMPLE_STATES } from './assets/index.js';
 import { renderFOV } from './render/fov.js';
 import { observability } from './sim/quality.js';
 import { UI } from './ui/strings.js';
@@ -92,5 +93,17 @@ document.querySelectorAll('#reagent button').forEach((b) => {
   });
 });
 
+/**
+ * 애셋 시트. 전 종을 같은 폭으로 늘어놓아 선 두께·음영 방향·크기 감각을 눈으로 대조한다.
+ * 상태는 SAMPLE_STATES 의 첫 번째 것을 쓴다 — 린터가 검사하는 상태와 같아야 하기 때문이다.
+ */
+function paintSheet() {
+  $('#sheet').innerHTML = Object.entries(ASSETS).map(([name, mod]) => {
+    const sample = SAMPLE_STATES[name]?.[0] ?? {};
+    return `<div class="cell">${mod.render({ ...sample, seed: state.seed })}<span class="name">${name}</span></div>`;
+  }).join('');
+}
+
 $('#harness-note').textContent = UI.harnessNote;
 paint();
+paintSheet();
