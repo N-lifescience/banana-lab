@@ -28,6 +28,15 @@ test('모든 애셋에 대표 상태가 정의돼 있다', () => {
   }
 });
 
+test('모든 애셋에 realSizeMm 이 선언돼 있다', () => {
+  // 애셋은 저마다 프레임을 꽉 채워 그린다. 실험대에 함께 놓을 때의 크기는
+  // 그린 크기가 아니라 이 값으로 정한다. 값의 정합성은 사람이 본다.
+  for (const [name, spec] of Object.entries(CONTRACT)) {
+    assert.equal(typeof spec.realSizeMm, 'number', `${name} 의 realSizeMm 이 없습니다`);
+    assert.ok(spec.realSizeMm > 0, `${name} 의 realSizeMm 은 양수여야 합니다`);
+  }
+});
+
 test('등록된 애셋은 render 와 applyState 를 모두 내보낸다', () => {
   for (const [name, mod] of Object.entries(ASSETS)) {
     assert.equal(typeof mod.render, 'function', `${name}.render 없음`);

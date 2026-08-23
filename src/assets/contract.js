@@ -16,10 +16,16 @@
 /**
  * mutable: 상태에 따라 코드가 바꿔도 되는 속성
  * 'children' 은 그 그룹 안에 도형을 주입해도 된다는 뜻 (기포, 반점 등)
+ *
+ * realSizeMm: 실물의 **가장 긴 변** (mm).
+ *   애셋은 저마다 400×300 프레임을 꽉 채워 그린다. 단독 아이콘으로 쓸 때 그래야 하기 때문이다.
+ *   그래서 그린 크기끼리 비교하면 안 된다 — 스포이트와 시약병이 같은 높이로 그려져 있다.
+ *   실험대에 함께 놓을 때의 화면 크기는 이 값에 비례해서 정한다. docs/02-asset-contract.md 참조.
  */
 export const CONTRACT = {
   banana: {
     file: 'banana.js',
+    realSizeMm: 180,   // 중간 크기 바나나, 껍질 포함 길이
     viewBox: '0 0 400 312',
     states: ['ripe', 'peel'],
     nodes: {
@@ -36,6 +42,7 @@ export const CONTRACT = {
 
   slide: {
     file: 'slide.js',
+    realSizeMm: 76,    // 표준 슬라이드글라스 76 × 26 mm 의 긴 변
     viewBox: '0 0 400 300',
     states: ['sample', 'stain', 'reaction', 'coverslip', 'bubbles'],
     nodes: {
@@ -50,6 +57,7 @@ export const CONTRACT = {
 
   coverslip: {
     file: 'coverslip.js',
+    realSizeMm: 22,    // 표준 커버글라스 22 × 22 mm
     viewBox: '0 0 400 300',
     states: ['angle', 'held'],
     nodes: {
@@ -60,6 +68,7 @@ export const CONTRACT = {
 
   dropper: {
     file: 'dropper.js',
+    realSizeMm: 150,   // 고무 젖꼭지 포함 스포이트 전장
     viewBox: '0 0 400 300',
     states: ['holds', 'level', 'squeezed'],
     nodes: {
@@ -74,6 +83,7 @@ export const CONTRACT = {
 
   forceps: {
     file: 'forceps.js',
+    realSizeMm: 120,   // 실험용 핀셋 표준 길이
     viewBox: '0 0 400 300',
     states: ['closed', 'holding'],
     nodes: {
@@ -86,6 +96,7 @@ export const CONTRACT = {
 
   bottle: {
     file: 'bottle.js',
+    realSizeMm: 105,   // 100 mL 갈색 시약병, 마개 포함 높이
     viewBox: '0 0 400 300',
     states: ['kind', 'level', 'capOpen'],
     nodes: {
@@ -100,6 +111,7 @@ export const CONTRACT = {
 
   microscope: {
     file: 'microscope.js',
+    realSizeMm: 340,   // 학생용 광학현미경 높이
     viewBox: '0 0 400 300',
     states: ['objective', 'coarse', 'fine', 'diaphragm', 'lamp', 'stage'],
     nodes: {
@@ -122,22 +134,23 @@ export const CONTRACT = {
     },
   },
 
-  dish:   { file: 'dish.js',   viewBox: '0 0 400 300', states: ['contents'],
+  // 페트리 접시 지름 90 · 폐액통 높이 250 · 킴와이프스 박스 긴 변 215 · 실험대 폭 1500
+  dish:   { file: 'dish.js',   realSizeMm: 90,   viewBox: '0 0 400 300', states: ['contents'],
             nodes: { '#dish': { required: true, mutable: [] },
                      '#dish-shade': { required: true, mutable: [] },
                      '#contents': { required: true, mutable: ['children'] } } },
 
-  waste:  { file: 'waste.js',  viewBox: '0 0 400 300', states: ['level'],
+  waste:  { file: 'waste.js',  realSizeMm: 250,  viewBox: '0 0 400 300', states: ['level'],
             nodes: { '#bin': { required: true, mutable: [] },
                      '#bin-shade': { required: true, mutable: [] },
                      '#level': { required: true, mutable: ['y', 'height', 'fill'] } } },
 
-  tissue: { file: 'tissue.js', viewBox: '0 0 400 300', states: ['used'],
+  tissue: { file: 'tissue.js', realSizeMm: 215,  viewBox: '0 0 400 300', states: ['used'],
             nodes: { '#box': { required: true, mutable: [] },
                      '#box-shade': { required: true, mutable: [] },
                      '#sheet': { required: true, mutable: ['opacity'] } } },
 
-  bench:  { file: 'bench.js',  viewBox: '0 0 400 300', states: [],
+  bench:  { file: 'bench.js',  realSizeMm: 1500, viewBox: '0 0 400 300', states: [],
             nodes: { '#surface': { required: true, mutable: [] },
                      '#surface-shade': { required: true, mutable: [] },
                      '#shelf': { required: true, mutable: [] } } },

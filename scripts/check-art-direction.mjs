@@ -11,6 +11,7 @@
  *   4. 선 두께가 STROKE 세 값 중 하나인가
  *   5. 계약(contract.js)에 선언된 노드가 전부, 한 번씩 있는가
  *   6. viewBox 가 계약과 같은가
+ *   7. realSizeMm 이 계약에 선언돼 있는가 (값의 정합성은 검사하지 않는다)
  *
  * 통과하지 못하면 종료 코드 1. CI와 에이전트가 이 값을 본다.
  */
@@ -74,6 +75,11 @@ function checkOne(name, state, svg, label) {
   const vb = attrValues(svg, 'viewBox')[0];
   if (vb !== spec.viewBox) {
     problems.push(`${where}: viewBox "${vb}" — 계약은 "${spec.viewBox}" 입니다`);
+  }
+
+  // 선언 여부만 본다. 값이 실물과 맞는지는 기계가 판정할 수 없어 사람이 본다.
+  if (typeof spec.realSizeMm !== 'number' || !(spec.realSizeMm > 0)) {
+    problems.push(`${where}: contract.js 에 realSizeMm(실물의 가장 긴 변, mm)이 없습니다`);
   }
 
   for (const id of requiredNodes(name)) {
