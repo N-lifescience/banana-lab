@@ -478,6 +478,33 @@ test('하드 게이트는 두 종류뿐이다', () => {
   }
 });
 
+test('방울이 있는 슬라이드는 반드시 시약이 정해져 있다', () => {
+  // 시야 렌더러가 이 불변식에 기대고 있다. (가) 대조군은 방울이 0개인 한 가지 상태뿐이라
+  // "대조군에 두 방울" 같은 조합은 존재하지 않는다.
+  // 이게 깨지면 시약 없이 염색된 시야가 나올 수 있다.
+  const payloads = {
+    SMEAR: { slide: 'A', thickness: 0.3 }, FILL_DROPPER: { reagent: REAGENTS.IKI },
+    DROP: { slide: 'A', count: 1 }, TICK: { seconds: 1 },
+    PLACE_COVERSLIP: { slide: 'A', angleDeg: 45 }, MOUNT: { slide: 'A' },
+    SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
+    FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
+    NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
+    MOVE_STAGE: { dx: 20, dy: 0 },
+  };
+  const types = Object.keys(ACTIONS);
+  // 시드로 순서를 정해 결정적으로 훑는다. Math.random() 을 쓰면 실패가 재현되지 않는다.
+  let s = S0();
+  for (let step = 0; step < 600; step++) {
+    const type = types[(step * 7 + Math.floor(step / types.length) * 3) % types.length];
+    s = run(s, type, payloads[type] ?? {}).state;
+    for (const id of SLIDE_IDS) {
+      const sl = s.slides[id];
+      assert.ok(!(sl.stain === null && sl.drops > 0),
+        `${step}번째 ${type} 뒤 슬라이드 ${id} 에 시약 없이 ${sl.drops}방울이 생겼습니다`);
+    }
+  }
+});
+
 test('reduce 는 원본 상태를 바꾸지 않는다', () => {
   const s = S0();
   const before = JSON.stringify(s);
