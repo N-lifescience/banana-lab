@@ -25,18 +25,30 @@
   .layout{display:grid;grid-template-columns:1.5fr 1fr;gap:0;height:100vh}
   @media (max-width:860px){.layout{grid-template-columns:1fr;height:auto}}
 
-  /* 실험대 */
-  #bench{position:relative;overflow:hidden;background:var(--sunk);min-height:560px}
+  /* 실험대 — 배경 애셋과 물건이 같은 4:3 무대를 쓴다.
+     따로 놀면 창 크기가 바뀔 때 물건이 선반에서 떠오른다. */
+  #bench{position:relative;overflow:auto;background:var(--sunk);display:flex;
+    align-items:flex-start;justify-content:center;padding:12px}
+  .bench-stage{position:relative;width:100%;aspect-ratio:4/3}
   .bench-bg{position:absolute;inset:0}
   .bench-bg svg{width:100%;height:100%;display:block}
   .bench-tokens{position:absolute;inset:0}
-  .token{position:absolute;background:none;border:none;padding:6px;margin:0;cursor:grab;
-    touch-action:none;line-height:0;border-radius:6px;min-width:32px;min-height:32px;
-    display:flex;align-items:center;justify-content:center}
-  .token:active,.token--dragging{cursor:grabbing;z-index:5}
-  .token svg{height:100%;width:auto;display:block;pointer-events:none;
+
+  /* 물건. width 는 realSizeMm 비율로 인라인 지정된다 — 여기서 크기를 덮어쓰지 말 것. */
+  .token{position:absolute;background:none;border:none;padding:0;margin:0;cursor:grab;
+    touch-action:none;line-height:0;border-radius:6px}
+  .token svg{width:100%;height:auto;display:block;pointer-events:none;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
-  .token:hover{background:rgba(255,255,255,.18)}
+  .token:active,.token--dragging{cursor:grabbing;z-index:5}
+  .token:hover::after,.token:focus-visible::after{background:rgba(255,255,255,.18)}
+
+  /* 손가락으로 집을 수 있는 최소 크기를 그림과 분리한다.
+     덮개 유리는 실물 22 mm 라 화면에서 아주 작지만, 그렇다고 그림을 키우면
+     realSizeMm 비례가 무너진다. 그림은 그대로 두고 잡는 영역만 넓힌다. */
+  .token::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    min-width:44px;min-height:44px;width:100%;height:100%;border-radius:8px}
+  .token:focus-visible{outline:none}
+  .token:focus-visible::after{outline:2px solid var(--indigo);outline-offset:2px}
 
   /* 탐구 노트 */
   #notebook{overflow-y:auto;padding:20px 22px;border-left:1px solid var(--rule);background:var(--surface)}

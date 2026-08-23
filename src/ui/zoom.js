@@ -36,6 +36,7 @@ export function createZoom(root, store) {
   let mode = null;
   let slideId = null;
   let opener = null;
+  let openerId = null;
   let panDrag = null;
   // 재물대를 끌거나 슬라이더를 쥐고 있는 동안에는 구독으로 들어오는 전체 다시 그리기를
   // 건너뛴다. TICK 처럼 사용자와 무관한 상태 변경이 body.innerHTML 을 새로 만들면
@@ -50,11 +51,15 @@ export function createZoom(root, store) {
     if (root.hidden) return;
     root.hidden = true;
     document.removeEventListener('keydown', onKeydown);
-    if (opener && opener.isConnected) opener.focus();
-    opener = null;
     // 재물대 이동·초점·조리개는 드래그 중 skipNotify 로 조용히 갱신됐다.
     // 닫을 때 한 번 전체를 동기화해 실험대(배경) 뷰가 최신 상태를 반영하게 한다.
+    // 이 notify 가 bench 를 다시 그리면 opener 로 잡아 둔 버튼 자체가 새 요소로 바뀌므로,
+    // notify 를 먼저 하고 나서 data-id 로 (다시 만들어졌을 수도 있는) 같은 자리를 찾아 포커스한다.
     store.notify();
+    const target = openerId ? document.querySelector(`[data-id="${openerId}"]`) : opener;
+    if (target && target.isConnected) target.focus();
+    opener = null;
+    openerId = null;
   }
   closeBtn.addEventListener('click', close);
   root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
@@ -63,6 +68,7 @@ export function createZoom(root, store) {
     mode = openMode;
     slideId = openSlideId;
     opener = openerEl ?? document.activeElement;
+    openerId = opener?.dataset?.id ?? null;
     root.hidden = false;
     document.addEventListener('keydown', onKeydown);
     renderBody();

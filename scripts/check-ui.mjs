@@ -55,22 +55,44 @@ record(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / ')
 
 /* ---------------- 2. 드래그 중 시야를 다시 만들지 않는가 ---------------- */
 
+// 시야를 보려면 재물대에 슬라이드가 올라가 있어야 한다.
+// 비어 있으면 확대 뷰는 열리되 "재물대에 슬라이드가 없습니다" 만 보여 준다 — 막는 게 아니다.
+// 드래그로 여기까지 오는 것은 이 스크립트가 볼 대상이 아니라, 상태를 직접 만들어 둔다.
+const staged = await page.evaluate(() => {
+  const s = window.__store;
+  if (!s) return false;
+  s.dispatch('PEEL_BANANA', {});
+  s.dispatch('SMEAR', { slide: 'B', thickness: 0.3 });
+  s.dispatch('FILL_DROPPER', { reagent: 'IKI' });
+  s.dispatch('DROP', { slide: 'B', count: 2 });
+  s.dispatch('PICK_COVERSLIP', {});
+  s.dispatch('PLACE_COVERSLIP', { slide: 'B', angleDeg: 45 });
+  s.dispatch('MOUNT', { slide: 'B' });
+  s.dispatch('SET_OBJECTIVE', { objective: 40 });
+  return s.getState().microscope.stage === 'B';
+});
+record(staged, '슬라이드를 재물대에 올리는 상태가 만들어진다');
+
 // 현미경 확대 뷰를 키보드로 연다. 시야는 그 안에만 있다.
+// 상태를 바꾸면 실험대가 다시 그려진다. 새로 붙은 요소를 잡아야 키 처리가 살아 있다.
+await page.waitForTimeout(400);
 await page.$eval('[data-id="microscope"]', (el) => el.focus());
 await page.keyboard.press('Enter');
-await page.waitForTimeout(400);
-const zoomOpenedByKey = await page.$('#zoom-fov') !== null;
+await page.waitForTimeout(500);
+const zoomOpenedByKey = await page.$eval('#zoom', (el) => !el.hidden).catch(() => false);
+const fovPresent = await page.$('#fov-slot') !== null;
 record(zoomOpenedByKey, '확대 뷰를 키보드로 열 수 있다', 'data-id="microscope" 에 Enter');
+record(fovPresent, '슬라이드가 올라가 있으면 시야가 그려진다');
 
-// #zoom-fov 의 자식이 통째로 갈리면 renderFOV 를 다시 부른 것이다.
+// #fov-slot 의 자식이 통째로 갈리면 renderFOV 를 다시 부른 것이다.
 // 시야 이동은 #fov-scene 의 transform 만 바꿔야 한다 (src/render/fov.js 머리말).
-const slot = await page.$('#zoom-fov');
+const slot = await page.$('#fov-slot');
 if (!slot) {
-  record(false, '시야를 끄는 동안 다시 만들지 않는다', '#zoom-fov 이 화면에 없다');
+  record(false, '시야를 끄는 동안 다시 만들지 않는다', '#fov-slot 이 화면에 없다');
 } else {
   await page.evaluate(() => {
     window.__fovRebuilds = 0;
-    const target = document.querySelector('#zoom-fov');
+    const target = document.querySelector('#fov-slot');
     new MutationObserver((records) => {
       for (const r of records) if (r.addedNodes.length) window.__fovRebuilds++;
     }).observe(target, { childList: true });
@@ -96,7 +118,7 @@ if (!slot) {
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
-const closed = await page.$('#zoom-fov') === null;
+const closed = await page.$eval('#zoom', (el) => el.hidden).catch(() => true);
 const focusBack = await page.evaluate(() => document.activeElement?.dataset?.id ?? null);
 record(closed, 'Esc 로 확대 뷰가 닫힌다');
 record(focusBack === 'microscope', '닫으면 포커스가 열었던 곳으로 돌아온다',
@@ -105,15 +127,15 @@ record(focusBack === 'microscope', '닫으면 포커스가 열었던 곳으로 �
 /* ---------------- 4. 막지 않는가 — 절차를 어겨도 진행된다 ---------------- */
 
 // 껍질을 안 벗긴 채 문지르면? 막히지 않고 토스트만 떠야 한다.
-const toastCount = await page.evaluate(() => document.querySelector('#toast')?.children.length ?? -1);
+const toastCount = await page.evaluate(() => document.querySelector('#toast-region')?.children.length ?? -1);
 record(toastCount >= 0, '토스트 영역이 살아 있다', `현재 ${toastCount}건`);
 
 /* ---------------- 5. 되돌리기 표시 ---------------- */
 
-const undoText = await page.$eval('#undo-btn', (el) => el.textContent ?? '').catch(() => null);
-const undoCount = await page.$eval('#undo-count', (el) => el.textContent ?? '').catch(() => null);
+const undoText = await page.$eval('#undo', (el) => el.textContent ?? '').catch(() => null);
+const undoCount = await page.$eval('#undo-left', (el) => el.textContent ?? '').catch(() => null);
 if (undoText === null) {
-  record(false, '되돌리기 표시에 Infinity 가 새지 않는다', '#undo-btn 이 없다');
+  record(false, '되돌리기 표시에 Infinity 가 새지 않는다', '#undo 이 없다');
 } else {
   const shown = `${undoText} ${undoCount ?? ''}`;
   record(!/Infinity|undefined|NaN/.test(shown), '되돌리기 표시에 Infinity 가 새지 않는다',
