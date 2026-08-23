@@ -109,6 +109,22 @@
         <div class="lab"><label for="diaphragm">조리개</label><span id="v-diaphragm"></span></div>
         <input type="range" id="diaphragm" min="0" max="100" value="80">
       </div>
+      <div class="ctrl">
+        <div class="lab"><label for="reaction">반응 진행도</label><span id="v-reaction"></span></div>
+        <input type="range" id="reaction" min="0" max="100" value="100">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="pan">재물대 좌우</label><span id="v-pan"></span></div>
+        <input type="range" id="pan" min="-240" max="240" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span>슬라이드 상태</span></div>
+        <div class="seg" id="flags" role="group" aria-label="슬라이드 상태">
+          <button type="button" data-flag="cracked">금 감</button>
+          <button type="button" data-flag="contaminated">오염</button>
+          <button type="button" data-flag="bubbles">기포</button>
+        </div>
+      </div>
 
       <div class="meter">
         <div class="bar"><div class="fill" id="q-fill"></div></div>

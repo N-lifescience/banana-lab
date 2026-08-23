@@ -23,6 +23,11 @@ const state = {
   focus: 0,
   diaphragm: 0.8,
   thickness: 0.3,
+  reaction: 1,
+  pan: 0,
+  cracked: false,
+  contaminated: false,
+  bubbles: 0,
   seed: 31337,
 };
 
@@ -36,8 +41,12 @@ function fieldParams() {
     excess,
     floating: excess > 0.6,
     tooThick: state.thickness > 0.6,
-    contaminated: false,
-    bubbles: 0,
+    contaminated: state.contaminated,
+    bubbles: state.bubbles,
+    cracked: state.cracked,
+    reactionT: state.reaction,
+    panX: state.pan,
+    panY: 0,
     objective: state.objective,
     focusErr: Math.abs(state.focus),
     brightness: Math.max(0, Math.min(1, state.diaphragm / needed)),
@@ -63,6 +72,8 @@ function paint() {
   $('#v-focus').textContent = state.focus.toFixed(3);
   $('#v-diaphragm').textContent = state.diaphragm.toFixed(2);
   $('#v-thickness').textContent = state.thickness.toFixed(2);
+  $('#v-reaction').textContent = state.reaction.toFixed(2);
+  $('#v-pan').textContent = `${state.pan > 0 ? '+' : ''}${state.pan} px`;
 }
 
 function bindRange(id, key, scale = 1) {
@@ -78,6 +89,19 @@ bindRange('#drops', 'drops', 1);
 bindRange('#focus', 'focus', 1000);
 bindRange('#diaphragm', 'diaphragm', 100);
 bindRange('#thickness', 'thickness', 100);
+bindRange('#reaction', 'reaction', 100);
+bindRange('#pan', 'pan', 1);
+
+// 슬라이드에 붙은 상태 셋. 켜고 끄면서 시야에 어떻게 나타나는지 본다.
+document.querySelectorAll('#flags button').forEach((b) => {
+  b.addEventListener('click', () => {
+    const flag = b.dataset.flag;
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(on));
+    state[flag] = flag === 'bubbles' ? (on ? 3 : 0) : on;
+    paint();
+  });
+});
 
 $('#objective').addEventListener('input', (e) => {
   state.objective = [4, 10, 40][Number(e.target.value)];
