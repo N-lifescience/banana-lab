@@ -42,10 +42,6 @@ function stepNoteLabel(key) {
 export function createNotebook(root, store, { onOpenZoom }) {
   root.innerHTML = `
     <h1>${N.heading}</h1>
-    <div class="undo-row">
-      <button type="button" id="undo">${UI.undo.label}</button>
-      <span id="undo-left"></span>
-    </div>
     <div id="note-tabs" class="note-tabs" role="tablist"></div>
     <div id="note-panel" class="note-panel"></div>`;
 
@@ -63,7 +59,7 @@ export function createNotebook(root, store, { onOpenZoom }) {
     tab.addEventListener('click', () => { activeStage = stage.id; render(); });
     tabsEl.appendChild(tab);
   }
-  root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
+  // 되돌리기 버튼은 실험대(`bench.js`) 에 있다. 되돌리는 대상이 조작이지 글이 아니기 때문이다.
 
   /* ---------------------------------------------------------------- */
   /* 1 문제 인식 · 2 준비물                                             */
@@ -336,10 +332,6 @@ export function createNotebook(root, store, { onOpenZoom }) {
     });
     panelEl.innerHTML = STAGE_RENDERERS[activeStage](st);
     bindPanel();
-
-    const undosLeft = st.session.undosLeft;
-    root.querySelector('#undo-left').textContent =
-      undosLeft === Infinity ? UI.undo.unlimited : UI.undo.left(undosLeft);
   }
 
   store.subscribe(render);

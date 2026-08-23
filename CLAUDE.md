@@ -24,7 +24,7 @@ npm run check    # 커밋 전 필수 — 테스트 + 아트 디렉션 린터
 `tasks/T01-state-machine.md`부터 번호순으로 진행합니다. 카드마다 검증 명령이 있으니
 끝낼 때마다 실제로 실행해서 통과를 확인하고 커밋하세요.
 
-현재 상태: **T01~T05 완료, T07 진행 중. T06 은 미착수(사람 대기).**
+현재 상태: **T01~T05, T07~T08 완료. T06 은 미착수(사람 대기), T09~T11 은 대기.**
 
 - 진행 기록 — 각 카드에서 무엇을 왜 고쳤는지: `PROGRESS.md`
 - 오케스트레이터 역할과 검토 규칙: `tasks/ORCHESTRATOR.md`
@@ -34,6 +34,7 @@ npm run check    # 커밋 전 필수 — 테스트 + 아트 디렉션 린터
 ```bash
 npm run dev                      # /  앱,  /harness.html  하네스
 node scripts/check-ui.mjs        # 조작 UI — 화면을 띄워야 아는 것
+node scripts/check-bench.mjs     # 실험대 어포던스 — 말풍선·하이라이트·문지르기
 node scripts/check-grading.mjs   # 서술형 첨삭 — 바깥에서 던지는 문장
 node scripts/perf-fov.mjs --dom  # 시야 렌더러 성능
 ```

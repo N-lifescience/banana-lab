@@ -330,6 +330,22 @@ test('조리개를 닫으면 어두워진다 — 막지는 않는다', () => {
   assert.equal(r.state.microscope.diaphragm, 0.1);
 });
 
+test('재물대에 잘못 올린 슬라이드는 되돌리기를 쓰지 않고 내릴 수 있다', () => {
+  let s = run(S0(), 'MOUNT', { slide: 'B' }).state;
+  assert.equal(s.microscope.stage, 'B');
+
+  const before = s.session.undosLeft;
+  const off = run(s, 'UNMOUNT');
+  assert.equal(off.outcome, 'ok');
+  assert.equal(off.state.microscope.stage, null);
+  assert.equal(
+    off.state.session.undosLeft, before,
+    '내리는 데 되돌리기 횟수를 쓰면 2·3단계에서 실수 한 번이 조작 예산을 깎는다'
+  );
+
+  assert.equal(run(off.state, 'UNMOUNT').outcome, 'ok', '올린 것이 없으면 조용히 넘어간다');
+});
+
 /* ---------------- 안전 수칙 · 기록 ---------------- */
 
 test('안전 수칙은 감점하지 않고, 늦게라도 지키면 기록에서 지운다', () => {

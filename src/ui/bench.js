@@ -59,6 +59,24 @@ const SURFACE_MM = (155 / 300) * STAGE_H_MM;  // 작업면 앞 모서리 (viewBo
 const DRAG_THRESHOLD_PX = 6;
 
 /**
+ * 잡을 수 있는 최소 크기 (px). `.token::after` 가 화면에서 보장하는 값과 같아야 한다.
+ * 덮개 유리는 실물 22 mm 라 그림이 아주 작은데, 놓기 판정을 그림 크기로 하면
+ * 눈에 보이는 넓은 영역에 갖다 대도 아무 일이 안 일어난다 — 잡히지 않는 것처럼 보인다.
+ */
+const MIN_HIT_PX = 44;
+
+/**
+ * 문질러 바르기 — 받침 유리 **위에서 움직인 거리**(mm)로 두께가 정해진다.
+ *
+ * 누르고 있던 시간이 아니다. 허공에 오래 들고 있었다고 두껍게 발릴 수는 없고,
+ * 실제로 문지르는 동작은 왕복 운동이기 때문이다.
+ * 이 거리만큼 움직이면 가장 두껍게 발린다 (받침 유리 긴 변이 76 mm 이므로 여러 번 왕복).
+ */
+const SMEAR_FULL_MM = 700;
+const SMEAR_MIN = 0.12;
+const SMEAR_MAX = 0.9;
+
+/**
  * 손에 들고 쓰는 도구. 대상에 놓아 조작을 마치면 제자리(선반)로 돌아온다.
  * 그러지 않으면 대상 위에 그대로 남아, 나중에 그 대상(슬라이드 등)을 다시 누를 수 없게 가린다.
  */
@@ -99,6 +117,85 @@ function defaultItems() {
 }
 
 /**
+ * 끌어다 놓았을 때 무슨 일이 일어나는가. **종류 쌍**으로만 적는다.
+ *
+ * 상태(핀셋이 지금 덮개 유리를 들고 있는가 같은 것)는 여기서 보지 않는다.
+ * 빈손 핀셋을 받침 유리에 대면 rules.js 가 "손으로 집으려 하니 미끄러집니다" 라고 답해 주는데,
+ * 그 답을 듣는 것이 이 실험에서 배우는 내용이다. 여기서 미리 걸러 내면 들을 기회가 사라진다.
+ * 그래서 드래그 중 하이라이트는 "된다" 가 아니라 **"여기에 무언가 일어난다"** 는 표시다.
+ *
+ * 이 표 하나가 세 곳에 함께 쓰인다 — 실제 실행, 드래그 중 대상 하이라이트, 안내 문구 유무.
+ * 셋을 따로 적으면 조작을 하나 늘릴 때마다 세 곳이 어긋난다.
+ */
+export function dropTable(store) {
+  return {
+    banana: {
+      slide: (item, target, d) => {
+        const thickness = clamp(d.smearMm / SMEAR_FULL_MM, SMEAR_MIN, SMEAR_MAX);
+        store.dispatch('SMEAR', { slide: target.slide, thickness });
+      },
+    },
+    dropper: {
+      bottle: (item, target) => store.dispatch('FILL_DROPPER', { reagent: target.reagent }),
+      slide: (item, target) => {
+        // T07 1단계 — 변인 조작을 고정해 둔다: 방울 수 선택 UI 를 따로 내주는 대신,
+        // 한 번의 조작이 정확한 두 방울이 되게 한다. 그래도 반복해서 놓으면 넘칠 수 있다 — 막지 않는다.
+        const count = store.getState().session.level === 1 ? 2 : 1;
+        store.dispatch('DROP', { slide: target.slide, count });
+      },
+      waste: () => store.dispatch('RINSE_DROPPER', {}),
+    },
+    forceps: {
+      coverslip: (item, target, d) => {
+        const result = store.dispatch('PICK_COVERSLIP', {});
+        if (result.state.tools.forceps.holding === 'coverslip') d.onPickCoverslip(target.id);
+      },
+      slide: (item, target, d) => {
+        // 마지막 이동 방향으로 놓는 각도를 정한다. 대각선으로 내려놓을수록 45°에 가깝다.
+        const angleDeg = clamp(
+          (Math.atan2(Math.abs(d.lastDy), Math.abs(d.lastDx)) * 180) / Math.PI, 0, 90
+        );
+        const result = store.dispatch('PLACE_COVERSLIP', { slide: target.slide, angleDeg });
+        if (result.state.tools.forceps.holding !== 'coverslip') d.onUseCoverslip();
+      },
+    },
+    slide: {
+      microscope: (item) => {
+        store.dispatch('MOUNT', { slide: item.slide });
+        // T07 1단계 — 배율도 고정한다: 대물렌즈 선택 UI 를 안 주는 대신 400배로 맞춰 둔다.
+        if (store.getState().session.level === 1) {
+          store.dispatch('SET_OBJECTIVE', { objective: 40 });
+        }
+      },
+    },
+  };
+}
+
+/**
+ * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ *
+ * 시약병·폐액통·휴지의 안전 수칙은 늦게라도 하면 자기 평가의 위반 기록에서 지워진다
+ * (rules.js 의 safetyAction). 그 셋을 부르는 곳이 여기 말고는 없다 —
+ * 없으면 위반 기록이 한 번 남고 영영 지워지지 않는다.
+ */
+export function tapTable(store, onOpenZoom) {
+  return {
+    banana: () => store.dispatch('PEEL_BANANA', {}),
+    slide: (item, el) => onOpenZoom('slide', item.slide, el),
+    microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
+    bottle: () => store.dispatch('CLOSE_CAP', {}),
+    waste: () => store.dispatch('DISPOSE_WASTE', {}),
+    tissue: () => store.dispatch('WASH_HANDS', {}),
+  };
+}
+
+/** 실험대에 놓인 물건들. 배치를 몰라도 종류만 알면 되는 검사에 쓴다. */
+export const BENCH_KINDS = [
+  'banana', 'slide', 'coverslip', 'dropper', 'forceps',
+  'bottle', 'dish', 'microscope', 'waste', 'tissue',
+];
+
+/**
  * @param {HTMLElement} root
  * @param {{getState:Function, dispatch:Function, subscribe:Function}} store
  * @param {{onOpenZoom:(mode:string, slideId:string|null, opener:HTMLElement)=>void}} handlers
@@ -106,10 +203,30 @@ function defaultItems() {
 export function createBench(root, store, { onOpenZoom }) {
   root.classList.add('bench');
   // 배경과 물건을 같은 무대 안에 둔다. 무대가 4:3 을 지키므로 둘이 함께 스케일된다.
-  root.innerHTML =
-    `<div class="bench-stage"><div class="bench-bg" aria-hidden="true"></div><div class="bench-tokens"></div></div>`;
+  // 안내 말풍선은 무대 바로 아래에 둔다 — 물건 층(.bench-tokens)은 조작할 때마다
+  // 통째로 다시 그려지므로, 그 안에 두면 말풍선이 같이 사라진다.
+  root.innerHTML = `
+    <div class="bench-bar">
+      <button type="button" id="undo">${UI.undo.label}</button>
+      <span id="undo-left"></span>
+      <button type="button" id="unmount" hidden>${UI.bench.unmount}</button>
+    </div>
+    <div class="bench-stage">
+      <div class="bench-bg" aria-hidden="true"></div>
+      <div class="bench-tokens"></div>
+      <div class="bench-tip" id="bench-tip" role="tooltip" hidden></div>
+    </div>`;
   root.querySelector('.bench-bg').innerHTML = ASSETS.bench.render({});
   const layer = root.querySelector('.bench-tokens');
+  const tipEl = root.querySelector('.bench-tip');
+  const unmountBtn = root.querySelector('#unmount');
+
+  root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
+  unmountBtn.addEventListener('click', () => store.dispatch('UNMOUNT', {}));
+
+  const DROPS = dropTable(store);
+
+  const TAPS = tapTable(store, onOpenZoom);
 
   const items = defaultItems();
   for (const item of items) { item.homeX = item.x; item.homeY = item.y; }
@@ -166,71 +283,122 @@ export function createBench(root, store, { onOpenZoom }) {
     return false;
   }
 
-  /** 드래그 중인 요소의 중심점 아래 있는, 자기 자신이 아닌 첫 토큰. */
-  function findDropTarget(item) {
-    const el = layer.querySelector(`[data-id="${item.id}"]`);
-    if (!el) return null;
+  const elFor = (id) => layer.querySelector(`[data-id="${id}"]`);
+
+  /**
+   * 놓기 판정에 쓰는 사각형. 그림이 작아도 최소 MIN_HIT_PX 는 잡아 준다 —
+   * 화면에서 눌리는 영역(.token::after)과 같은 크기여야 손에 잡히는 대로 동작한다.
+   */
+  function hitRect(el) {
     const r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const w = Math.max(r.width, MIN_HIT_PX);
+    const h = Math.max(r.height, MIN_HIT_PX);
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+  }
+
+  /**
+   * 드래그가 시작될 때 다른 물건들의 판정 사각형을 한 번만 재어 둔다.
+   * 드래그 중에는 끄는 물건 말고는 아무것도 움직이지 않으므로(재렌더도 건너뛴다) 안전하고,
+   * 포인터가 움직일 때마다 열몇 개를 다시 재는 일을 없앤다.
+   */
+  function captureRects(selfId) {
+    const rects = new Map();
     for (const other of items) {
-      if (other.id === item.id || isHidden(other)) continue;
-      const oe = layer.querySelector(`[data-id="${other.id}"]`);
-      if (!oe) continue;
-      const or_ = oe.getBoundingClientRect();
+      if (other.id === selfId || isHidden(other)) continue;
+      const oe = elFor(other.id);
+      if (oe) rects.set(other.id, hitRect(oe));
+    }
+    return rects;
+  }
+
+  /** 끄는 물건의 중심점 아래 있는 첫 토큰. */
+  function targetUnder() {
+    const r = drag.el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    for (const other of items) {
+      const or_ = drag.rects.get(other.id);
+      if (!or_) continue;
       if (cx >= or_.left && cx <= or_.right && cy >= or_.top && cy <= or_.bottom) return other;
     }
     return null;
   }
 
-  function applyDrop(item, target, dragInfo) {
-    if (!target) return;
-    const t = target.kind;
-    if (item.kind === 'banana' && t === 'slide') {
-      const thickness = clamp(dragInfo.heldMs / 2500, 0.12, 0.9);
-      store.dispatch('SMEAR', { slide: target.slide, thickness });
-    } else if (item.kind === 'dropper' && t === 'bottle') {
-      store.dispatch('FILL_DROPPER', { reagent: target.reagent });
-    } else if (item.kind === 'dropper' && t === 'slide') {
-      // T07 1단계 — 변인 조작을 고정해 둔다: 방울 수 선택 UI 를 따로 내주는 대신,
-      // 한 번의 조작이 정확한 두 방울이 되게 한다. 그래도 반복해서 놓으면 넘칠 수 있다 — 막지 않는다.
-      const count = store.getState().session.level === 1 ? 2 : 1;
-      store.dispatch('DROP', { slide: target.slide, count });
-    } else if (item.kind === 'dropper' && t === 'waste') {
-      store.dispatch('RINSE_DROPPER', {});
-    } else if (item.kind === 'forceps' && t === 'coverslip') {
-      const result = store.dispatch('PICK_COVERSLIP', {});
-      if (result.state.tools.forceps.holding === 'coverslip') pickedCoverslipId = target.id;
-    } else if (item.kind === 'forceps' && t === 'slide') {
-      // 마지막 이동 방향으로 놓는 각도를 정한다. 대각선으로 내려놓을수록 45°에 가깝다.
-      const angleDeg = clamp(
-        (Math.atan2(Math.abs(dragInfo.lastDy), Math.abs(dragInfo.lastDx)) * 180) / Math.PI, 0, 90
-      );
-      const result = store.dispatch('PLACE_COVERSLIP', { slide: target.slide, angleDeg });
-      if (result.state.tools.forceps.holding !== 'coverslip' && pickedCoverslipId) {
-        const c = findItem(pickedCoverslipId);
-        if (c) c.used = true;
-        pickedCoverslipId = null;
-      }
-    } else if (item.kind === 'slide' && t === 'microscope') {
-      store.dispatch('MOUNT', { slide: item.slide });
-      // T07 1단계 — 배율도 고정한다: 대물렌즈 선택 UI 를 안 주는 대신 400배로 맞춰 둔다.
-      if (store.getState().session.level === 1) {
-        store.dispatch('SET_OBJECTIVE', { objective: 40 });
-      }
+  /* ---------------------------------------------------------------- */
+  /* 안내 말풍선 — 이름과 지금 할 수 있는 조작                          */
+  /* ---------------------------------------------------------------- */
+
+  function showTip(item) {
+    if (drag) return;
+    const level = store.getState().session.level;
+    const lines = UI.bench.hints[item.kind]?.[level] ?? [];
+    tipEl.innerHTML =
+      `<b>${item.label}</b>${lines.map((t) => `<span>${t}</span>`).join('')}`;
+    // 무대 밖으로 밀려나지 않게 가로 위치를 안쪽으로 묶는다.
+    const centerMm = item.x + CONTRACT[item.asset].realSizeMm / 2;
+    tipEl.style.left = `${clamp(xPct(centerMm), 12, 88)}%`;
+    tipEl.style.top = `${yPct(item.y)}%`;
+    tipEl.hidden = false;
+  }
+
+  function hideTip() {
+    tipEl.hidden = true;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 드래그                                                            */
+  /* ---------------------------------------------------------------- */
+
+  /** 지금 끄는 물건이 무언가 일으킬 수 있는 상대들을 표시한다. */
+  function markTargets(item) {
+    const accepts = DROPS[item.kind] ?? {};
+    for (const other of items) {
+      const oe = elFor(other.id);
+      if (!oe || other.id === item.id) continue;
+      oe.classList.toggle('token--target', Boolean(accepts[other.kind]));
+      oe.classList.toggle('token--inert', !accepts[other.kind]);
     }
+  }
+
+  function clearMarks() {
+    layer.querySelectorAll('.token').forEach((el) => {
+      el.classList.remove('token--target', 'token--inert', 'token--target-hot');
+    });
+  }
+
+  /** 문지르는 동안 얼마나 발렸는지 보여 준다. 안 보이면 문지르는 중인 줄을 모른다. */
+  function updateSmearMeter() {
+    let meter = drag.el.querySelector('.smear-meter');
+    if (drag.smearMm <= 0) {
+      meter?.remove();
+      return;
+    }
+    if (!meter) {
+      meter = document.createElement('div');
+      meter.className = 'smear-meter';
+      meter.innerHTML = '<i></i>';
+      drag.el.appendChild(meter);
+    }
+    const t = clamp(drag.smearMm / SMEAR_FULL_MM, 0, 1);
+    meter.querySelector('i').style.width = `${(t * 100).toFixed(0)}%`;
   }
 
   function onPointerDown(e, item, el) {
     if (e.button !== undefined && e.button !== 0) return;
+    hideTip();
     el.setPointerCapture(e.pointerId);
     drag = {
       pointerId: e.pointerId, item, el,
       startClientX: e.clientX, startClientY: e.clientY,
       startX: item.x, startY: item.y,
-      downAt: performance.now(),
       moved: false, lastDx: 0, lastDy: 0, prevTx: 0, prevTy: 0,
+      smearMm: 0,
+      rects: captureRects(item.id),
     };
     el.classList.add('token--dragging');
+    markTargets(item);
   }
 
   /** 화면에서 끈 픽셀을 실험대 위 밀리미터로 바꾼다. 무대가 커지든 작아지든 같은 거리를 옮긴다. */
@@ -252,32 +420,61 @@ export function createBench(root, store, { onOpenZoom }) {
     drag.item.y = drag.startY + ty * k;
     drag.el.style.left = `${xPct(drag.item.x)}%`;
     drag.el.style.top = `${yPct(drag.item.y)}%`;
+
+    const target = targetUnder();
+    // 지금 무엇 위에 있는지 표시한다.
+    for (const other of items) elFor(other.id)?.classList.remove('token--target-hot');
+    if (target && DROPS[drag.item.kind]?.[target.kind]) {
+      elFor(target.id)?.classList.add('token--target-hot');
+    }
+    // 문지르기는 받침 유리 **위에서 움직인 거리**만 센다. 허공에서 흔든 것은 세지 않는다.
+    if (drag.item.kind === 'banana' && target?.kind === 'slide') {
+      drag.smearMm += Math.hypot(drag.lastDx, drag.lastDy) * k;
+      drag.smearTarget = target;
+      updateSmearMeter();
+    }
   }
 
   /** 탭(포인터로 움직임 없이 누르고 뗌) 또는 키보드 활성화(Enter/Space) 로 여는 동작. */
   function handleTap(item, el) {
-    if (item.kind === 'slide') onOpenZoom('slide', item.slide, el);
-    else if (item.kind === 'microscope') onOpenZoom('scope', store.getState().microscope.stage, el);
-    else if (item.kind === 'banana') store.dispatch('PEEL_BANANA', {});
+    TAPS[item.kind]?.(item, el);
   }
 
   function onPointerUp(e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
-    const { item, el, moved, downAt } = drag;
+    const { item, el, moved } = drag;
     el.releasePointerCapture(e.pointerId);
     el.classList.remove('token--dragging');
-    const heldMs = performance.now() - downAt;
+    el.querySelector('.smear-meter')?.remove();
+    clearMarks();
 
     if (!moved) {
       // 움직이지 않았다면 조작이 아니라 탭이다.
-      handleTap(item, el);
       drag = null;
+      handleTap(item, el);
       renderTokens();
       return;
     }
 
-    const target = findDropTarget(item);
-    applyDrop(item, target, { heldMs, lastDx: drag.lastDx, lastDy: drag.lastDy });
+    let target = targetUnder();
+    // 문지르다 보면 손을 뗄 때 받침 유리 밖에 있기 쉽다 — 왕복 운동이라 매번 가장자리를 넘어간다.
+    // 받침 유리(76 mm)는 화면에서 40 px 남짓이라 자연스러운 왕복이 대부분 유리 밖에서 끝난다.
+    // 여기서 놓쳐 버리면 계량기가 다 찼는데도 아무 일이 안 일어난다. 문지른 것은 문지른 것이다.
+    if (!target && drag.smearMm > 0 && drag.smearTarget) target = drag.smearTarget;
+    const run = target ? DROPS[item.kind]?.[target.kind] : null;
+    if (run) {
+      run(item, target, {
+        smearMm: drag.smearMm, lastDx: drag.lastDx, lastDy: drag.lastDy,
+        onPickCoverslip: (id) => { pickedCoverslipId = id; },
+        onUseCoverslip: () => {
+          if (pickedCoverslipId) {
+            const c = findItem(pickedCoverslipId);
+            if (c) c.used = true;
+            pickedCoverslipId = null;
+          }
+        },
+      });
+    }
     if (target && HAND_TOOLS.has(item.kind)) {
       item.x = item.homeX;
       item.y = item.homeY;
@@ -308,12 +505,18 @@ export function createBench(root, store, { onOpenZoom }) {
       el.style.top = `${yPct(item.y)}%`;
       el.style.width = `${widthPct(item.asset)}%`;
       el.setAttribute('aria-label', item.label);
+      el.setAttribute('aria-describedby', 'bench-tip');
       el.innerHTML = ASSETS[item.asset].render(assetState(item));
 
       el.addEventListener('pointerdown', (e) => onPointerDown(e, item, el));
       el.addEventListener('pointermove', onPointerMove);
       el.addEventListener('pointerup', onPointerUp);
       el.addEventListener('pointercancel', onPointerUp);
+
+      el.addEventListener('pointerenter', () => showTip(item));
+      el.addEventListener('pointerleave', hideTip);
+      el.addEventListener('focus', () => showTip(item));
+      el.addEventListener('blur', hideTip);
 
       // 키보드 활성화(Enter/Space). 포인터 탭은 위 pointerup 경로가 이미 처리한다.
       el.addEventListener('keydown', (e) => {
@@ -327,9 +530,18 @@ export function createBench(root, store, { onOpenZoom }) {
     if (focusedId) layer.querySelector(`[data-id="${focusedId}"]`)?.focus();
   }
 
+  function renderBar() {
+    const st = store.getState();
+    const undosLeft = st.session.undosLeft;
+    root.querySelector('#undo-left').textContent =
+      undosLeft === Infinity ? UI.undo.unlimited : UI.undo.left(undosLeft);
+    unmountBtn.hidden = !st.microscope.stage;
+  }
+
   // 드래그 도중에는 다시 그리지 않는다. TICK 처럼 사용자와 무관하게 들어오는 상태 변경이
   // DOM 을 새로 만들면 setPointerCapture 가 무효화돼 드래그가 조용히 끊긴다.
   // 드래그가 끝나면 onPointerUp 이 최신 상태로 어차피 다시 그린다.
-  store.subscribe(() => { if (!drag) renderTokens(); });
+  store.subscribe(() => { renderBar(); if (!drag) renderTokens(); });
   renderTokens();
+  renderBar();
 }
