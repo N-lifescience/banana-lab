@@ -2,6 +2,7 @@
   "name": "banana-lab",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "바나나에서 탄수화물과 지질 관찰하기 — 웹 실험 시뮬레이터",
   "engines": {
