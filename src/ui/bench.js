@@ -11,7 +11,7 @@
  */
 
 import { ASSETS } from '../assets/index.js';
-import { CONTRACT } from '../assets/contract.js';
+import { CONTRACT, CONTENT_BOX, drawnBoxMm } from '../assets/contract.js';
 import { UI } from './strings.js';
 
 /**
@@ -94,26 +94,26 @@ function defaultItems() {
     // 상단 선반
     // 받침 유리 사이를 120 mm 씩 벌려 둔다. 바나나가 180 mm 라 90 mm 간격에서는
     // 끄는 동안 바나나 그림이 이웃한 유리 두 장을 함께 덮어, 어디에 발리는지 보이지 않았다.
-    shelf(40, { id: 'banana', asset: 'banana', kind: 'banana', labelKey: 'banana' }),
-    shelf(290, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', labelKey: 'slideA' }),
-    shelf(410, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', labelKey: 'slideB' }),
-    shelf(530, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', labelKey: 'slideC' }),
+    shelf(505, { id: 'banana', asset: 'banana', kind: 'banana', labelKey: 'banana' }),
+    shelf(1050, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', labelKey: 'slideA' }),
+    shelf(900, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', labelKey: 'slideB' }),
+    shelf(750, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', labelKey: 'slideC' }),
     // 낱장 석 장을 늘어놓았더니 22 mm 짜리가 화면에서 12 px 이라 무엇인지 알아볼 수 없었다.
     // 통 하나로 바꾼다 — 실제 실험실도 통에서 꺼내 쓰고, 종류(kind)는 그대로라 조작표는 그대로다.
-    shelf(660, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', labelKey: 'coverbox' }),
-    shelf(820, { id: 'dropper', asset: 'dropper', kind: 'dropper', labelKey: 'dropper' }),
-    shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
-    shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
-    shelf(1250, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
+    shelf(1156, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', labelKey: 'coverbox' }),
+    surface(1301, { id: 'dropper', asset: 'dropper', kind: 'dropper', labelKey: 'dropper' }),
+    surface(1380, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
+    shelf(1298, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
+    shelf(1375, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
     // 작업면. 씻는 곳(개수대)과 버리는 곳(쓰레기통·폐액통)을 나눠 둔다 —
     // 실험 접시 하나가 둘을 겸하고 있었는데, 그림도 이름도 그 일과 맞지 않았다.
     // 접시는 실험대에서 뺐다. 두 물건이 그 일을 나눠 가진 뒤로는 놓아 둘 자리라는 뜻밖에
     // 남지 않는데, 자리를 차지하면 학생은 "이걸로 뭘 해야 하나" 를 계속 묻게 된다.
-    surface(15, { id: 'sink', asset: 'sink', kind: 'sink', labelKey: 'sink' }),
-    surface(410, { id: 'tissue', asset: 'tissue', kind: 'tissue', labelKey: 'tissue' }),
-    surface(640, { id: 'microscope', asset: 'microscope', kind: 'microscope', labelKey: 'microscope' }),
-    surface(995, { id: 'waste', asset: 'waste', kind: 'waste', labelKey: 'waste' }),
-    surface(1255, { id: 'bin', asset: 'bin', kind: 'bin', labelKey: 'bin' }),
+    surface(477, { id: 'sink', asset: 'sink', kind: 'sink', labelKey: 'sink' }),
+    surface(728, { id: 'tissue', asset: 'tissue', kind: 'tissue', labelKey: 'tissue' }),
+    surface(905, { id: 'microscope', asset: 'microscope', kind: 'microscope', labelKey: 'microscope' }),
+    surface(340, { id: 'waste', asset: 'waste', kind: 'waste', labelKey: 'waste' }),
+    surface(0, { id: 'bin', asset: 'bin', kind: 'bin', labelKey: 'bin' }),
     // 이름은 키로만 적어 둔다. 편집 모드가 배치를 다시 코드로 뱉을 때
     // `label: I.banana` 를 되살리려면 어느 키였는지를 알아야 한다.
   ].map((it) => ({ ...it, label: I[it.labelKey], y: it.bottom - heightMm(it.asset) }));
@@ -204,21 +204,19 @@ export function tapTable(store, onOpenZoom) {
 }
 
 /**
- * 실험대 배치를 mm 사각형으로 낸다.
+ * 실험대 배치를 mm 사각형으로 낸다. **그려진 부분**의 사각형이다 (프레임이 아니라).
  *
- * 물건이 서로 겹치면 나중에 그려진 쪽이 앞선 쪽의 클릭을 통째로 가로챈다.
- * 실제로 개수대를 500 mm 로 잡았더니 세로 375 mm 로 자라 선반 위 받침 유리를 덮었고,
- * 받침 유리를 끌 수가 없었다. 눈으로는 개수대가 아래쪽에만 그려져 있어 보이지 않는다 —
- * 애셋은 저마다 400×300 프레임을 채워 그리므로 **빈 여백까지 잡는 영역**이기 때문이다.
+ * 물건이 서로 겹치면 나중에 그려진 쪽이 앞선 쪽의 클릭을 가로챈다.
+ * 예전에는 애셋의 400×300 프레임 전체를 그 영역으로 쳤는데, 스포이트는 폭 400 중 55 만
+ * 실제로 그려져 있다. 그 여백까지 세면 눈에는 한참 떨어져 보이는 물건 둘이 겹친 것이 되고,
+ * 작업면에 놓을 물건 일곱을 재면 1695 mm 라 1500 mm 실험대에 아예 앉힐 수가 없었다.
+ * 이제 칠해진 부분만 포인터를 받으므로(`index.html` 의 `.token`), 여기서도 그 부분만 잰다.
  */
 export function benchLayout() {
-  return defaultItems().map((it) => ({
-    id: it.id,
-    x: it.x,
-    y: it.y,
-    w: CONTRACT[it.asset].realSizeMm,
-    h: heightMm(it.asset),
-  }));
+  return defaultItems().map((it) => {
+    const d = drawnBoxMm(it.asset);
+    return { id: it.id, x: it.x + d.dx, y: it.y + d.dy, w: d.w, h: d.h };
+  });
 }
 
 /** 실험대에 놓인 물건들. 배치를 몰라도 종류만 알면 되는 검사에 쓴다. */
@@ -279,6 +277,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
           <button type="button" id="edit-reset">${UI.edit.reset}</button>
         </div>
         <p class="edit-note">${UI.edit.note}</p>
+        <p class="edit-warn" id="edit-warn"></p>
         <table class="edit-table"><tbody id="edit-rows"></tbody></table>
       </div>` : ''}`;
   root.querySelector('.bench-bg').innerHTML = ASSETS.bench.render({});
@@ -311,14 +310,44 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     item.y = item.bottom - h;
   }
 
+  /**
+   * 서로 겹치는 물건 짝. 겹치면 **뒤에 그려진 쪽이 앞엣것의 클릭을 가로챈다.**
+   * 재는 것은 그려진 부분이다 — 포인터를 받는 것도 그 부분이다.
+   */
+  function overlaps() {
+    const box = (it) => {
+      const d = drawnBoxMm(it.asset);
+      return { x: it.x + d.dx, y: it.y + d.dy, w: d.w, h: d.h };
+    };
+    const bad = new Set();
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = box(items[i]);
+        const b = box(items[j]);
+        if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+          bad.add(items[i].id);
+          bad.add(items[j].id);
+        }
+      }
+    }
+    return bad;
+  }
+
   function renderEditPanel() {
     if (!edit) return;
-    root.querySelector('#edit-rows').innerHTML = items.map((it) => `
-      <tr>
+    const bad = overlaps();
+    root.querySelector('#edit-rows').innerHTML = items.map((it) => {
+      const d = drawnBoxMm(it.asset);
+      return `
+      <tr${bad.has(it.id) ? ' class="edit-bad"' : ''}>
         <td>${it.id}</td>
         <td>${Math.abs(it.bottom - SHELF_MM) < 1 ? UI.edit.shelf : UI.edit.surface}</td>
         <td class="edit-x">${Math.round(it.x)}</td>
-      </tr>`).join('');
+        <td class="edit-span">~${Math.round(it.x + d.dx + d.w)}</td>
+        <td>${bad.has(it.id) ? UI.edit.overlap : ''}</td>
+      </tr>`;
+    }).join('');
+    root.querySelector('#edit-warn').textContent = bad.size ? UI.edit.overlapWarn(bad.size) : '';
   }
 
   if (edit) {
@@ -392,12 +421,21 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
    * 놓기 판정에 쓰는 사각형. 그림이 작아도 최소 MIN_HIT_PX 는 잡아 준다 —
    * 화면에서 눌리는 영역(.token::after)과 같은 크기여야 손에 잡히는 대로 동작한다.
    */
-  function hitRect(el) {
+  function hitRect(el, assetName) {
     const r = el.getBoundingClientRect();
-    const w = Math.max(r.width, MIN_HIT_PX);
-    const h = Math.max(r.height, MIN_HIT_PX);
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
+    // 프레임이 아니라 **그려진 부분**을 잰다. 개수대 프레임(380 mm)은 휴지 프레임과 겹치는데,
+    // 그림은 한참 떨어져 있다 — 프레임으로 재면 휴지 그림을 겨눠도 개수대가 잡힌다.
+    const c = CONTENT_BOX[assetName];
+    const [, , vw, vh] = CONTRACT[assetName].viewBox.split(/\s+/).map(Number);
+    const left = r.left + r.width * (c.x0 / vw);
+    const top = r.top + r.height * (c.y0 / vh);
+    const dw = r.width * ((c.x1 - c.x0) / vw);
+    const dh = r.height * ((c.y1 - c.y0) / vh);
+    // 그림이 손가락보다 작으면 최소 크기까지 넓혀 준다 (덮개 유리 통·받침 유리).
+    const w = Math.max(dw, MIN_HIT_PX);
+    const h = Math.max(dh, MIN_HIT_PX);
+    const cx = left + dw / 2;
+    const cy = top + dh / 2;
     return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
   }
 
@@ -411,16 +449,16 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     for (const other of items) {
       if (other.id === selfId || isHidden(other)) continue;
       const oe = elFor(other.id);
-      if (oe) rects.set(other.id, hitRect(oe));
+      if (oe) rects.set(other.id, hitRect(oe, other.asset));
     }
     return rects;
   }
 
-  /** 끄는 물건의 중심점 아래 있는 첫 토큰. */
+  /** 끄는 물건의 **그림** 중심 아래 있는 첫 토큰. 프레임 중심은 그림 밖일 수 있다. */
   function targetUnder() {
-    const r = drag.el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
+    const g = hitRect(drag.el, drag.item.asset);
+    const cx = (g.left + g.right) / 2;
+    const cy = (g.top + g.bottom) / 2;
     for (const other of items) {
       const or_ = drag.rects.get(other.id);
       if (!or_) continue;
@@ -715,6 +753,9 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       el.style.left = `${xPct(item.x)}%`;
       el.style.top = `${yPct(item.y)}%`;
       el.style.width = `${widthPct(item.asset)}%`;
+      // 그림이 손가락보다 작으면 여백까지 잡을 수 있게 표시해 둔다 (`.token[data-small]`).
+      // 화면 폭을 모르는 자리라 mm 로 잰다 — 44 px 는 실험대 1500 mm 를 화면 폭으로 나눈 값이다.
+      if (drawnBoxMm(item.asset).w < MIN_HIT_PX * pxToMm()) el.dataset.small = 'true';
       el.setAttribute('aria-label', item.label);
       el.setAttribute('aria-describedby', 'bench-tip');
       el.innerHTML = ASSETS[item.asset].render(assetState(item));

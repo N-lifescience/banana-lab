@@ -638,6 +638,77 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await ed.close();
 }
 
+/* ---------- 그려진 범위(CONTENT_BOX)가 실제 그림과 맞는가 ---------- */
+{
+  // 이 숫자로 "물건이 서로 겹치는가" 를 판정하고, 포인터도 칠해진 곳에서만 받는다.
+  // 그림을 다시 그리면 값이 어긋나는데, 화면만 보면 멀쩡해 보인다. 여기서 잡는다.
+  const cb = await browser.newPage();
+  await cb.goto(`${BASE}/harness.html`, { waitUntil: 'networkidle' });
+  const drift = await cb.evaluate(async () => {
+    const { ASSETS, SAMPLE_STATES } = await import('/src/assets/index.js');
+    const { CONTENT_BOX, CONTRACT } = await import('/src/assets/contract.js');
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px';
+    document.body.appendChild(host);
+    const bad = [];
+    for (const [name, mod] of Object.entries(ASSETS)) {
+      const [, , vw, vh] = CONTRACT[name].viewBox.split(/\s+/).map(Number);
+      let box = null;
+      for (const st of SAMPLE_STATES[name] ?? [{}]) {
+        host.innerHTML = mod.render({ ...st, seed: 1 });
+        const b = host.querySelector('svg').getBBox();
+        const cur = { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
+        box = box ? {
+          x0: Math.min(box.x0, cur.x0), y0: Math.min(box.y0, cur.y0),
+          x1: Math.max(box.x1, cur.x1), y1: Math.max(box.y1, cur.y1),
+        } : cur;
+      }
+      // 프레임 밖은 잘려서 보이지도 눌리지도 않는다. 프레임 안으로 자른 값과 견준다.
+      const live = {
+        x0: Math.max(0, Math.floor(box.x0)), y0: Math.max(0, Math.floor(box.y0)),
+        x1: Math.min(vw, Math.ceil(box.x1)), y1: Math.min(vh, Math.ceil(box.y1)),
+      };
+      const saved = CONTENT_BOX[name];
+      if (!saved) { bad.push(`${name}: 값이 없음`); continue; }
+      // 2 는 선 두께 반올림 정도의 여유다. 그림이 실제로 바뀌면 이보다 크게 벌어진다.
+      for (const k of ['x0', 'y0', 'x1', 'y1']) {
+        if (Math.abs(saved[k] - live[k]) > 2) {
+          bad.push(`${name}.${k} 적힌 값 ${saved[k]} / 실제 ${live[k]}`);
+        }
+      }
+    }
+    host.remove();
+    return bad;
+  });
+  ok(drift.length === 0, '적어 둔 그려진 범위가 실제 그림과 맞는다', drift.slice(0, 3).join(' / '));
+  await cb.close();
+}
+
+/* ---------- 겨눈 그림이 잡히는가 (프레임이 겹치는 이웃이 가로채지 않는가) ---------- */
+{
+  // 개수대 프레임(380 mm)은 휴지 그림 자리까지 뻗어 있다. 프레임으로 판정하던 때에는
+  // 휴지 그림을 겨눠도 개수대가 잡혔고, 받침 유리가 씻겨 시료가 사라졌다.
+  const aim = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await aim.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await aim.evaluate(() => {
+    window.__store.dispatch('PEEL_BANANA', {});
+    window.__store.dispatch('SMEAR', { slide: 'B', thickness: 0.3 });
+  });
+  await aim.waitForTimeout(120);
+  const aBox = async (sel) => aim.locator(sel).boundingBox();
+  const aCenter = (b) => [b.x + b.width / 2, b.y + b.height / 2];
+  const sb = await aBox('[data-id="slideB"]');
+  const ti = await aBox('[data-id="tissue"]');
+  await aim.mouse.move(...aCenter(sb));
+  await aim.mouse.down();
+  await aim.mouse.move(...aCenter(ti), { steps: 10 });
+  await aim.mouse.up();
+  await aim.waitForTimeout(180);
+  const kept = await aim.evaluate(() => window.__store.getState().slides.B.sample !== null);
+  ok(kept, '휴지 그림을 겨누면 옆 개수대가 가로채지 않는다 (시료가 씻기지 않는다)');
+  await aim.close();
+}
+
 /* ---------- 보고서 — 화면에서 이름을 받고, 종이에만 남는가 ---------- */
 {
   const rp = await browser.newPage({ viewport: { width: 1400, height: 900 } });

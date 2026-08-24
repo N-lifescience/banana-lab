@@ -51,10 +51,18 @@
   .bench-tokens{position:absolute;inset:0}
 
   /* 물건. width 는 realSizeMm 비율로 인라인 지정된다 — 여기서 크기를 덮어쓰지 말 것. */
+  /* 포인터는 **칠해진 곳에서만** 받는다.
+     애셋은 저마다 400×300 프레임을 채워 그리지만 실제로 칠해진 부분은 그보다 좁다 —
+     스포이트는 폭 400 중 55 만 쓴다. 프레임 전체가 클릭을 받으면 눈에는 한참 떨어져 보이는
+     물건이 옆엣것을 덮어 못 잡게 되고, 작업면에 물건 일곱을 나란히 놓을 수조차 없다.
+     SVG 는 기본이 visiblePainted 라, 도형이 없는 여백은 그대로 통과한다. */
   .token{position:absolute;background:none;border:none;padding:0;margin:0;cursor:grab;
-    touch-action:none;line-height:0;border-radius:6px}
-  .token svg{width:100%;height:auto;display:block;pointer-events:none;
+    touch-action:none;line-height:0;border-radius:6px;pointer-events:none}
+  .token svg{width:100%;height:auto;display:block;pointer-events:auto;
     filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  /* 그림이 손가락보다 작은 물건(덮개 유리 통, 받침 유리)은 여백까지 잡아 준다.
+     그러지 않으면 12~28 px 짜리를 정확히 눌러야 한다. 작은 것만이므로 옆엣것을 덮지 않는다. */
+  .token[data-small="true"]::after{pointer-events:auto}
   /* 끄는 물건은 살짝 비친다. 바나나(180 mm)처럼 큰 것을 끌 때 아래에 있는
      받침 유리의 강조 표시가 가려지면, 어디에 놓이는지 보이지 않는다. */
   .token:active,.token--dragging{cursor:grabbing;z-index:5}
@@ -112,6 +120,9 @@
   .edit-table{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px}
   .edit-table td{padding:2px 14px 2px 0;white-space:nowrap}
   .edit-table .edit-x{text-align:right;font-weight:700}
+  .edit-table .edit-span{text-align:right;color:var(--ink-mute)}
+  .edit-warn{font-size:12.5px;color:var(--warn);margin:0 0 10px;line-height:1.5}
+  .edit-table .edit-bad td{color:var(--warn);font-weight:700}
   /* 물건에 붙는 x 좌표. 물건 그림 위에 얹히므로 바탕을 깔아 읽히게 한다. */
   .edit-x-tag{position:absolute;left:50%;top:-2px;transform:translate(-50%,-100%);
     background:var(--indigo);color:#fff;border-radius:3px;padding:1px 4px;

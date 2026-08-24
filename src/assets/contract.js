@@ -195,6 +195,54 @@ export const CONTRACT = {
             landmarks: { shelfTopY: 65, surfaceFrontY: 155 } },
 };
 
+/**
+ * 애셋에서 **실제로 그려진 범위** (viewBox 좌표).
+ *
+ * 애셋은 저마다 400×300 프레임을 채워 그리지만 실제로 칠해진 부분은 그보다 좁다.
+ * 스포이트는 폭 400 중 55 만 쓴다 — 나머지는 빈 여백이다.
+ * 그 여백까지 잡는 영역으로 치면 눈에는 한참 떨어져 보이는 물건 둘이 겹친 것으로 판정된다.
+ * 실제로 작업면 일곱을 프레임 폭으로 재면 1695 mm 라 1500 mm 실험대에 아예 못 앉힌다.
+ *
+ * 이 값은 손으로 적지 않는다 — 브라우저에서 `getBBox()` 로 재어 옮긴 것이고,
+ * `scripts/check-bench.mjs` 가 실제 그림과 어긋나지 않는지 확인한다.
+ * 그림을 다시 그리면 그 검사가 먼저 알려 준다.
+ */
+export const CONTENT_BOX = {
+  banana:     { x0: 52,  y0: 25,  x1: 350, y1: 312 },
+  slide:      { x0: 60,  y0: 105, x1: 344, y1: 202 },
+  coverslip:  { x0: 20,  y0: 37,  x1: 232, y1: 215 },
+  coverbox:   { x0: 80,  y0: 41,  x1: 330, y1: 246 },
+  dropper:    { x0: 173, y0: 29,  x1: 228, y1: 280 },
+  forceps:    { x0: 163, y0: 40,  x1: 237, y1: 271 },
+  bottle:     { x0: 132, y0: 5,   x1: 286, y1: 284 },
+  microscope: { x0: 90,  y0: 26,  x1: 300, y1: 289 },
+  dish:       { x0: 90,  y0: 112, x1: 310, y1: 213 },
+  waste:      { x0: 120, y0: 64,  x1: 280, y1: 282 },
+  sink:       { x0: 98,  y0: 50,  x1: 302, y1: 264 },
+  bin:        { x0: 120, y0: 32,  x1: 280, y1: 277 },
+  tissue:     { x0: 110, y0: 58,  x1: 318, y1: 232 },
+  bench:      { x0: 0,   y0: 0,   x1: 400, y1: 300 },
+};
+
+/**
+ * 그려진 범위를 **밀리미터**로. 프레임 왼쪽 위에서의 치우침(dx, dy)과 크기(w, h).
+ *
+ * 실험대에 놓인 물건의 `x` 는 여전히 **프레임** 왼쪽이다. 그림은 그보다 dx 만큼 안쪽에서 시작한다.
+ */
+export function drawnBoxMm(name) {
+  const spec = CONTRACT[name];
+  const [, , vw, vh] = spec.viewBox.split(/\s+/).map(Number);
+  const c = CONTENT_BOX[name];
+  const frameW = spec.realSizeMm;
+  const frameH = frameW * (vh / vw);
+  return {
+    dx: frameW * (c.x0 / vw),
+    dy: frameH * (c.y0 / vh),
+    w: frameW * ((c.x1 - c.x0) / vw),
+    h: frameH * ((c.y1 - c.y0) / vh),
+  };
+}
+
 /** 계약에 선언된, 반드시 존재해야 하는 노드 id 목록 */
 export function requiredNodes(name) {
   const spec = CONTRACT[name];
