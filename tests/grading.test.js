@@ -81,5 +81,9 @@ test('배율 첨삭 — 접안 10배 × 대물렌즈', () => {
   assert.equal(gradeMagnification(400, 40).status, STATUS.PASS);
   const wrong = gradeMagnification('40', 40);
   assert.equal(wrong.status, STATUS.MORE);
-  assert.match(wrong.message, /400/);
+  // 첨삭은 곱할 두 수를 알려 주고, **곱한 결과는 알려 주지 않는다.**
+  // 한 번 틀렸다고 답을 내주면 그 칸은 더 이상 아무것도 묻지 않는 칸이 된다.
+  assert.match(wrong.message, /10배/);
+  assert.match(wrong.message, /40배/);
+  assert.doesNotMatch(wrong.message, /400/);
 });

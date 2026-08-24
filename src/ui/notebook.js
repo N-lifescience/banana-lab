@@ -14,7 +14,6 @@ import { SLIDE_IDS } from '../sim/state.js';
 import { ASSETS } from '../assets/index.js';
 import { renderFOV } from '../render/fov.js';
 import { observability } from '../sim/quality.js';
-import { magnification } from '../sim/optics.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { UI } from './strings.js';
 
@@ -143,7 +142,7 @@ export function createNotebook(root, store, { onOpenZoom }) {
         }</label>
         <textarea data-note="${level === 2 ? whyKey : key}"
           id="note-${level === 2 ? 'why' : 'predict'}-${id}"
-          placeholder="${level === 2 ? N.predictWhyPlaceholder : N.predictFreePlaceholder}"
+          placeholder="${(level === 2 ? N.predictWhyPlaceholder : N.predictFreePlaceholder)[id]}"
           >${escapeHtml(st.session.notes[level === 2 ? whyKey : key] ?? '')}</textarea>`;
       return `
         <div class="predict-block">
@@ -235,13 +234,16 @@ export function createNotebook(root, store, { onOpenZoom }) {
       // 또 붙이면 겹친다 — "(나) 아이오딘–아이오딘화 칼륨 · 아이오딘–아이오딘화 칼륨".
       return `
         <div class="capture-card">
-          <h3>${UI.slideShort[c.slide]} · ${UI.reagents[c.reagent ?? 'NONE']}</h3>
+          <h3>${UI.slideShort[c.slide]} · ${c.reagent ? UI.reagents[c.reagent] : UI.noReagent}</h3>
           <!-- 기록한 시야를 그대로 되살린다. 캡처가 fieldParams 한 벌을 통째로 담고 있으므로
                그때 본 것과 같은 그림이 나온다. idPrefix 를 카드마다 달리 주지 않으면
                모든 카드가 첫 카드의 흐림·잘라내기를 쓴다 — 에러 없이 조용히 틀린다. -->
           <div class="capture-fov">${renderFOV(c, { idPrefix: `cap${i}-` })}</div>
           <dl class="capture-readout">
-            <div><dt>${UI.controls.objective}</dt><dd>${UI.units.mag(magnification(c.objective))}</dd></div>
+            <!-- 대물렌즈 칸에 총배율(=접안 10 × 대물)을 적고 있었다. 이름과 값이 어긋난 데다,
+                 바로 아래 "배율 입력" 이 묻는 답을 화면이 먼저 알려 주고 있었다.
+                 여기는 대물렌즈 배율만 보여 준다 — 곱하는 일은 학생 몫이다. -->
+            <div><dt>${UI.controls.objective}</dt><dd>${UI.units.mag(c.objective)}</dd></div>
             <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
           </dl>
           <label class="notes-label" for="${domId}">${N.magInput}</label>

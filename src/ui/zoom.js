@@ -435,7 +435,7 @@ export function createZoom(root, store) {
         </div>`;
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
-      <p class="zoom-slide-label">${UI.slideShort[slideId]} · ${UI.reagents[p.reagent ?? 'NONE']}</p>
+      <p class="zoom-slide-label">${UI.slideShort[slideId]} · ${p.reagent ? UI.reagents[p.reagent] : UI.noReagent}</p>
       <div class="scope-stage">
         <div class="scope-figure" id="scope-figure" aria-hidden="true"></div>
         <div class="zoom-fov" id="fov-slot" tabindex="0"></div>

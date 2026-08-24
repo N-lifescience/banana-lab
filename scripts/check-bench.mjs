@@ -424,6 +424,13 @@ await page.waitForTimeout(200);
 const cards = await page.locator('#notebook .capture-card').count();
 ok(cards >= 1, '기록한 결과가 탐구 노트 5단계에 보인다', `카드 ${cards}장`);
 
+// 카드의 표는 "대물렌즈" 라 써 놓고 총배율(400배)을 적고 있었다. 이름과 값이 어긋난 데다,
+// 바로 아래 "배율 입력" 이 채점하는 답을 화면이 먼저 알려 주고 있었다.
+const readout = await page.locator('#notebook .capture-card .capture-readout').first().innerText();
+ok(/대물렌즈[\s\S]*\b40배/.test(readout) && !readout.includes('400배'),
+   '결과 카드가 대물렌즈 배율을 그대로 적는다 (총배율을 대신 적어 답을 흘리지 않는다)',
+   JSON.stringify(readout.replace(/\n/g, ' | ')));
+
 // 고배율에서 조동나사 다이얼을 돌리면 깨지고, 화면이 그 사실을 말한다.
 // 손으로 돌려서 확인한다 — dispatch 로 부르면 다이얼이 그 결과를 화면에 반영하는지는 못 본다.
 await page.locator('[data-id="microscope"]').click();

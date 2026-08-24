@@ -119,6 +119,15 @@ test('탐구 과정의 예시 문구가 세부 단계마다 다르다', () => {
   }
   assert.equal(new Set(egs).size, egs.length,
     `예시 문구가 겹칩니다 — ${egs.length}칸에 서로 다른 ${new Set(egs).size}개뿐입니다`);
+  // 3단계(예상)의 예시도 같은 이유로 슬라이드마다 달라야 한다. 여기가 한동안 세 칸 모두
+  // 같은 문장이었고, 그건 (가) 대조군에는 아예 맞지도 않는 문장이었다.
+  for (const map of [UI.notebook.predictWhyPlaceholder, UI.notebook.predictFreePlaceholder]) {
+    const eg = ['A', 'B', 'C'].map((id) => map[id]);
+    for (const [i, s] of eg.entries()) {
+      assert.ok(typeof s === 'string' && s.trim(), `예상 ${'ABC'[i]} 칸에 예시 문구가 없습니다`);
+    }
+    assert.equal(new Set(eg).size, 3, `예상 칸의 예시 문구가 겹칩니다 — ${JSON.stringify(eg)}`);
+  }
   // 세부 단계 이름도 함께 확인한다. 구조를 { label, eg } 로 바꿨으므로 label 이 있어야 한다.
   for (const g of UI.protocol) {
     for (const s of g.steps) {

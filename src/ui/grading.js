@@ -12,7 +12,7 @@
  * 달리 여기서는 규칙과 문구가 한 쌍이라 표 밖(strings.js)으로 떼어내지 않는다.
  */
 
-import { magnification } from '../sim/optics.js';
+import { magnification, EYEPIECE } from '../sim/optics.js';
 
 export const STATUS = { PASS: 'pass', MORE: 'more', UNAVAILABLE: 'unavailable' };
 
@@ -166,6 +166,8 @@ export function gradeMagnification(input, objective) {
   if (Number(input) === correct) return { status: STATUS.PASS, message: null };
   return {
     status: STATUS.MORE,
-    message: `배율은 접안렌즈와 대물렌즈 배율의 곱입니다. 지금 대물렌즈는 ${correct}×입니다`,
+    // 예전 문구는 "지금 대물렌즈는 400×입니다" 였다 — 400 은 대물렌즈가 아니라 답이고,
+    // 한 번 틀리면 화면이 곱셈 결과를 그대로 내주고 있었다. 곱할 두 수만 알려 준다.
+    message: `배율은 접안렌즈 배율 × 대물렌즈 배율입니다. 접안렌즈는 ${EYEPIECE}배, 지금 대물렌즈는 ${objective}배입니다`,
   };
 }
