@@ -8,6 +8,7 @@
 import * as banana from './banana.js';
 import * as slide from './slide.js';
 import * as coverslip from './coverslip.js';
+import * as coverbox from './coverbox.js';
 import * as dropper from './dropper.js';
 import * as forceps from './forceps.js';
 import * as bottle from './bottle.js';
@@ -20,15 +21,15 @@ import * as tissue from './tissue.js';
 import * as bench from './bench.js';
 
 export const ASSETS = {
-  banana, slide, coverslip, dropper, forceps, bottle,
+  banana, slide, coverslip, coverbox, dropper, forceps, bottle,
   microscope, dish, waste, sink, bin, tissue, bench,
 };
 
 /**
  * 그림을 다시 그려야 하는 애셋. 계약과 상호작용은 이미 붙어 있고 형태만 자리표시다.
- * 붙여 넣을 지시는 tasks/T12-PROMPT.md 에 있다.
+ * 붙여 넣을 지시는 tasks/T17-PROMPT.md 에 있다.
  */
-export const PENDING = [];
+export const PENDING = ['coverbox'];
 
 /** 린터와 UI가 함께 쓰는 대표 상태 조합. 애셋마다 최소 이 상태들에서 검사한다. */
 export const SAMPLE_STATES = {
@@ -45,6 +46,7 @@ export const SAMPLE_STATES = {
     { sample: { thickness: 0.3 }, stain: 'IKI', reaction: 1, coverslip: true, bubbles: 3 },
   ],
   coverslip: [{ angle: 45 }, { angle: 90 }],
+  coverbox: [{}],
   dropper: [{ holds: null }, { holds: 'IKI', level: 1 }, { holds: 'SUDAN3', level: 0.4 }],
   forceps: [{ closed: false }, { closed: true, holding: 'coverslip' }],
   bottle: [{ kind: 'IKI', level: 1 }, { kind: 'SUDAN3', level: 0.3, capOpen: true }],

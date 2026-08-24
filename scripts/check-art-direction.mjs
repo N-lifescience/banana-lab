@@ -149,6 +149,6 @@ console.log(`  ${green('✓')} 위반 없음`);
 if (!only && PENDING.length) {
   console.log(dim(`\n  그림을 다시 그려야 하는 애셋 ${PENDING.length}종: ${PENDING.join(', ')}`));
   console.log(dim('  계약과 상호작용은 이미 붙어 있고 형태만 자리표시입니다.'));
-  console.log(dim('  tasks/T12-PROMPT.md 참조. src/assets/banana.js 를 본보기로 만드세요.'));
+  console.log(dim('  tasks/ 의 해당 프롬프트 카드 참조. src/assets/banana.js 를 본보기로 만드세요.'));
 }
 console.log('');

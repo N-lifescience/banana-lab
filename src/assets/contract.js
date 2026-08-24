@@ -66,6 +66,20 @@ export const CONTRACT = {
     },
   },
 
+  // 낱장 22 mm 는 화면에서 12 px 이라 알아볼 수가 없었다. 실제 실험실처럼 통에서 꺼내 쓴다.
+  // 상태가 없다 — 덮개 유리는 얼마든지 꺼내 쓰고, 한 번 쓴 것은 쓰레기통으로 간다.
+  coverbox: {
+    file: 'coverbox.js',
+    realSizeMm: 60,    // 22 mm 낱장을 담는 통. 긴 변 기준
+    viewBox: '0 0 400 300',
+    states: [],
+    nodes: {
+      '#box':       { required: true,  mutable: [] },
+      '#box-shade': { required: true,  mutable: [] },
+      '#stack':     { required: true,  mutable: [] },
+    },
+  },
+
   dropper: {
     file: 'dropper.js',
     realSizeMm: 150,   // 고무 젖꼭지 포함 스포이트 전장

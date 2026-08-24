@@ -1,4 +1,4 @@
-/** T08 브라우저 검증 — 어포던스가 실제로 화면에 나타나는지. */
+﻿/** T08 브라우저 검증 — 어포던스가 실제로 화면에 나타나는지. */
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE ?? 'http://localhost:5173';
@@ -117,7 +117,7 @@ ok(thickC < thickA, '문지르지 않고 놓기만 하면 더 얇다', `(다) ${
 
 // 핀셋으로 덮개 유리를 집을 수 있는가 (그림이 아주 작은 대상)
 const forcepsBox = await box('[data-id="forceps"]');
-const coverBox = await box('[data-id="coverslip1"]');
+const coverBox = await box('[data-id="coverbox"]');
 await page.mouse.move(...center(forcepsBox));
 await page.mouse.down();
 await page.mouse.move(...center(coverBox), { steps: 8 });
@@ -183,7 +183,7 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
      JSON.stringify((await state()).slides.B.sample));
   await put('dropper', 'bottleIKI');
   ok((await state()).tools.dropper.holds === 'IKI', '키보드 — 스포이트를 채운다');
-  await put('forceps', 'coverslip1');
+  await put('forceps', 'coverbox');
   ok((await state()).tools.forceps.holding === 'coverslip', '키보드 — 핀셋으로 집는다');
   await put('slideB', 'microscope');
   ok((await state()).microscope.stage === 'B', '키보드 — 재물대에 올린다');
@@ -595,3 +595,4 @@ for (const r of out) {
 }
 console.log(`\n${out.length - fail}/${out.length} 통과`);
 process.exit(fail ? 1 : 0);
+

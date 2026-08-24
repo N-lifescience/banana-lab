@@ -97,9 +97,9 @@ function defaultItems() {
     shelf(290, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', label: I.slideA }),
     shelf(410, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', label: I.slideB }),
     shelf(530, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', label: I.slideC }),
-    shelf(660, { id: 'coverslip1', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
-    shelf(700, { id: 'coverslip2', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
-    shelf(740, { id: 'coverslip3', asset: 'coverslip', kind: 'coverslip', label: I.coverslip }),
+    // 낱장 석 장을 늘어놓았더니 22 mm 짜리가 화면에서 12 px 이라 무엇인지 알아볼 수 없었다.
+    // 통 하나로 바꾼다 — 실제 실험실도 통에서 꺼내 쓰고, 종류(kind)는 그대로라 조작표는 그대로다.
+    shelf(660, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', label: I.coverbox }),
     shelf(820, { id: 'dropper', asset: 'dropper', kind: 'dropper', label: I.dropper }),
     shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', label: I.forceps }),
     shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', label: I.bottleIKI }),
