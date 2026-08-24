@@ -256,12 +256,27 @@ export function createNotebook(root, store, { onOpenZoom }) {
   /* 6 정리 — 서술형 3문항 + 첨삭, 세부 단계 기록·예상 재복습, 성찰 문항  */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * 실제로 **무엇이 보였는가**.
+   *
+   * 예전에는 시약 이름("아이오딘–아이오딘화 칼륨")을 돌려줬다. 그런데 이 자리는 예상과
+   * 견주는 자리다 — 학생이 "청람색 알갱이가 보인다" 고 예상했는데 실제 결과가 시약 이름이면
+   * 견줄 것이 없다. (가) 대조군은 아예 "없음" 이라 아무 정보도 아니었다.
+   * 눈으로 본 것을 말한다.
+   */
   function actualSummary(st, slideId) {
     const cap = [...st.session.captures].reverse().find((c) => c.slide === slideId);
-    if (cap) return `${UI.reagents[cap.reagent ?? 'NONE']} · ${UI.observability.label} ${observability(cap).score}`;
     const s = st.slides[slideId];
-    if (s.stain) return `${UI.reagents[s.stain]} · 반응 진행도 ${Math.round(s.reactionT * 100)}%`;
-    return UI.reagents.NONE;
+    const stain = cap ? cap.reagent : s.stain;
+    const reacted = cap ? (cap.reactionT ?? 0) : s.reactionT;
+
+    let seen;
+    if (!stain) seen = N.actualNone;
+    else if (reacted < 0.7) seen = N.actualPending;
+    else seen = stain === 'IKI' ? N.actualStarch : N.actualLipid;
+
+    if (!cap) return `${seen} ${N.actualNotCaptured}`;
+    return `${seen} (${UI.observability.label} ${observability(cap).score})`;
   }
 
   function renderStepNotesRecap(st) {
@@ -276,8 +291,12 @@ export function createNotebook(root, store, { onOpenZoom }) {
     const rows = SLIDE_IDS.map((id) => `
       <div class="predict-compare-row">
         <h4>${UI.slides[id]}</h4>
-        <div>${N.predictLabel} ${escapeHtml(st.session.notes[`predict.${id}`] ?? '—')}</div>
-        <div>${N.actualLabel}: ${actualSummary(st, id)}</div>
+        <dl class="compare-pair">
+          <dt>${N.predictRecapLabel}</dt>
+          <dd>${escapeHtml(st.session.notes[`predict.${id}`] || N.predictNone)}</dd>
+          <dt>${N.actualLabel}</dt>
+          <dd>${actualSummary(st, id)}</dd>
+        </dl>
       </div>`).join('');
     return `<section><h3>${N.predictHeading}</h3>${rows}</section>`;
   }
@@ -312,13 +331,24 @@ export function createNotebook(root, store, { onOpenZoom }) {
     return `<section id="reflect">${items}</section>`;
   }
 
+  /**
+   * 첨삭 줄. **빈칸에는 띄우지 않는다.**
+   *
+   * 아무것도 안 쓴 칸에 "두 물질의 양과 흩어진 모양을 서로 견주어 써 보세요" 가 먼저 뜨면,
+   * 학생은 쓰기도 전에 부족하다는 말부터 듣는다. 쓸 마음이 꺾이는 자리다.
+   * 다만 **답할 수 없는 문항**(아직 결과 보드가 없는 3번)은 왜 못 쓰는지 미리 알려 준다 —
+   * 그건 지적이 아니라 안내다.
+   */
+  function gradeLine(id, key, text) {
+    const g = gradeQuestion(key, text);
+    if (!text.trim() && g.status !== 'unavailable') return '';
+    return `<p id="grade-${id}" class="grade-line" data-grade="${g.status}">${g.message ?? N.gradeOk}</p>`;
+  }
+
   function renderStage6(st) {
     const qa = st.session.notes['q.a'] ?? '';
     const q2 = st.session.notes.q2 ?? '';
     const q3 = st.session.notes.q3 ?? '';
-    const gA = gradeQuestion('qa', qa);
-    const g2 = gradeQuestion('q2', q2);
-    const g3 = gradeQuestion('q3', q3);
     return `
       ${renderStepNotesRecap(st)}
       ${renderPredictCompare(st)}
@@ -329,17 +359,17 @@ export function createNotebook(root, store, { onOpenZoom }) {
         <label class="notes-label" for="note-qa">${N.qaContinueLabel}</label>
         <p class="stage-empty">${qa.trim() ? N.qaCarried : N.qaNotYet}</p>
         <textarea data-note="q.a" id="note-qa">${escapeHtml(qa)}</textarea>
-        <p id="grade-qa" class="grade-line" data-grade="${gA.status}">${gA.message ?? ''}</p>
+        ${gradeLine('qa', 'qa', qa)}
       </section>
       <section class="grade-block">
         <label class="notes-label" for="note-q2">${N.q2Label}</label>
         <textarea data-note="q2" id="note-q2">${escapeHtml(q2)}</textarea>
-        <p id="grade-q2" class="grade-line" data-grade="${g2.status}">${g2.message ?? ''}</p>
+        ${gradeLine('q2', 'q2', q2)}
       </section>
       <section class="grade-block">
         <label class="notes-label" for="note-q3">${N.q3Label}</label>
         <textarea data-note="q3" id="note-q3">${escapeHtml(q3)}</textarea>
-        <p id="grade-q3" class="grade-line" data-grade="${g3.status}">${g3.message ?? ''}</p>
+        ${gradeLine('q3', 'q3', q3)}
       </section>
       ${renderReflect(st)}`;
   }
@@ -378,8 +408,8 @@ export function createNotebook(root, store, { onOpenZoom }) {
     const reflections = N.reflectionItems.map(({ key, label, eg }) => `
       <div class="self-eval-item">
         <label class="notes-label" for="note-reflect-${key}">${label}</label>
-        <textarea data-note="reflect.${key}" id="note-reflect-${key}"
-          placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`reflect.${key}`] ?? '')}</textarea>
+        <textarea data-note="feedback.${key}" id="note-feedback-${key}"
+          placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`feedback.${key}`] ?? '')}</textarea>
       </div>`).join('');
 
     const violations = st.session.violations;

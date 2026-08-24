@@ -438,7 +438,13 @@ export function createBench(root, store, { onOpenZoom }) {
 
   function hideTipSoon() {
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(hideTip, 0);
+    hideTimer = setTimeout(() => {
+      // 말풍선 **안으로** 포커스가 옮겨 갔으면 닫지 않는다.
+      // 키보드로 놓으려면 Tab 해서 「여기에 놓기」 버튼으로 들어가야 하는데,
+      // 그때 토큰에서 blur 가 나므로 그대로 닫으면 버튼이 눈앞에서 사라진다.
+      if (tipEl.contains(document.activeElement)) return;
+      hideTip();
+    }, 0);
   }
 
   // 말풍선 안 버튼에서 포커스가 완전히 빠져나가면 닫는다.

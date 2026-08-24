@@ -167,6 +167,10 @@
     padding:12px;font-size:15px;font-weight:600}
   .start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
   .predict-compare-row{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px}
+  /* 예상과 실제를 나란히. 라벨과 답이 한 줄에 붙어 있으면 어디까지가 질문인지 안 읽힌다. */
+  .compare-pair{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:6px 0 0}
+  .compare-pair dt{color:var(--ink-mute);font-size:12px;white-space:nowrap}
+  .compare-pair dd{margin:0}
   .capture-card{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:12px}
   .capture-readout{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
   .capture-readout dt{color:var(--ink-mute)}

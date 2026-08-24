@@ -157,11 +157,16 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
   await kb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
   await kb.waitForTimeout(250);
   const state = () => kb.evaluate(() => window.__store.getState());
+  // 말풍선은 포커스가 옮겨 온 다음 프레임에 뜬다. 고정 시간으로 기다리면
+  // 기계가 느린 날에 부서진다 — 버튼이 나타날 때까지 기다린다.
   const put = async (who, onto) => {
     await kb.locator(`[data-id="${who}"]`).focus();
-    await kb.waitForTimeout(200);
     const btn = kb.locator(`#bench-tip [data-onto="${onto}"]`);
-    if (!(await btn.count())) return false;
+    try {
+      await btn.waitFor({ state: 'attached', timeout: 3000 });
+    } catch {
+      return false;
+    }
     await btn.focus();
     await kb.keyboard.press('Enter');
     await kb.waitForTimeout(260);
@@ -448,6 +453,53 @@ ok(dirty === true, '덮개 유리 없이 고배율로 올리면 렌즈가 더러
 await drag('[data-id="tissue"]', '[data-id="microscope"]');
 const cleaned = await page.evaluate(() => window.__store.getState().slides.A.lensTouched);
 ok(cleaned === false, '휴지를 현미경에 대면 렌즈를 닦는다', `lensTouched=${cleaned}`);
+
+/* ---------- 6단계 정리 ---------- */
+{
+  const nb = await browser.newPage({ viewport: { width: 900, height: 1000 } });
+  await nb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await nb.waitForTimeout(250);
+
+  // 아무것도 안 쓴 칸에 첨삭이 먼저 뜨면, 학생은 쓰기도 전에 부족하다는 말부터 듣는다.
+  await nb.locator('.note-tab[data-stage="6"]').click();
+  await nb.waitForTimeout(220);
+  const empty = await nb.locator('#notebook .grade-line').evaluateAll(
+    (e) => e.map((x) => `${x.id}:${x.dataset.grade}`));
+  ok(empty.every((g) => g.endsWith(':unavailable')),
+     '빈칸에는 첨삭이 뜨지 않는다 (아직 답할 수 없는 문항 안내만 남는다)', JSON.stringify(empty));
+
+  // 실험을 돌리고 예상-실제 비교를 본다
+  await nb.evaluate(() => {
+    const d = (t, p) => window.__store.dispatch(t, p);
+    d('PEEL_BANANA', {});
+    for (const s of ['A', 'B', 'C']) d('SMEAR', { slide: s, thickness: 0.3 });
+    d('FILL_DROPPER', { reagent: 'IKI' }); d('DROP', { slide: 'B', count: 2 });
+    d('RINSE_DROPPER', {}); d('FILL_DROPPER', { reagent: 'SUDAN3' }); d('DROP', { slide: 'C', count: 2 });
+    for (let i = 0; i < 5; i++) d('TICK', { seconds: 1 });
+    for (const s of ['A', 'B', 'C']) { d('PICK_COVERSLIP', {}); d('PLACE_COVERSLIP', { slide: s, angleDeg: 45 }); }
+    d('SAVE_NOTE', { step: 'predict.A', text: '색이 변하지 않는다' });
+    for (const s of ['A', 'B', 'C']) {
+      d('MOUNT', { slide: s }); d('SET_OBJECTIVE', { objective: 4 });
+      d('COARSE_FOCUS', { delta: -window.__store.getState().microscope.coarse });
+      d('SET_OBJECTIVE', { objective: 40 }); d('CAPTURE', {});
+    }
+  });
+  await nb.locator('.note-tab[data-stage="5"]').click();
+  await nb.waitForTimeout(150);
+  await nb.locator('.note-tab[data-stage="6"]').click();
+  await nb.waitForTimeout(300);
+
+  // 실제 결과는 시약 이름이 아니라 **눈으로 본 것**이어야 한다.
+  // (가) 대조군이 "없음" 으로 나오던 자리다 — 견줄 것이 없는 답이었다.
+  const compare = await nb.locator('.predict-compare-row').first().innerText();
+  ok(compare.includes('색이 변하지 않았습니다'),
+     '실제 결과가 무엇이 보였는지를 말한다 (시약 이름이 아니라)', JSON.stringify(compare.replace(/\n/g, ' | ')));
+  ok(!compare.includes('없음'), '대조군 결과가 "없음" 으로 나오지 않는다');
+
+  const t6 = await nb.locator('#note-panel').innerText();
+  ok(!/undefined|NaN|\[object/.test(t6), '6단계에 새는 값이 없다');
+  await nb.close();
+}
 
 /* ---------- 버튼이 눈에 보이는가 (다크 모드에서 흰 바탕 흰 글씨였다) ---------- */
 

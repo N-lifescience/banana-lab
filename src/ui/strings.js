@@ -340,7 +340,22 @@ export const UI = {
       3: '',
     },
     predictHeading: '내가 예상했던 것과 실제 결과를 견주어 보세요',
-    actualLabel: '실제 결과',
+    predictRecapLabel: '내 예상',
+    predictNone: '적지 않았습니다',
+    actualLabel: '실제로 본 것',
+
+    /**
+     * 6단계에서 예상과 나란히 놓는 **실제 결과**.
+     *
+     * 시약 이름을 그대로 보여 주면 견줄 것이 없다 — 학생은 "청람색 알갱이가 보인다" 고
+     * 예상했는데 결과가 "아이오딘–아이오딘화 칼륨" 이면 맞았는지 틀렸는지 알 수 없다.
+     * (가) 대조군은 아예 "없음" 이라 아무 정보도 아니었다. **눈으로 본 것**을 말한다.
+     */
+    actualNone: '색이 변하지 않았습니다. 세포 모양만 보입니다.',
+    actualStarch: '청람색 알갱이가 보입니다.',
+    actualLipid: '선홍색 방울이 보입니다.',
+    actualPending: '색이 아직 변하는 중이었습니다.',
+    actualNotCaptured: '— 아직 현미경으로 기록하지 않았습니다.',
     goalOnlyLabel: (title) => `이번 절차의 목표: ${title}`,
     noCaptures: '아직 기록된 결과가 없습니다. 현미경 확대 뷰에서 결과 기록 버튼을 눌러 보세요.',
     magInput: '배율 입력',
