@@ -583,6 +583,61 @@ const marked3 = await page.locator('.token--target').count();
 await page.mouse.up();
 ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된다', `${marked3}개`);
 
+/* ---------- 배치 편집 모드 — 옮기기만 하고 아무 일도 일으키지 않는가 ---------- */
+{
+  const ed = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
+  await ed.goto(`${BASE}/?level=1&edit=1`, { waitUntil: 'networkidle' });
+  ok(await ed.locator('#edit-panel').count() === 1, '?edit=1 로 배치 편집 모드가 열린다');
+
+  const eBox = async (sel) => ed.locator(sel).boundingBox();
+  const eCenter = (b) => [b.x + b.width / 2, b.y + b.height / 2];
+
+  // 먼저 아래로 내린다. 선반 물건을 아래로 끌면 작업면에 붙어야 한다.
+  // (순서가 중요하다 — 먼저 다른 물건 위로 옮겨 놓으면 그 물건이 위에 겹쳐 그려져서
+  //  다음 번에 집는 것이 바나나가 아니라 겹친 물건이 된다.)
+  const ban = await eBox('[data-id="banana"]');
+  await ed.mouse.move(...eCenter(ban));
+  await ed.mouse.down();
+  await ed.mouse.move(eCenter(ban)[0], eCenter(ban)[1] + 300, { steps: 12 });
+  await ed.mouse.up();
+  await ed.waitForTimeout(200);
+
+  const code = await ed.evaluate(() => window.__layoutCode());
+  const bananaLine = code.split('\n').find((l) => l.includes("id: 'banana'"));
+  ok(/^\s*surface\(\d+,/.test(bananaLine ?? ''),
+     '아래로 끌면 작업면에 붙고, 그 자리가 코드로 나온다', JSON.stringify(bananaLine));
+  ok(code.split('\n').filter((l) => l.includes('labelKey')).length === 14,
+     '코드에 실험대 물건 14개가 모두 나온다');
+
+  // 화면에도 좌표가 보여야 한다 — 스크린샷 한 장으로 읽을 수 있어야 하기 때문이다.
+  ok(await ed.locator('.edit-x-tag').count() === 14, '물건마다 x 좌표가 화면에 붙는다');
+
+  // 핀셋을 덮개 유리 통에 끌어다 댄다. 평소라면 한 장 집는다.
+  //
+  // 바나나를 받침 유리에 문지르는 것으로 검사하다가 한 번 헛발질했다 — 껍질을 안 벗긴
+  // 바나나는 편집 모드가 아니어도 발리지 않아서, 편집 모드를 껐다 켜도 결과가 같았다.
+  // **앞 조건이 없는 조작**으로 봐야 이 검사가 무언가를 말한다.
+  const fps = await eBox('[data-id="forceps"]');
+  const cbx = await eBox('[data-id="coverbox"]');
+  await ed.mouse.move(...eCenter(fps));
+  await ed.mouse.down();
+  await ed.mouse.move(...eCenter(cbx), { steps: 10 });
+  await ed.mouse.up();
+  await ed.waitForTimeout(200);
+
+  const holding = await ed.evaluate(() => window.__store.getState().tools.forceps.holding);
+  ok(holding === null,
+     '편집 모드에서는 끌어다 놓아도 조작이 일어나지 않는다', `holding=${holding}`);
+
+  // 「여기에 놓기」 버튼은 진짜 조작을 일으킨다. "조작은 일어나지 않습니다" 라고 적어 둔
+  // 화면에 그 버튼이 있으면 안 된다.
+  await ed.locator('[data-id="forceps"]').focus();
+  await ed.waitForTimeout(150);
+  ok(await ed.locator('#bench-tip .tip-actions').count() === 0,
+     '편집 모드 말풍선에는 놓기 버튼이 없다');
+  await ed.close();
+}
+
 /* ---------- 보고서 — 화면에서 이름을 받고, 종이에만 남는가 ---------- */
 {
   const rp = await browser.newPage({ viewport: { width: 1400, height: 900 } });

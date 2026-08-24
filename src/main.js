@@ -53,6 +53,16 @@ function levelFromUrl() {
   return raw === 1 || raw === 2 || raw === 3 ? raw : null;
 }
 
+/**
+ * 배치 편집 모드 — `?edit=1`.
+ *
+ * 개발 서버에서만 연다. `window.__store` 와 같은 이유다 — 배포본에 남기면 학생이
+ * 실험대를 흐트러뜨릴 수 있고, 그건 이 앱이 답해야 할 조작이 아니다.
+ */
+function editMode() {
+  return import.meta.env.DEV && new URLSearchParams(location.search).get('edit') === '1';
+}
+
 let store = null;
 
 /**
@@ -80,7 +90,7 @@ function boot(level) {
   const zoom = createZoom($('#zoom'), store);
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
   const report = createReport($('#report'), store);
-  createBench($('#bench'), store, { onOpenZoom: openZoom });
+  createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, { onOpenZoom: openZoom, onReport: report.open });
 
   startClock();

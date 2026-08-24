@@ -103,6 +103,20 @@
   .bench-tip span{display:block;color:var(--ink-mute);margin-top:3px}
   .bench-tip[hidden]{display:none}
 
+  /* 배치 편집 모드 (?edit=1, 개발 서버 전용).
+     스크린샷 한 장으로 좌표를 읽을 수 있어야 하므로 숫자를 크고 또렷하게 둔다. */
+  .edit-panel{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:12px 14px}
+  .edit-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+  .edit-head button{padding:5px 10px;font-size:12.5px}
+  .edit-note{font-size:12px;color:var(--ink-mute);margin:6px 0 10px}
+  .edit-table{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px}
+  .edit-table td{padding:2px 14px 2px 0;white-space:nowrap}
+  .edit-table .edit-x{text-align:right;font-weight:700}
+  /* 물건에 붙는 x 좌표. 물건 그림 위에 얹히므로 바탕을 깔아 읽히게 한다. */
+  .edit-x-tag{position:absolute;left:50%;top:-2px;transform:translate(-50%,-100%);
+    background:var(--indigo);color:#fff;border-radius:3px;padding:1px 4px;
+    font:700 11px/1.3 ui-monospace,monospace;font-style:normal;pointer-events:none}
+
   /* 탐구 노트 */
   #notebook{overflow-y:auto;padding:20px 22px;border-left:1px solid var(--rule);background:var(--surface)}
   #notebook h1{font-size:17px;margin:0 0 14px}

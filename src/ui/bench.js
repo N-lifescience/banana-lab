@@ -94,27 +94,29 @@ function defaultItems() {
     // 상단 선반
     // 받침 유리 사이를 120 mm 씩 벌려 둔다. 바나나가 180 mm 라 90 mm 간격에서는
     // 끄는 동안 바나나 그림이 이웃한 유리 두 장을 함께 덮어, 어디에 발리는지 보이지 않았다.
-    shelf(40, { id: 'banana', asset: 'banana', kind: 'banana', label: I.banana }),
-    shelf(290, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', label: I.slideA }),
-    shelf(410, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', label: I.slideB }),
-    shelf(530, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', label: I.slideC }),
+    shelf(40, { id: 'banana', asset: 'banana', kind: 'banana', labelKey: 'banana' }),
+    shelf(290, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', labelKey: 'slideA' }),
+    shelf(410, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', labelKey: 'slideB' }),
+    shelf(530, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', labelKey: 'slideC' }),
     // 낱장 석 장을 늘어놓았더니 22 mm 짜리가 화면에서 12 px 이라 무엇인지 알아볼 수 없었다.
     // 통 하나로 바꾼다 — 실제 실험실도 통에서 꺼내 쓰고, 종류(kind)는 그대로라 조작표는 그대로다.
-    shelf(660, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', label: I.coverbox }),
-    shelf(820, { id: 'dropper', asset: 'dropper', kind: 'dropper', label: I.dropper }),
-    shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', label: I.forceps }),
-    shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', label: I.bottleIKI }),
-    shelf(1250, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', label: I.bottleSUDAN }),
+    shelf(660, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', labelKey: 'coverbox' }),
+    shelf(820, { id: 'dropper', asset: 'dropper', kind: 'dropper', labelKey: 'dropper' }),
+    shelf(990, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
+    shelf(1120, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
+    shelf(1250, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
     // 작업면. 씻는 곳(개수대)과 버리는 곳(쓰레기통·폐액통)을 나눠 둔다 —
     // 실험 접시 하나가 둘을 겸하고 있었는데, 그림도 이름도 그 일과 맞지 않았다.
     // 접시는 실험대에서 뺐다. 두 물건이 그 일을 나눠 가진 뒤로는 놓아 둘 자리라는 뜻밖에
     // 남지 않는데, 자리를 차지하면 학생은 "이걸로 뭘 해야 하나" 를 계속 묻게 된다.
-    surface(15, { id: 'sink', asset: 'sink', kind: 'sink', label: I.sink }),
-    surface(410, { id: 'tissue', asset: 'tissue', kind: 'tissue', label: I.tissue }),
-    surface(640, { id: 'microscope', asset: 'microscope', kind: 'microscope', label: I.microscope }),
-    surface(995, { id: 'waste', asset: 'waste', kind: 'waste', label: I.waste }),
-    surface(1255, { id: 'bin', asset: 'bin', kind: 'bin', label: I.bin }),
-  ].map((it) => ({ ...it, y: it.bottom - heightMm(it.asset) }));
+    surface(15, { id: 'sink', asset: 'sink', kind: 'sink', labelKey: 'sink' }),
+    surface(410, { id: 'tissue', asset: 'tissue', kind: 'tissue', labelKey: 'tissue' }),
+    surface(640, { id: 'microscope', asset: 'microscope', kind: 'microscope', labelKey: 'microscope' }),
+    surface(995, { id: 'waste', asset: 'waste', kind: 'waste', labelKey: 'waste' }),
+    surface(1255, { id: 'bin', asset: 'bin', kind: 'bin', labelKey: 'bin' }),
+    // 이름은 키로만 적어 둔다. 편집 모드가 배치를 다시 코드로 뱉을 때
+    // `label: I.banana` 를 되살리려면 어느 키였는지를 알아야 한다.
+  ].map((it) => ({ ...it, label: I[it.labelKey], y: it.bottom - heightMm(it.asset) }));
 }
 
 /**
@@ -226,11 +228,34 @@ export const BENCH_KINDS = [
 ];
 
 /**
+ * 배치를 다시 코드로 뱉는다 — 편집 모드에서 옮긴 자리를 그대로 `defaultItems()` 에 붙여 넣는다.
+ *
+ * 눈으로 옮긴 것을 손으로 숫자로 옮겨 적는 일은 반드시 어딘가 틀린다.
+ * 옮긴 사람이 스크린샷만 보내면 되도록, 화면이 스스로 좌표를 말하게 한다.
+ */
+function layoutCode(items) {
+  const lines = items.map((it) => {
+    const fn = Math.abs(it.bottom - SHELF_MM) < 1 ? 'shelf' : 'surface';
+    const props = [
+      `id: '${it.id}'`,
+      `asset: '${it.asset}'`,
+      `kind: '${it.kind}'`,
+      it.slide ? `slide: '${it.slide}'` : null,
+      it.reagent ? `reagent: '${it.reagent}'` : null,
+      `labelKey: '${it.labelKey}'`,
+    ].filter(Boolean).join(', ');
+    return `    ${fn}(${Math.round(it.x)}, { ${props} }),`;
+  });
+  return `// src/ui/bench.js 의 defaultItems() 안, 배열 자리에 그대로 붙여 넣습니다.\n${lines.join('\n')}`;
+}
+
+/**
  * @param {HTMLElement} root
  * @param {{getState:Function, dispatch:Function, subscribe:Function}} store
- * @param {{onOpenZoom:(mode:string, slideId:string|null, opener:HTMLElement)=>void}} handlers
+ * @param {{onOpenZoom:Function, edit?:boolean}} handlers
+ *   edit — 배치를 옮겨 보는 모드. 조작은 일어나지 않고 물건이 놓인 자리에 그대로 남는다.
  */
-export function createBench(root, store, { onOpenZoom }) {
+export function createBench(root, store, { onOpenZoom, edit = false }) {
   root.classList.add('bench');
   // 배경과 물건을 같은 무대 안에 둔다. 무대가 4:3 을 지키므로 둘이 함께 스케일된다.
   // 안내 말풍선은 무대 바로 아래에 둔다 — 물건 층(.bench-tokens)은 조작할 때마다
@@ -245,7 +270,17 @@ export function createBench(root, store, { onOpenZoom }) {
       <div class="bench-bg" aria-hidden="true"></div>
       <div class="bench-tokens"></div>
       <div class="bench-tip" id="bench-tip" role="tooltip" hidden></div>
-    </div>`;
+    </div>
+    ${edit ? `
+      <div class="edit-panel" id="edit-panel">
+        <div class="edit-head">
+          <b>${UI.edit.heading}</b>
+          <button type="button" id="edit-copy">${UI.edit.copy}</button>
+          <button type="button" id="edit-reset">${UI.edit.reset}</button>
+        </div>
+        <p class="edit-note">${UI.edit.note}</p>
+        <table class="edit-table"><tbody id="edit-rows"></tbody></table>
+      </div>` : ''}`;
   root.querySelector('.bench-bg').innerHTML = ASSETS.bench.render({});
   const layer = root.querySelector('.bench-tokens');
   const tipEl = root.querySelector('.bench-tip');
@@ -261,6 +296,46 @@ export function createBench(root, store, { onOpenZoom }) {
   const items = defaultItems();
   for (const item of items) { item.homeX = item.x; item.homeY = item.y; }
   let drag = null;
+
+  /* ---------------- 편집 모드 ---------------- */
+
+  /**
+   * 물건은 두 선 중 **가까운 쪽**에 바닥을 댄다 — 선반 위 아니면 작업면 위다.
+   * 중간 높이에 띄워 둘 수는 없다. 그림에 그런 자리가 없기 때문이다.
+   */
+  function snapToLine(item) {
+    const h = heightMm(item.asset);
+    const bottom = item.y + h;
+    item.bottom = Math.abs(bottom - SHELF_MM) <= Math.abs(bottom - SURFACE_MM) ? SHELF_MM : SURFACE_MM;
+    item.x = clamp(item.x, 0, STAGE_W_MM - CONTRACT[item.asset].realSizeMm);
+    item.y = item.bottom - h;
+  }
+
+  function renderEditPanel() {
+    if (!edit) return;
+    root.querySelector('#edit-rows').innerHTML = items.map((it) => `
+      <tr>
+        <td>${it.id}</td>
+        <td>${Math.abs(it.bottom - SHELF_MM) < 1 ? UI.edit.shelf : UI.edit.surface}</td>
+        <td class="edit-x">${Math.round(it.x)}</td>
+      </tr>`).join('');
+  }
+
+  if (edit) {
+    root.querySelector('#edit-copy').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(layoutCode(items));
+      e.target.textContent = UI.edit.copied;
+      setTimeout(() => { e.target.textContent = UI.edit.copy; }, 1500);
+    });
+    root.querySelector('#edit-reset').addEventListener('click', () => {
+      for (const [i, it] of defaultItems().entries()) Object.assign(items[i], it);
+      renderTokens();
+      renderEditPanel();
+    });
+    // 스크린샷만으로 배치를 옮겨 적을 수 있어야 한다. 콘솔에도 한 벌 남긴다 —
+    // 붙여 넣기가 막힌 환경(권한 거부)에서도 길이 하나는 남는다.
+    window.__layoutCode = () => layoutCode(items);
+  }
 
   function slideRenderState(slideId) {
     const s = store.getState().slides[slideId];
@@ -402,7 +477,9 @@ export function createBench(root, store, { onOpenZoom }) {
     hideTimer = 0;
     const level = store.getState().session.level;
     const lines = UI.bench.hints[item.kind]?.[level] ?? [];
-    const targets = withActions ? dropTargetsFor(item) : [];
+    // 편집 모드에서는 놓을 곳 버튼을 내지 않는다. 그 버튼은 실제 조작을 일으키므로
+    // "조작은 일어나지 않습니다" 라고 적어 둔 화면에 있으면 안 된다.
+    const targets = withActions && !edit ? dropTargetsFor(item) : [];
     const actions = targets.length ? `
       <div class="tip-actions">
         <span class="tip-actions-label">${UI.bench.keyboardPut}</span>
@@ -505,7 +582,8 @@ export function createBench(root, store, { onOpenZoom }) {
       rects: captureRects(item.id),
     };
     el.classList.add('token--dragging');
-    markTargets(item);
+    // 편집 모드에서는 놓을 곳 표시가 없다. 조작이 일어나지 않으니 표시할 것도 없다.
+    if (!edit) markTargets(item);
   }
 
   /** 화면에서 끈 픽셀을 실험대 위 밀리미터로 바꾼다. 무대가 커지든 작아지든 같은 거리를 옮긴다. */
@@ -527,6 +605,8 @@ export function createBench(root, store, { onOpenZoom }) {
     drag.item.y = drag.startY + ty * k;
     drag.el.style.left = `${xPct(drag.item.x)}%`;
     drag.el.style.top = `${yPct(drag.item.y)}%`;
+
+    if (edit) return;
 
     const target = targetUnder();
     // 지금 무엇 위에 있는지 표시한다.
@@ -555,6 +635,8 @@ export function createBench(root, store, { onOpenZoom }) {
 
   /** 탭(포인터로 움직임 없이 누르고 뗌) 또는 키보드 활성화(Enter/Space) 로 여는 동작. */
   function handleTap(item, el) {
+    // 편집 모드에서 확대 뷰가 열리면 옮기던 흐름이 끊긴다. 자리만 옮기는 모드다.
+    if (edit) return;
     TAPS[item.kind]?.(item, el);
   }
 
@@ -578,6 +660,17 @@ export function createBench(root, store, { onOpenZoom }) {
       pointerTapAt = performance.now();
       handleTap(item, el);
       renderTokens();
+      return;
+    }
+
+    // 편집 모드 — 조작은 일어나지 않고, 놓은 자리에 그대로 남는다.
+    if (edit) {
+      snapToLine(item);
+      item.homeX = item.x;
+      item.homeY = item.y;
+      drag = null;
+      renderTokens();
+      renderEditPanel();
       return;
     }
 
@@ -625,6 +718,8 @@ export function createBench(root, store, { onOpenZoom }) {
       el.setAttribute('aria-label', item.label);
       el.setAttribute('aria-describedby', 'bench-tip');
       el.innerHTML = ASSETS[item.asset].render(assetState(item));
+      // 스크린샷 한 장으로 자리를 읽을 수 있어야 한다. 물건마다 x(mm)를 달아 둔다.
+      if (edit) el.insertAdjacentHTML('beforeend', `<i class="edit-x-tag">${Math.round(item.x)}</i>`);
 
       el.addEventListener('pointerdown', (e) => onPointerDown(e, item, el));
       el.addEventListener('pointermove', onPointerMove);
@@ -679,4 +774,5 @@ export function createBench(root, store, { onOpenZoom }) {
   store.subscribe(() => { renderBar(); if (!drag) renderTokens(); });
   renderTokens();
   renderBar();
+  renderEditPanel();
 }
