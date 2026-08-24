@@ -18,3 +18,7 @@ probe-tmp.mjs
 shot-tmp.mjs
 
 .vercel
+
+# 보안 점검 결과물. 설정(dorms-check.config.json)은 커밋하고 리포트는 남기지 않는다 —
+# 매번 다시 재는 값이라 커밋해 두면 언제 잰 것인지 헷갈린다.
+.dorms-check/

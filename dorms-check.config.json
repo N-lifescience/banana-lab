@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "바나나랩",
+    "url": "https://banana-inquiry-based-virtual-lab.vercel.app",
+    "stack": "Vite"
+  },
+  "tracks": [
+    "security"
+  ],
+  "edzipCase": null,
+  "teacher": {
+    "dormsHandle": ""
+  },
+  "ownershipConfirmed": true
+}
