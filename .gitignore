@@ -16,3 +16,5 @@ shots/
 _audit-*.mjs
 probe-tmp.mjs
 shot-tmp.mjs
+
+.vercel

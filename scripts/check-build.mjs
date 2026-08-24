@@ -52,9 +52,13 @@ ok(await page.evaluate(() => window.__layoutCode === undefined),
    vite build 는 index.html 하나만 묶는다. 다만 `npm run preview` 는 모르는 주소를
    index.html 로 되돌려 주므로 HTTP 200 이 올 수 있다 — 상태 코드가 아니라
    **하네스 내용이 나오는가**로 판단한다. */
+// 없는 주소를 일부러 두드리는 것이므로 여기서 나는 404 는 콘솔 에러로 세지 않는다.
+// 세면 "하네스가 배포되지 않았다" 를 확인할 때마다 "콘솔 에러 0건" 이 실패한다 — 실제로 그랬다.
+const errorsBeforeProbe = errors.length;
 const harness = await page.goto(`${BASE}/harness.html`).catch(() => null);
 ok(!(await page.locator('div#sheet').count()),
    '개발 하네스(애셋 시트)는 배포본에 없다', harness ? `HTTP ${harness.status()}` : '응답 없음');
+errors.length = errorsBeforeProbe;
 
 /* ---------- 실험이 처음부터 끝까지 도는가 (마우스로) ---------- */
 await page.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
