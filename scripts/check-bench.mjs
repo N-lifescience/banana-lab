@@ -533,8 +533,14 @@ async function checkButtonContrast(page, where) {
       // SVG 안의 글자는 CSS color 가 아니라 애셋이 정한 fill 로 칠해진다.
       // 그걸 CSS 색으로 재면 실제로 잘 보이는 글자를 못 읽는다고 말하게 된다 —
       // 검사가 한 번 헛발질하면 그 뒤로 아무도 안 믿는다. HTML 글자만 잰다.
+      //
+      // 이름표(.token-name)와 좌표 딱지(.edit-x-tag)도 제 색과 제 바탕을 갖고 물건 그림 위에
+      // 떠 있다. 그것을 버튼의 색으로 재면 실제로는 잘 읽히는 글자를 못 읽는다고 말하게 된다 —
+      // 실제로 그랬다. 그 둘은 아래에서 따로 잰다.
       const htmlText = [...el.childNodes]
-        .filter((n) => n.nodeType === 3 || (n.nodeType === 1 && n.tagName.toLowerCase() !== 'svg'))
+        .filter((n) => n.nodeType === 3
+          || (n.nodeType === 1 && n.tagName.toLowerCase() !== 'svg'
+              && !n.classList.contains('token-name') && !n.classList.contains('edit-x-tag')))
         .map((n) => n.textContent).join('').trim();
       if (!htmlText) continue;
       const fg = parse(getComputedStyle(el).color);
@@ -682,6 +688,56 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   });
   ok(drift.length === 0, '적어 둔 그려진 범위가 실제 그림과 맞는다', drift.slice(0, 3).join(' / '));
   await cb.close();
+}
+
+/* ---------- 이름표가 늘 보이는가, 서로 겹치지 않는가 ---------- */
+{
+  // 이름이 말풍선에만 있으면 마우스를 하나씩 올려 보기 전에는 실험대에 무엇이 있는지 모른다.
+  const nm = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await nm.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+  const names = await nm.evaluate(() => [...document.querySelectorAll('.token-name')]
+    .map((n) => ({ text: n.textContent.trim(), r: n.getBoundingClientRect().toJSON() })));
+  ok(names.length === 14, '실험대 물건 14개에 모두 이름표가 붙는다', `${names.length}개`);
+  ok(names.every((n) => n.text.length > 0), '빈 이름표가 없다');
+  // 3단계에서도 이름은 보인다 — 난이도가 줄이는 것은 설명이지 물건이 무엇인지가 아니다.
+  ok(names.some((n) => n.text === '현미경'), '3단계에서도 이름표가 보인다');
+
+  const clash = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const a = names[i].r;
+      const b = names[j].r;
+      if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) {
+        clash.push(`${names[i].text}↔${names[j].text}`);
+      }
+    }
+  }
+  ok(clash.length === 0, '이름표끼리 겹치지 않는다 (겹치면 아래 줄로 내려간다)', clash.join(' / '));
+
+  // 이름표는 물건 그림 위에 얹힌다. 제 바탕을 깔지 않으면 그림 색에 따라 글자가 묻힌다.
+  const readable = await nm.evaluate(() => {
+    const lum = (c) => {
+      const [r, g, b] = c.map((v) => {
+        const s = v / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const parse = (s) => (s.match(/[\d.]+/g) ?? []).slice(0, 4).map(Number);
+    const bad = [];
+    for (const n of document.querySelectorAll('.token-name')) {
+      const st = getComputedStyle(n);
+      const fg = parse(st.color);
+      const bg = parse(st.backgroundColor);
+      if (bg.length < 3 || (bg[3] !== undefined && bg[3] < 0.6)) { bad.push(`${n.textContent}: 바탕 없음`); continue; }
+      const [a, b] = [lum(fg.slice(0, 3)), lum(bg.slice(0, 3))].sort((x, y) => y - x);
+      const ratio = (a + 0.05) / (b + 0.05);
+      if (ratio < 4.5) bad.push(`${n.textContent}=${ratio.toFixed(2)}`);
+    }
+    return bad;
+  });
+  ok(readable.length === 0, '이름표 글자가 제 바탕 위에서 읽힌다', readable.join(' / '));
+  await nm.close();
 }
 
 /* ---------- 겨눈 그림이 잡히는가 (프레임이 겹치는 이웃이 가로채지 않는가) ---------- */

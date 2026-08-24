@@ -759,6 +759,13 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       el.setAttribute('aria-label', item.label);
       el.setAttribute('aria-describedby', 'bench-tip');
       el.innerHTML = ASSETS[item.asset].render(assetState(item));
+      // 이름표는 **그림 아래**에 붙는다. 프레임 아래가 아니다 — 애셋마다 여백이 달라서
+      // 프레임 기준으로 달면 어떤 것은 물건에 붙고 어떤 것은 한참 떨어진다.
+      const c = CONTENT_BOX[item.asset];
+      const [, , vw, vh] = CONTRACT[item.asset].viewBox.split(/\s+/).map(Number);
+      el.insertAdjacentHTML('beforeend',
+        `<i class="token-name" style="left:${((c.x0 + c.x1) / 2 / vw) * 100}%;`
+        + `top:${(c.y1 / vh) * 100}%">${UI.bench.shortNames[item.labelKey] ?? item.label}</i>`);
       // 스크린샷 한 장으로 자리를 읽을 수 있어야 한다. 물건마다 x(mm)를 달아 둔다.
       if (edit) el.insertAdjacentHTML('beforeend', `<i class="edit-x-tag">${Math.round(item.x)}</i>`);
 
@@ -795,7 +802,42 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
       layer.appendChild(el);
     }
+    layoutNames();
     if (focusedId) layer.querySelector(`[data-id="${focusedId}"]`)?.focus();
+  }
+
+  /**
+   * 이름표가 서로 겹치면 아래 줄로 내린다.
+   *
+   * 물건 사이가 좁으면 이름표끼리 부딪혀 글자가 겹쳐 읽을 수 없게 된다.
+   * 배치는 사람이 편집 모드에서 정하는 것이라 어떤 간격이 올지 여기서는 알 수 없다 —
+   * 그러니 배치를 제한하지 말고, 부딪히는 것만 한 줄 내린다.
+   * 왼쪽부터 훑으며 줄마다 "지금까지 찬 오른쪽 끝"을 기억해 첫 빈 줄에 앉힌다.
+   */
+  const NAME_ROW_PX = 15;   // index.html 의 .token-name 이 한 줄에 내려가는 거리와 같아야 한다
+  const NAME_GAP_PX = 4;
+
+  function layoutNames() {
+    const names = [...layer.querySelectorAll('.token-name')];
+    if (names.length === 0) return;
+    for (const n of names) n.style.removeProperty('--name-row');
+    // 선반 이름표와 작업면 이름표는 서로 부딪힐 일이 없다. 가로만 보고 밀면
+    // 한참 위아래로 떨어진 둘을 겹친 것으로 치고 애먼 이름표를 내려 보낸다 — 실제로 그랬다.
+    // 가로·세로를 함께 본다.
+    const placed = [];
+    const sorted = names
+      .map((n) => ({ el: n, r: n.getBoundingClientRect() }))
+      .sort((a, b) => a.r.left - b.r.left);
+    for (const { el, r } of sorted) {
+      let row = 0;
+      const clash = (dy) => placed.some((p) =>
+        r.left < p.right + NAME_GAP_PX && r.right + NAME_GAP_PX > p.left
+        && r.top + dy < p.bottom && r.bottom + dy > p.top);
+      while (clash(row * NAME_ROW_PX)) row++;
+      const dy = row * NAME_ROW_PX;
+      placed.push({ left: r.left, right: r.right, top: r.top + dy, bottom: r.bottom + dy });
+      if (row > 0) el.style.setProperty('--name-row', row);
+    }
   }
 
   function renderBar() {
