@@ -37,7 +37,7 @@ export const UI = {
     dialogTitle: '보고서 만들기',
     privacy: '이름과 학번은 <b>이 보고서를 만들 때만</b> 씁니다. 어디에도 저장하지 않고, 인쇄 창이 닫히면 화면에서도 지웁니다.',
     fields: [
-      { key: 'school', label: '학교', placeholder: '예: ○○중학교', width: 'wide' },
+      { key: 'school', label: '학교', placeholder: '예: ○○고등학교', width: 'wide' },
       { key: 'grade', label: '학년', placeholder: '예: 2' },
       { key: 'classNo', label: '반', placeholder: '예: 4' },
       { key: 'number', label: '번호', placeholder: '예: 17' },

@@ -288,10 +288,13 @@
   .report-dialog::backdrop{background:rgba(10,12,8,.55)}
   .report-dialog h2{font-size:16px;margin:0 0 10px}
   .rp-privacy{font-size:12.5px;color:var(--ink-mute);margin:0 0 16px;line-height:1.55}
-  .rp-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .rp-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute)}
+  /* input 은 아무것도 안 하면 기본 너비(약 20자)를 최소 폭으로 우긴다. 세 칸을 나란히 놓으면
+     그 합이 창보다 넓어져 번호 칸이 잘리고 가로 스크롤이 생겼다. 실제로 그랬다.
+     `min-width:0` 이 그걸 푼다. `minmax(0,1fr)` 은 그리드 쪽에서 같은 것을 한 번 더 막는다. */
+  .rp-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .rp-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute);min-width:0}
   .rp-field--wide{grid-column:1/-1}
-  .rp-field input{border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
+  .rp-field input{min-width:0;border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
     color:var(--ink);padding:8px;font:inherit}
   .rp-howto{font-size:12.5px;color:var(--ink-mute);margin:14px 0 0}
   .rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}

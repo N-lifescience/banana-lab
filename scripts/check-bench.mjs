@@ -594,6 +594,17 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await rp.waitForTimeout(150);
   ok(await rp.locator('#report-dialog').isVisible(), '탐구 노트에서 보고서 만들기 창을 연다');
 
+  // 좁은 창에서 창이 넘치는가. 처음엔 넘쳤다 — grid 트랙을 1fr 로 두면 트랙의 최소 폭이
+  // input 기본 너비(약 20자)라 세 칸이 창보다 넓어지고, 번호 칸이 잘린 채 가로 스크롤이 생긴다.
+  await rp.setViewportSize({ width: 480, height: 760 });
+  await rp.waitForTimeout(120);
+  const fit = await rp.evaluate(() => {
+    const d = document.querySelector('#report-dialog');
+    return { scrollW: d.scrollWidth, clientW: d.clientWidth };
+  });
+  ok(fit.scrollW <= fit.clientW, '좁은 창에서도 보고서 창이 가로로 넘치지 않는다', JSON.stringify(fit));
+  await rp.setViewportSize({ width: 1400, height: 900 });
+
   await rp.locator('#rp-name').fill('홍길동');
   await rp.locator('#rp-grade').fill('2');
   await rp.locator('#rp-make').click();

@@ -37,6 +37,46 @@ test('모든 애셋에 realSizeMm 이 선언돼 있다', () => {
   }
 });
 
+/**
+ * 그룹 안에 적힌 좌표 중 가장 작은 y. `<g id="...">` 부터 짝이 되는 `</g>` 까지를 본다.
+ * points/x·y/rect/line 어느 형태로 그렸든 숫자는 여기 다 들어온다.
+ */
+function topYOfGroup(svg, id) {
+  const start = svg.indexOf(`<g id="${id}"`);
+  assert.notEqual(start, -1, `#${id} 그룹이 없습니다`);
+  let depth = 0;
+  let i = start;
+  for (; i < svg.length; i++) {
+    if (svg.startsWith('<g', i)) depth++;
+    else if (svg.startsWith('</g>', i)) { depth--; if (depth === 0) break; }
+  }
+  const body = svg.slice(start, i);
+  const ys = [];
+  for (const [, v] of body.matchAll(/\b(?:y|y1|y2|cy)="(-?[\d.]+)"/g)) ys.push(Number(v));
+  for (const [, list] of body.matchAll(/\bpoints="([^"]+)"/g)) {
+    const nums = list.trim().split(/[\s,]+/).map(Number);
+    for (let k = 1; k < nums.length; k += 2) ys.push(nums[k]);
+  }
+  for (const [, d] of body.matchAll(/\bd="([^"]+)"/g)) {
+    const nums = d.match(/-?[\d.]+/g)?.map(Number) ?? [];
+    for (let k = 1; k < nums.length; k += 2) ys.push(nums[k]);
+  }
+  assert.ok(ys.length, `#${id} 에서 좌표를 하나도 못 읽었습니다`);
+  return Math.min(...ys);
+}
+
+test('실험대 배경의 랜드마크가 제자리에 있다', () => {
+  // 물건은 허공이 아니라 이 두 선에 **바닥을 대고** 선다 (src/ui/bench.js).
+  // 그림을 다시 그리면서 선반이나 작업면을 위아래로 옮기면 실험대 위 물건이 전부 뜨는데,
+  // 그림만 보면 멀쩡해 보여서 아무도 눈치채지 못한다. 벽·바닥 같은 분위기 도형은 #room 에 둔다.
+  const { shelfTopY, surfaceFrontY } = CONTRACT.bench.landmarks;
+  const svg = ASSETS.bench.render({});
+  assert.equal(topYOfGroup(svg, 'shelf'), shelfTopY,
+    `선반 상판 윗면이 y=${shelfTopY} 에 있어야 합니다 — 선반 위 물건이 뜹니다`);
+  assert.equal(topYOfGroup(svg, 'surface'), surfaceFrontY,
+    `작업면 앞 모서리가 y=${surfaceFrontY} 에 있어야 합니다 — 작업면 위 물건이 뜹니다`);
+});
+
 test('등록된 애셋은 render 와 applyState 를 모두 내보낸다', () => {
   for (const [name, mod] of Object.entries(ASSETS)) {
     assert.equal(typeof mod.render, 'function', `${name}.render 없음`);

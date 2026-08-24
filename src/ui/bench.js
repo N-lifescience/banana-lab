@@ -53,8 +53,9 @@ const heightMm = (assetName) => CONTRACT[assetName].realSizeMm * aspect(assetNam
  * 물건은 허공이 아니라 이 높이에 **바닥을 대고** 선다.
  * 숫자를 바꾸려면 배경 애셋의 좌표를 먼저 보라 — 둘이 어긋나면 물건이 떠 보인다.
  */
-const SHELF_MM = (65 / 300) * STAGE_H_MM;     // 선반 상판 윗면 (viewBox y=65)
-const SURFACE_MM = (155 / 300) * STAGE_H_MM;  // 작업면 앞 모서리 (viewBox y=155)
+const LANDMARKS = CONTRACT.bench.landmarks;
+const SHELF_MM = (LANDMARKS.shelfTopY / 300) * STAGE_H_MM;      // 선반 상판 윗면
+const SURFACE_MM = (LANDMARKS.surfaceFrontY / 300) * STAGE_H_MM; // 작업면 앞 모서리
 
 const DRAG_THRESHOLD_PX = 6;
 

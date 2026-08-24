@@ -178,10 +178,21 @@ export const CONTRACT = {
                      '#box-shade': { required: true, mutable: [] },
                      '#sheet': { required: true, mutable: ['opacity'] } } },
 
+  // 실험대 배경. `#room` 은 벽·바닥·천장 같은 분위기용이라 없어도 된다 —
+  // 대신 **랜드마크를 건드리면 안 된다**. 아래 landmarks 를 보라.
   bench:  { file: 'bench.js',  realSizeMm: 1500, viewBox: '0 0 400 300', states: [],
             nodes: { '#surface': { required: true, mutable: [] },
                      '#surface-shade': { required: true, mutable: [] },
-                     '#shelf': { required: true, mutable: [] } } },
+                     '#shelf': { required: true, mutable: [] },
+                     '#room': { required: false, mutable: [] } },
+            /**
+             * 물건이 **바닥을 대고 서는 선**. viewBox y 좌표다.
+             *
+             * `src/ui/bench.js` 가 이 값으로 선반 위·작업면 위 물건의 높이를 정한다.
+             * 그림을 다시 그리면서 이 선을 옮기면 실험대 위 물건이 전부 허공에 뜬다.
+             * 그러고도 화면은 멀쩡해 보인다 — 그래서 tests/assets.contract.test.js 가 지킨다.
+             */
+            landmarks: { shelfTopY: 65, surfaceFrontY: 155 } },
 };
 
 /** 계약에 선언된, 반드시 존재해야 하는 노드 id 목록 */
