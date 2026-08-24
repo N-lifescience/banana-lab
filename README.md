@@ -7,16 +7,41 @@
 목표다. 시료를 두껍게 바르면 빛이 통과하지 않고, 덮개 유리를 수직으로 떨어뜨리면 기포가 생기고,
 저배율에서 초점을 잡기 전에 고배율로 올리면 아무것도 보이지 않는다 — 실제와 똑같이.
 
+## 다른 탐구 실험도 이렇게 만들려면
+
+이 저장소는 **참조 구현**입니다. 같은 방식으로 다른 실험을 만들 수 있게 정리해 두었습니다.
+
+| 문서 | 누가 읽나 |
+|---|---|
+| [`NEW-EXPERIMENT.md`](NEW-EXPERIMENT.md) | **실험 하나를 새로 만드는 사람.** 갈아 끼울 파일 목록, 함정, 붙여 넣을 프롬프트 |
+| [`PLAYBOOK.md`](PLAYBOOK.md) | 왜 이렇게 만들었는지 알고 싶은 사람. 설계 원칙 |
+| [`MERGE-AND-DEPLOY.md`](MERGE-AND-DEPLOY.md) | **여러 실험을 하나로 묶고 배포하는 사람** |
+| [`AGENTS.md`](AGENTS.md) | 코드를 건드리는 에이전트. 어기면 안 되는 것 |
+
+여러 실험을 병렬로 만들 계획이라면, 각 세션은 이 저장소를 통째로 복제해 **독립된 앱**으로
+만듭니다. 공용 엔진을 먼저 만들지 마세요 — 무엇이 공통인지는 세 번째 실험이 나와야 압니다.
+자세한 이유와 순서는 `MERGE-AND-DEPLOY.md` 에 있습니다.
+
 ## 시작하기
 
 ```bash
 npm install
 npm run dev        # 개발 서버
-npm run check      # 테스트 + 아트 디렉션 린터
+npm run check      # 테스트 + 아트 디렉션 린터 (커밋 전 필수)
 npm run build      # 정적 빌드 (dist/)
 ```
 
-Node 20 이상.
+Node 20 이상. 서버도 데이터베이스도 환경변수도 없는 **정적 사이트**입니다.
+
+화면을 띄워야 알 수 있는 것은 따로 뺐습니다 — 커밋 게이트가 한 번이라도 헛발질하면
+그 뒤로 아무도 안 믿기 때문입니다.
+
+```bash
+node scripts/check-bench.mjs                       # 조작 UI (브라우저)
+npm run build && npm run preview                   # 다른 터미널에서
+node scripts/check-build.mjs                       # 배포본 연기 검사
+npm run dev  →  http://localhost:5173/?edit=1      # 실험대 배치 편집 모드
+```
 
 ## 저장소 구조
 
