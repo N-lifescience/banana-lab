@@ -5,6 +5,12 @@ export default defineConfig({
   build: {
     target: 'es2022',
     rollupOptions: {
+      // 개인정보처리방침은 앱과 따로 도는 정적 문서다. 자바스크립트가 필요 없으므로
+      // 진입점으로만 넣어 둔다 (harness.html 은 개발용이라 배포본에 넣지 않는다).
+      input: {
+        main: 'index.html',
+        privacy: 'privacy.html',
+      },
       output: { manualChunks: undefined }
     }
   },

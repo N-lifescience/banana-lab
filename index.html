@@ -335,6 +335,14 @@
   /* 종이는 화면에 두지 않는다. 인쇄할 때만 나타난다. */
   .report-sheet{display:none}
 
+  /* 개인정보처리방침 링크. 실험을 가리지 않도록 구석에 작게 두되 늘 닿을 수 있게 한다. */
+  .site-foot{position:fixed;right:10px;bottom:6px;z-index:40;font-size:11px;
+    background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:2px 7px;
+    opacity:.75}
+  .site-foot:hover,.site-foot:focus-within{opacity:1}
+  .site-foot a{color:var(--ink-mute);text-decoration:none}
+  .site-foot a:hover,.site-foot a:focus-visible{color:var(--ink);text-decoration:underline}
+
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
   /* ---- 인쇄 (= PDF로 저장) ----------------------------------------
@@ -343,7 +351,7 @@
   @media print{
     @page{margin:14mm}
     html,body{height:auto;background:#fff;color:#000}
-    .layout,#toast-region,#zoom,#start,.report-dialog{display:none!important}
+    .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
     .report-sheet{display:block}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .report-sheet{font-size:11pt;line-height:1.5}
@@ -400,6 +408,12 @@
   <div id="zoom" hidden></div>
   <div id="report"></div>
 </div>
+<!-- 개인정보처리방침 링크는 **정적 HTML 에** 둔다.
+     시작 화면은 자바스크립트가 그리므로, 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에는
+     아무것도 안 보인다. 사람에게도 늘 보여야 하는 링크라 화면 구석에 띄워 둔다. -->
+<footer class="site-foot">
+  <a href="/privacy">개인정보처리방침</a>
+</footer>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>

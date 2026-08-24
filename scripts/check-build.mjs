@@ -98,6 +98,47 @@ await page.waitForTimeout(200);
 ok(await page.locator('#report-dialog').isVisible(), '보고서 창이 열린다');
 await page.keyboard.press('Escape');
 
+/* ---------- 개인정보처리방침 ----------
+   자바스크립트가 그리는 링크는 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에 안 보인다.
+   정적 HTML 에 들어 있는지를 본다. */
+const homeHtml = await (await fetch(BASE)).text();
+ok(/href=["']\/privacy["']/.test(homeHtml),
+   '개인정보처리방침 링크가 정적 HTML 에 있다');
+const privacyRes = await page.goto(`${BASE}/privacy`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+ok(privacyRes && privacyRes.status() === 200 && /개인정보처리방침/.test(await page.title()),
+   '/privacy 가 열린다', privacyRes ? `HTTP ${privacyRes.status()}` : '응답 없음');
+ok(/수집하지 않습니다/.test(await page.content()), '방침이 무엇을 수집하는지 밝힌다');
+
+/* ---------- 보안 응답 헤더 ----------
+   vercel.json 이 붙이는 것이라 로컬 preview 에서는 확인할 수 없다.
+   BASE 가 배포 주소일 때만 잰다 — 로컬에서 통과했다고 배포본이 통과한 게 아니다. */
+if (BASE.startsWith('https://')) {
+  const res = await fetch(BASE, { redirect: 'follow' });
+  const want = {
+    'content-security-policy': /default-src/,
+    'strict-transport-security': /max-age=\d+/,
+    'x-frame-options': /DENY|SAMEORIGIN/i,
+    'x-content-type-options': /nosniff/i,
+    'referrer-policy': /\S/,
+    'permissions-policy': /\S/,
+  };
+  const missing = Object.entries(want)
+    .filter(([k, re]) => !re.test(res.headers.get(k) ?? ''))
+    .map(([k]) => k);
+  ok(missing.length === 0, '보안 응답 헤더 6종이 붙는다', missing.join(', '));
+
+  const csp = res.headers.get('content-security-policy') ?? '';
+  ok(!/unsafe-eval/.test(csp) && /script-src 'self'/.test(csp),
+     'CSP 가 스크립트를 자기 출처로 제한한다', csp.slice(0, 80));
+
+  const http = await fetch(BASE.replace('https://', 'http://'), { redirect: 'manual' });
+  ok(http.status >= 300 && http.status < 400
+     && (http.headers.get('location') ?? '').startsWith('https://'),
+     'HTTP 요청이 HTTPS 로 넘어간다', `HTTP ${http.status}`);
+} else {
+  console.log('  건너뜀  보안 응답 헤더 — BASE 가 배포 주소일 때만 잽니다');
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
