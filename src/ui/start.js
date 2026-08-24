@@ -33,7 +33,6 @@ export function createStart(root, onStart, initial = 1) {
           </button>`).join('')}
       </div>
       <button type="button" class="start-go" id="start-go"></button>
-      <p class="start-note">${S.note}</p>
     </div>`;
 
   const goBtn = root.querySelector('#start-go');

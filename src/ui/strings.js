@@ -24,7 +24,48 @@ export const UI = {
         desc: '단계마다 목표만 주어집니다. 물건에 마우스를 올려도 이름만 뜹니다. 되돌리기는 1회입니다.' },
     ],
     go: (name) => `${name.split(' —')[0]}로 시작하기`,
-    note: '주소 끝에 ?level=2 를 붙이면 이 화면을 건너뛰고 바로 그 단계로 들어갑니다.',
+  },
+
+  /**
+   * 보고서 — 수행 과정과 결과를 종이 한 벌로 내보낸다.
+   *
+   * 이름과 학번은 **이때만** 받는다. 실험하는 동안에는 묻지 않고, 받은 것도 저장하지 않는다.
+   * 상태(store)에도 넣지 않는다 — 되돌리기 기록에 남고 화면 곳곳으로 흘러 다니게 된다.
+   */
+  report: {
+    button: '보고서 만들기',
+    dialogTitle: '보고서 만들기',
+    privacy: '이름과 학번은 <b>이 보고서를 만들 때만</b> 씁니다. 어디에도 저장하지 않고, 인쇄 창이 닫히면 화면에서도 지웁니다.',
+    fields: [
+      { key: 'school', label: '학교', placeholder: '예: ○○중학교', width: 'wide' },
+      { key: 'grade', label: '학년', placeholder: '예: 2' },
+      { key: 'classNo', label: '반', placeholder: '예: 4' },
+      { key: 'number', label: '번호', placeholder: '예: 17' },
+      { key: 'name', label: '이름', placeholder: '예: 홍길동', width: 'wide' },
+    ],
+    make: 'PDF로 저장하기',
+    cancel: '취소',
+    // 브라우저 인쇄 창을 쓴다. 학생이 여기서 길을 잃지 않도록 한 줄로 짚어 준다.
+    howto: '인쇄 창이 열리면 프린터를 <b>“PDF로 저장”</b> 으로 고른 뒤 저장하세요.',
+    sheetTitle: '탐구 보고서 — 바나나에서 탄수화물과 지질 관찰하기',
+    levelLabel: '단계',
+    dateLabel: '작성일',
+    blank: '—',
+    notWritten: '적지 않았습니다',
+    sections: {
+      problem: '1. 문제 인식',
+      materials: '2. 준비물',
+      predict: '3. 예상',
+      process: '4. 탐구 과정',
+      result: '5. 결과',
+      wrapup: '6. 정리',
+      selfEval: '7. 자기 평가',
+    },
+    predictWhy: '까닭',
+    magAnswer: '학생이 적은 총배율',
+    noCaptures: '기록한 결과가 없습니다.',
+    likertHead: ['문항', '점수'],
+    date: (d) => `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`,
   },
 
   slides: { A: '(가) 대조군', B: '(나) 아이오딘–아이오딘화 칼륨', C: '(다) 수단 Ⅲ' },

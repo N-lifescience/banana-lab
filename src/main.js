@@ -12,6 +12,7 @@ import { createBench } from './ui/bench.js';
 import { createZoom } from './ui/zoom.js';
 import { createNotebook } from './ui/notebook.js';
 import { createStart } from './ui/start.js';
+import { createReport } from './ui/report.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -78,8 +79,9 @@ function boot(level) {
 
   const zoom = createZoom($('#zoom'), store);
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
+  const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom });
-  createNotebook($('#notebook'), store, { onOpenZoom: openZoom });
+  createNotebook($('#notebook'), store, { onOpenZoom: openZoom, onReport: report.open });
 
   startClock();
 }

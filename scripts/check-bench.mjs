@@ -583,6 +583,56 @@ const marked3 = await page.locator('.token--target').count();
 await page.mouse.up();
 ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된다', `${marked3}개`);
 
+/* ---------- 보고서 — 화면에서 이름을 받고, 종이에만 남는가 ---------- */
+{
+  const rp = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  // 인쇄 창이 뜨면 스크립트가 거기서 멈춘다. 브라우저 창을 여는 것 자체가 검사 대상은 아니다.
+  await rp.addInitScript(() => { window.print = () => {}; });
+  await rp.goto(`${BASE}/?level=2`, { waitUntil: 'networkidle' });
+
+  await rp.locator('#make-report').click();
+  await rp.waitForTimeout(150);
+  ok(await rp.locator('#report-dialog').isVisible(), '탐구 노트에서 보고서 만들기 창을 연다');
+
+  await rp.locator('#rp-name').fill('홍길동');
+  await rp.locator('#rp-grade').fill('2');
+  await rp.locator('#rp-make').click();
+  await rp.waitForTimeout(200);
+
+  const sheet = await rp.locator('#report-sheet').innerHTML();
+  ok(sheet.includes('홍길동') && sheet.includes('탐구 보고서'),
+     '넣은 이름이 보고서에 실린다', `종이 ${sheet.length}자`);
+
+  // 가장 중요한 것 — 이름이 상태로 새지 않는다. 새면 되돌리기 기록에 남고 화면 곳곳으로 흘러간다.
+  const leaked = await rp.evaluate(() => ({
+    store: JSON.stringify(window.__store.getState()).includes('홍길동'),
+    storage: JSON.stringify({ ...localStorage, ...sessionStorage }).includes('홍길동'),
+  }));
+  ok(!leaked.store && !leaked.storage,
+     '이름이 상태에도 브라우저 저장소에도 남지 않는다', JSON.stringify(leaked));
+
+  // 인쇄 모양에서 실험대는 사라지고 종이만 남는가
+  await rp.emulateMedia({ media: 'print' });
+  await rp.waitForTimeout(120);
+  const printed = await rp.evaluate(() => ({
+    layout: getComputedStyle(document.querySelector('.layout')).display,
+    sheet: getComputedStyle(document.querySelector('#report-sheet')).display,
+  }));
+  ok(printed.layout === 'none' && printed.sheet !== 'none',
+     '인쇄하면 실험대는 빠지고 보고서만 나온다', JSON.stringify(printed));
+  await rp.emulateMedia({ media: 'screen' });
+
+  // 인쇄 창이 닫히면 이름이 화면에서도 지워지는가
+  await rp.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  const after = await rp.evaluate(() => ({
+    sheet: document.querySelector('#report-sheet').innerHTML.length,
+    inputs: [...document.querySelectorAll('[data-field]')].map((e) => e.value).join(''),
+  }));
+  ok(after.sheet === 0 && after.inputs === '',
+     '인쇄가 끝나면 이름이 화면에서 지워진다', JSON.stringify(after));
+  await rp.close();
+}
+
 /* ---------- 결과 ---------- */
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 

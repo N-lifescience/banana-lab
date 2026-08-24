@@ -29,7 +29,7 @@ export const ASSETS = {
  * 그림을 다시 그려야 하는 애셋. 계약과 상호작용은 이미 붙어 있고 형태만 자리표시다.
  * 붙여 넣을 지시는 tasks/T17-PROMPT.md 에 있다.
  */
-export const PENDING = ['coverbox'];
+export const PENDING = [];
 
 /** 린터와 UI가 함께 쓰는 대표 상태 조합. 애셋마다 최소 이 상태들에서 검사한다. */
 export const SAMPLE_STATES = {

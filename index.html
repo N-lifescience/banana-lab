@@ -279,7 +279,73 @@
   .ctrl-group input[type=range]{flex:1;accent-color:var(--indigo)}
   .zoom-empty{color:var(--ink-mute);font-size:13.5px}
 
+  /* 보고서 만들기 — 이름을 받는 창. <dialog> 라 포커스 가두기와 Esc 는 브라우저가 한다. */
+  .note-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .note-head h1{margin-bottom:14px}
+  #make-report{padding:6px 11px;font-size:12.5px;white-space:nowrap}
+  .report-dialog{border:1px solid var(--rule);border-radius:10px;background:var(--surface);
+    color:var(--ink);max-width:460px;width:calc(100% - 40px);padding:22px}
+  .report-dialog::backdrop{background:rgba(10,12,8,.55)}
+  .report-dialog h2{font-size:16px;margin:0 0 10px}
+  .rp-privacy{font-size:12.5px;color:var(--ink-mute);margin:0 0 16px;line-height:1.55}
+  .rp-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .rp-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute)}
+  .rp-field--wide{grid-column:1/-1}
+  .rp-field input{border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
+    color:var(--ink);padding:8px;font:inherit}
+  .rp-howto{font-size:12.5px;color:var(--ink-mute);margin:14px 0 0}
+  .rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  .rp-actions button{padding:9px 14px;font-size:13.5px}
+  #rp-make{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
+  /* 종이는 화면에 두지 않는다. 인쇄할 때만 나타난다. */
+  .report-sheet{display:none}
+
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ---- 인쇄 (= PDF로 저장) ----------------------------------------
+     화면 UI 를 통째로 감추고 보고서만 남긴다. 시야 그림은 색이 곧 결과이므로
+     배경색을 반드시 함께 인쇄한다 — 색이 빠지면 청람색도 선홍색도 없는 종이가 된다. */
+  @media print{
+    @page{margin:14mm}
+    html,body{height:auto;background:#fff;color:#000}
+    .layout,#toast-region,#zoom,#start,.report-dialog{display:none!important}
+    .report-sheet{display:block}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .report-sheet{font-size:11pt;line-height:1.5}
+    .rp-head{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px}
+    .rp-head h1{font-size:15pt;margin:0 0 10px}
+    .rp-who{display:flex;flex-wrap:wrap;gap:4px 22px;margin:0;font-size:10pt}
+    .rp-who div{display:flex;gap:6px}
+    .rp-who dt{color:#555}
+    .rp-who dd{margin:0;font-weight:600}
+    .report-sheet section{break-inside:avoid;margin-bottom:16px}
+    .report-sheet h2{font-size:12pt;margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid #999}
+    .report-sheet h3{font-size:10.5pt;margin:0 0 4px}
+    .rp-row{break-inside:avoid;margin-bottom:10px}
+    .rp-row p{margin:0}
+    .rp-sub{color:#555;font-size:10pt}
+    .rp-steps{list-style:none;margin:0;padding:0}
+    .rp-steps li{display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:10px;
+      padding:3px 0;border-bottom:1px dotted #bbb;font-size:10pt;break-inside:avoid}
+    .rp-steps li span{color:#222}
+    .rp-pair{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:10.5pt}
+    .rp-pair div{display:contents}
+    .rp-pair dt{color:#555}
+    .rp-pair dd{margin:0}
+    /* 결과 카드는 두 장씩 나란히. 세 장이 각각 한 쪽을 차지하면 종이가 낭비된다. */
+    .rp-captures{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .rp-capture{border:1px solid #999;border-radius:4px;padding:8px;break-inside:avoid}
+    /* 시야는 정사각형이라 칸을 꽉 채우면 한 장이 종이 반쪽을 먹는다. 셋이 한 쪽에 들어가게 묶는다. */
+    .rp-fov svg{width:100%;max-width:55mm;height:auto;display:block;margin:0 auto}
+    .rp-readout{margin:6px 0 0;font-size:9.5pt}
+    .rp-readout div{display:flex;gap:6px}
+    .rp-readout dt{color:#555}
+    .rp-readout dd{margin:0}
+    .rp-likert{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:12px}
+    .rp-likert th,.rp-likert td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left}
+    .rp-likert th{border-bottom-width:1.5px;border-bottom-color:#666}
+    .rp-likert td:last-child{white-space:nowrap;width:1%}
+  }
 
   /* 터치 기기에서 손가락으로 누르는 버튼은 44px 이상. 실험대 물건(.token)은
      ::after 로 이미 보장하므로 여기서는 나머지 버튼만 다룬다. */
@@ -297,6 +363,7 @@
   </div>
   <div id="toast-region"></div>
   <div id="zoom" hidden></div>
+  <div id="report"></div>
 </div>
 <script type="module" src="/src/main.js"></script>
 </body>

@@ -23,7 +23,7 @@ const N = UI.notebook;
 // ponytail: 임계값 추정치. docs/06 에 정확한 수치가 없다 — 체감상 어긋나면 이 숫자만 바꾸면 된다.
 const LOW_OBSERVABILITY = 60;
 
-const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+export const escapeHtml = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
 /**
  * 관찰 기록 칸에 흐리게 띄울 예시 문구.
@@ -47,7 +47,7 @@ function substepId(group, i) {
 }
 
 /** notes 키 '3b' 를 "STEP 3 · 색 변화 관찰" 같은 사람이 읽는 문장으로. */
-function stepNoteLabel(key) {
+export function stepNoteLabel(key) {
   const m = /^([1-6])([a-z])?$/.exec(key);
   if (!m) return key;
   const group = UI.protocol.find((g) => g.id === m[1]);
@@ -56,11 +56,42 @@ function stepNoteLabel(key) {
   return `STEP ${group.id} · ${title ?? group.title}`;
 }
 
-export function createNotebook(root, store, { onOpenZoom }) {
+/**
+ * 실제로 **무엇이 보였는가**.
+ *
+ * 예전에는 시약 이름("아이오딘–아이오딘화 칼륨")을 돌려줬다. 그런데 이 자리는 예상과
+ * 견주는 자리다 — 학생이 "청람색 알갱이가 보인다" 고 예상했는데 실제 결과가 시약 이름이면
+ * 견줄 것이 없다. (가) 대조군은 아예 "없음" 이라 아무 정보도 아니었다.
+ * 눈으로 본 것을 말한다.
+ *
+ * 보고서(`report.js`)도 같은 문장을 쓴다 — 화면과 종이가 다른 말을 하면 안 된다.
+ */
+export function actualSummary(st, slideId) {
+  const cap = [...st.session.captures].reverse().find((c) => c.slide === slideId);
+  const s = st.slides[slideId];
+  const stain = cap ? cap.reagent : s.stain;
+  const reacted = cap ? (cap.reactionT ?? 0) : s.reactionT;
+
+  let seen;
+  if (!stain) seen = N.actualNone;
+  else if (reacted < 0.7) seen = N.actualPending;
+  else seen = stain === 'IKI' ? N.actualStarch : N.actualLipid;
+
+  if (!cap) return `${seen} ${N.actualNotCaptured}`;
+  return `${seen} (${UI.observability.label} ${observability(cap).score})`;
+}
+
+export function createNotebook(root, store, { onOpenZoom, onReport }) {
   root.innerHTML = `
-    <h1>${N.heading}</h1>
+    <div class="note-head">
+      <h1>${N.heading}</h1>
+      <button type="button" id="make-report">${UI.report.button}</button>
+    </div>
     <div id="note-tabs" class="note-tabs" role="tablist"></div>
     <div id="note-panel" class="note-panel"></div>`;
+
+  // 보고서는 탐구 노트가 내놓는 것이라 여기 둔다. 여는 일만 넘기고, 만드는 일은 report.js 가 한다.
+  root.querySelector('#make-report').addEventListener('click', () => onReport?.());
 
   const tabsEl = root.querySelector('#note-tabs');
   const panelEl = root.querySelector('#note-panel');
@@ -257,29 +288,6 @@ export function createNotebook(root, store, { onOpenZoom }) {
   /* ---------------------------------------------------------------- */
   /* 6 정리 — 서술형 3문항 + 첨삭, 세부 단계 기록·예상 재복습, 성찰 문항  */
   /* ---------------------------------------------------------------- */
-
-  /**
-   * 실제로 **무엇이 보였는가**.
-   *
-   * 예전에는 시약 이름("아이오딘–아이오딘화 칼륨")을 돌려줬다. 그런데 이 자리는 예상과
-   * 견주는 자리다 — 학생이 "청람색 알갱이가 보인다" 고 예상했는데 실제 결과가 시약 이름이면
-   * 견줄 것이 없다. (가) 대조군은 아예 "없음" 이라 아무 정보도 아니었다.
-   * 눈으로 본 것을 말한다.
-   */
-  function actualSummary(st, slideId) {
-    const cap = [...st.session.captures].reverse().find((c) => c.slide === slideId);
-    const s = st.slides[slideId];
-    const stain = cap ? cap.reagent : s.stain;
-    const reacted = cap ? (cap.reactionT ?? 0) : s.reactionT;
-
-    let seen;
-    if (!stain) seen = N.actualNone;
-    else if (reacted < 0.7) seen = N.actualPending;
-    else seen = stain === 'IKI' ? N.actualStarch : N.actualLipid;
-
-    if (!cap) return `${seen} ${N.actualNotCaptured}`;
-    return `${seen} (${UI.observability.label} ${observability(cap).score})`;
-  }
 
   function renderStepNotesRecap(st) {
     const rows = Object.entries(st.session.notes)
