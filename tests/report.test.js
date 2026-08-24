@@ -60,6 +60,23 @@ test('넣지 않은 개인정보 칸은 종이에 아예 나오지 않는다', (
   assert.ok(!html.includes('>학교<'), '비워 둔 학교 칸이 종이에 빈 항목으로 남습니다');
 });
 
+test('학생이 쓴 글은 태그로 해석되지 않는다', () => {
+  // 이 글은 학생 자기 화면에만 들어가지만, 보고서로 인쇄돼 남에게 건네진다.
+  // 따옴표까지 막지 않으면 속성 안에 들어갈 때 새 속성을 붙일 수 있다 (5단계 배율 칸).
+  let st = initialState(1);
+  const payload = `<img src=x onerror=alert(1)>" onfocus="alert(2)`;
+  for (const step of ['q2', 'mag.0', 'predict.A', '1a', 'feedback.learned']) {
+    st = reduce(st, { type: 'SAVE_NOTE', payload: { step, text: payload } }).state;
+  }
+  const html = buildSheet(st, { name: payload });
+  // "onerror=alert" 라는 **글자**는 남는다 — 그게 학생이 쓴 내용이고, 글자로 보이는 것이 맞다.
+  // 봐야 할 것은 그것이 태그나 속성으로 **해석되는가** 다.
+  assert.ok(!html.includes('<img src=x'), '학생이 쓴 태그가 그대로 들어갔습니다');
+  assert.ok(!html.includes('" onfocus='), '따옴표로 속성을 빠져나갈 수 있습니다');
+  assert.ok(html.includes('&lt;img'), '글자로는 남아 있어야 합니다');
+  assert.ok(html.includes('&quot;'), '따옴표가 인코딩되지 않았습니다');
+});
+
 test('보고서는 개인정보를 상태에도 저장소에도 보내지 않는다', () => {
   // 이름을 store 에 넣으면 되돌리기 기록에 남고, 상태를 읽는 모든 화면으로 흘러간다.
   assert.ok(!/\.dispatch\(/.test(SOURCE),
