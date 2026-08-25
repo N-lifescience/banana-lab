@@ -14,6 +14,7 @@
  * 비용을 지배하는 것은 세포 수가 아니라 녹말립 수이기 때문이다.
  */
 
+import { devUrl } from '../dev-port.js';
 import { renderFOV } from '../src/render/fov.js';
 
 const BASE = {
@@ -69,7 +70,7 @@ try {
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
-await page.goto(process.env.SHOT_URL ?? 'http://localhost:5173', { waitUntil: 'networkidle' });
+await page.goto(process.env.SHOT_URL ?? devUrl(), { waitUntil: 'networkidle' });
 
 console.log('브라우저 — SVG 주입 후 강제 레이아웃까지 (' + N + '회 평균)\n');
 for (const r of rows) {

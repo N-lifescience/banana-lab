@@ -10,7 +10,13 @@
  * 처음부터 끝까지 도는지를 본다. 여기서 걸리는 것은 개발 서버에서는 절대 안 보인다.
  */
 
-const BASE = process.env.BASE ?? 'http://localhost:4173';
+import { previewUrl } from '../dev-port.js';
+import { benchLayout } from '../src/ui/bench.js';
+
+/** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
+const ITEM_COUNT = benchLayout().length;
+
+const BASE = process.env.BASE ?? previewUrl();
 const out = [];
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
 
@@ -31,13 +37,13 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(BASE, { waitUntil: 'networkidle' });
 
 /* ---------- 시작 화면 ---------- */
-ok(await page.locator('.start-level').count() === 3, '시작 화면에 단계 셋이 있다');
+ok(await page.locator('.start-level[data-level]').count() === 3, '시작 화면에 단계 셋이 있다');
 await page.locator('.start-level[data-level="1"]').click();
 await page.locator('#start-go').click();
 await page.waitForTimeout(300);
-ok(await page.locator('.token').count() === 14, '실험대에 물건 14개가 놓인다',
+ok(await page.locator('.token').count() === ITEM_COUNT, `실험대에 물건 ${ITEM_COUNT}개가 놓인다`,
    `${await page.locator('.token').count()}개`);
-ok(await page.locator('.token-name').count() === 14, '이름표가 보인다');
+ok(await page.locator('.token-name').count() === ITEM_COUNT, '이름표가 보인다');
 
 /* ---------- 뒷문이 닫혀 있는가 ---------- */
 ok(await page.evaluate(() => window.__store === undefined),
@@ -64,6 +70,20 @@ errors.length = errorsBeforeProbe;
 await page.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
 
+/*
+ * 실험대는 탐구 노트 1~4 쪽을 읽어야 열린다. 다른 검사 스크립트는 `window.__store` 로
+ * 질러가지만 **배포본에는 그 뒷문이 없다** — 여기서는 학생과 똑같이 눌러서 연다.
+ * 덕분에 잠금 자체가 배포본에서 도는지도 같이 확인된다.
+ */
+ok(await page.locator('#bench-lock').isVisible(), '처음에는 실험대가 잠겨 있다');
+for (const stage of ['1', '2', '3', '4']) {
+  await page.locator(`.note-tab[data-stage="${stage}"]`).click();
+  await page.waitForTimeout(80);
+  await page.locator('#mark-read').click();
+  await page.waitForTimeout(80);
+}
+ok(await page.locator('#bench-lock').isHidden(), '1~4 쪽을 읽으면 실험대가 열린다');
+
 const box = async (sel) => page.locator(sel).boundingBox();
 const center = (b) => [b.x + b.width / 2, b.y + b.height / 2];
 async function drag(from, to) {
@@ -83,20 +103,77 @@ await drag('[data-id="banana"]', '[data-id="slideB"]');
 const smeared = await page.locator('[data-id="slideB"] #smear').count();
 ok(smeared === 1, '바나나를 껍질 벗겨 받침 유리에 문지를 수 있다');
 
-await drag('[data-id="slideB"]', '[data-id="microscope"]');
-await page.waitForTimeout(250);
-await page.locator('[data-id="microscope"]').click();
-await page.waitForTimeout(400);
-ok(await page.locator('#fov-slot svg').count() === 1, '현미경으로 시야를 볼 수 있다');
-ok(await page.locator('#capture').isVisible(), '결과를 기록할 수 있다');
-await page.keyboard.press('Escape');
+/*
+ * (가)(나)(다)를 한 장씩 올려 기록한다. 재물대에는 한 장만 올라가고 바꿔 올리면
+ * 앞의 것이 실험대로 돌아온다 (rules.js MOUNT) — 그래서 내리는 조작이 따로 없다.
+ */
+for (const [i, id] of ['B', 'A', 'C'].entries()) {
+  await drag(`[data-id="slide${id}"]`, '[data-id="microscope"]');
+  await page.waitForTimeout(250);
+  await page.locator('[data-id="microscope"]').click();
+  await page.waitForTimeout(400);
+  if (i === 0) {
+    ok(await page.locator('#fov-slot svg').count() === 1, '현미경으로 시야를 볼 수 있다');
+    ok(await page.locator('#capture').isVisible(), '결과를 기록할 수 있다');
+  }
+  await page.locator('#capture').click();
+  await page.waitForTimeout(150);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+}
 
-/* ---------- 보고서 ---------- */
+/* ---------- 보고서 ----------
+   「보고서 만들기」는 다 마무리해야 나온다 (notebook.js 의 reportReadiness).
+   다른 스크립트는 `window.__store` 로 상태를 채워 질러가지만 배포본에는 그 뒷문이 없다.
+   여기서는 학생과 똑같이 칸을 채운다 — 채우는 길 자체가 배포본에서 도는지도 함께 본다. */
+ok(await page.locator('.report-todo').count() === 1,
+   '마무리 전에는 단추 대신 남은 일이 적혀 있다');
+
+for (const stage of await page.locator('.note-tab').evaluateAll((els) => els.map((e) => e.dataset.stage))) {
+  await page.locator(`.note-tab[data-stage="${stage}"]`).click();
+  await page.waitForTimeout(80);
+
+  // 서술형 — 값을 넣고 change 를 알린다. 이 앱은 change 에서만 저장한다.
+  await page.locator('#note-panel [data-note]:not([type="radio"])').evaluateAll((els) => {
+    for (const el of els) {
+      if (String(el.value ?? '').trim()) continue;
+      el.value = '색과 모양이 조건에 따라 달랐고, 그것을 근거로 판단했습니다.';
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+
+  // 자기 평가는 라디오다. 값을 넣는 것이 아니라 고르는 것이고, 하나 고를 때마다
+  // 화면이 다시 그려지므로 묶음마다 그때그때 다시 찾는다.
+  const radioNames = await page.locator('#note-panel input[type="radio"][data-note]')
+    .evaluateAll((els) => [...new Set(els.map((e) => e.name))]);
+  for (const name of radioNames) {
+    await page.locator(`#note-panel input[type="radio"][name="${name}"]`).first().check();
+    await page.waitForTimeout(60);
+  }
+
+  // 선택형(예상·자기 평가) — 누를 때마다 다시 그려지므로 키마다 그때그때 다시 찾는다.
+  for (const attr of ['data-choice', 'data-reflect']) {
+    const keys = await page.locator(`#note-panel [${attr}]`)
+      .evaluateAll((els, a) => [...new Set(els.map((e) => e.getAttribute(a)))], attr);
+    for (const key of keys) {
+      await page.locator(`#note-panel [${attr}="${key}"]`).first().click();
+      await page.waitForTimeout(60);
+    }
+  }
+}
+
 await page.addInitScript(() => { window.print = () => {}; });
-await page.locator('#make-report').click();
-await page.waitForTimeout(200);
-ok(await page.locator('#report-dialog').isVisible(), '보고서 창이 열린다');
-await page.keyboard.press('Escape');
+
+// 안 나왔으면 **무엇이 남았는지**를 함께 적는다. "단추가 없다" 만으로는 고칠 수가 없다.
+const left = await page.locator('.report-todo li').allTextContents();
+const ready = await page.locator('#make-report').count() === 1;
+ok(ready, '다 마무리하면 보고서 단추가 나온다', left.length ? `남은 것: ${left.join(' · ')}` : '');
+if (ready) {
+  await page.locator('#make-report').click();
+  await page.waitForTimeout(200);
+  ok(await page.locator('#report-dialog').isVisible(), '보고서 창이 열린다');
+  await page.keyboard.press('Escape');
+}
 
 /* ---------- 개인정보처리방침 ----------
    자바스크립트가 그리는 링크는 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에 안 보인다.

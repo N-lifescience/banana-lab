@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { DEV_PORT, PREVIEW_PORT } from './dev-port.js';
 
 export default defineConfig({
   // 학교 네트워크에서 단일 파일로 배포해야 하는 경우가 있어 청크를 쪼개지 않는다.
@@ -14,5 +15,7 @@ export default defineConfig({
       output: { manualChunks: undefined }
     }
   },
-  server: { port: 5173, open: false }
+  // strictPort 인 이유는 dev-port.js 에 적어 두었다 — 밀려나느니 안 뜨는 편이 낫다.
+  server: { port: DEV_PORT, strictPort: true, open: false },
+  preview: { port: PREVIEW_PORT, strictPort: true, open: false }
 });

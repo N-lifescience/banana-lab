@@ -11,9 +11,10 @@
  * Playwright 가 없으면 안내만 하고 조용히 끝난다.
  */
 
+import { devUrl } from '../dev-port.js';
 import { mkdirSync } from 'node:fs';
 
-const url = process.env.SHOT_URL ?? 'http://localhost:5173';   // 하네스는 SHOT_URL=http://localhost:5173/harness.html
+const url = process.env.SHOT_URL ?? devUrl();   // 하네스는 SHOT_URL=<주소>/harness.html
 const selector = process.argv[2] ?? null;
 const name = process.argv[3] ?? 'harness';
 

@@ -18,6 +18,7 @@
  *   5. 되돌리기 표시에 Infinity 가 새지 않는가
  *   6. 라이트/다크 스크린샷
  */
+import { devUrl } from '../dev-port.js';
 
 import { mkdirSync } from 'node:fs';
 
@@ -33,7 +34,7 @@ mkdirSync('shots', { recursive: true });
 
 // 난이도를 주소로 정하면 시작 화면을 건너뛴다. 이 스크립트가 볼 것은 그 뒤의 조작이라
 // 매번 시작 화면을 클릭해 넘길 이유가 없다 (시작 화면 자체는 check-bench.mjs 가 본다).
-const URL_BASE = process.env.SHOT_URL ?? 'http://localhost:5173/?level=1';
+const URL_BASE = process.env.SHOT_URL ?? devUrl('/?level=1');
 const results = [];
 const record = (ok, label, detail = '') => {
   results.push({ ok, label, detail });

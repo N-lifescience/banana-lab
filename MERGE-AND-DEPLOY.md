@@ -48,7 +48,7 @@ lab/
     sim/store.js             createStore · UNDO · SAVE_NOTE · TICK · CAPTURE
   experiments/
     banana/                  실험 하나 = 폴더 하나
-      manifest.js            id · 제목 · 설명 · 진입점
+      manifest.js            id · 제목 · 설명 · 교육과정 자리 (실험 세션이 채워 온다)
       palette.js             이 실험의 시약색·반응색
       sim/  render/  assets/  ui/strings.js  layout.js  tests/
     onion/
@@ -68,6 +68,14 @@ lab/
 `npm run check` 가 잡습니다.
 
 `registry.js` 는 **합치는 사람만** 씁니다. 실험 세션은 건드리지 않습니다.
+`manifest.js` 는 반대로 **실험 세션이 채워 옵니다** — 클론에 `src/manifest.js` 로 들어
+있고, `validateManifest()` 와 `tests/manifest.test.js` 가 규약을 지키게 합니다.
+합치는 사람이 할 일은 `experiments/<id>/manifest.js` 로 옮기고 `entry` 를 붙이는 것뿐입니다.
+
+카드에 쓸 값이 이미 다 들어 있습니다 — 제목·한 문장 설명·난이도·뼈대,
+그리고 **`curriculum`(교육과정 자리 목록)**. 마지막 것이 목록 화면을 만듭니다:
+같은 실험이 여러 교과서에 걸리므로 화면은 실험을 한 번만 두고 교과별로 **비춰 보여** 줍니다.
+교과서 수만큼 실험을 복제하지 않는 것이 규모가 커졌을 때 유일하게 중요한 결정입니다.
 
 ---
 

@@ -1,11 +1,12 @@
 ﻿/** T08 브라우저 검증 — 어포던스가 실제로 화면에 나타나는지. */
+import { devUrl } from '../dev-port.js';
 import { chromium } from 'playwright';
 import { benchLayout } from '../src/ui/bench.js';
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 여기에 숫자를 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
 
-const BASE = process.env.BASE ?? 'http://localhost:5173';
+const BASE = process.env.BASE ?? devUrl();
 const out = [];
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
 
