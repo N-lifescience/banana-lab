@@ -15,9 +15,9 @@
 
 import {
   REAGENTS, SLIDE_IDS, coverage, excess, focusError, brightness, isTooThick, fieldParams,
-  HISTORY_LIMIT, PAN_LIMIT,
+  isStaining, initialSlide, HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
-import { focusTolerance } from './optics.js';
+import { focusTolerance, EYEPIECE } from './optics.js';
 
 export { PAN_LIMIT };
 
@@ -28,7 +28,11 @@ export { PAN_LIMIT };
  * 이걸 쌓으면 1초마다 도는 TICK 이 20칸짜리 기록을 몇 초 만에 밀어내고,
  * 되돌리기 1회짜리 3단계에서는 그 한 번이 TICK 을 무르는 데 쓰여 사라진다.
  */
-export const TRANSIENT_ACTIONS = new Set(['TICK', 'MOVE_STAGE', 'NOTE_VIOLATION']);
+export const TRANSIENT_ACTIONS = new Set([
+  'TICK', 'MOVE_STAGE', 'NOTE_VIOLATION',
+  // 탐구 노트의 어느 쪽을 읽었는지는 학생이 "한" 조작이 아니다. 되돌릴 것도 아니다.
+  'MARK_READ',
+]);
 
 /**
  * 연속 조작 — 슬라이더 한 번 끄는 동안 수십 번 디스패치된다.
@@ -156,8 +160,10 @@ export const ACTIONS = {
     }
     const drops = s.drops + count;
     const contaminated = s.contaminated || (!state.tools.dropper.rinsed && s.stain && s.stain !== reagent);
+    // 물은 봉입액이라 `stain` 을 차지하지 않는다. 방울 수만 는다 —
+    // 물을 먼저 떨어뜨린 뒤 검출 용액을 쓰면 그만큼 액이 많아지고, 그건 실제로도 그렇다.
     const next = withSlide(state, slide, {
-      stain: s.stain ?? reagent,
+      stain: isStaining(reagent) ? (s.stain ?? reagent) : s.stain,
       drops,
       contaminated,
       reactionT: Math.min(s.reactionT, 0.05),
@@ -166,7 +172,10 @@ export const ACTIONS = {
       return happened(next, '씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다.', 'cross-contamination');
     }
     if (drops === 1) return happened(next, '한 방울이 떨어졌습니다. 용액이 시료 전체에 닿지는 않았습니다.', 'partial');
-    if (drops >= 5) return happened(next, '액이 받침 유리 밖으로 흘러넘쳤습니다.', 'overflow');
+    if (drops >= 5) {
+      return happened(next, `액이 받침 유리 밖으로 흘러넘쳐 실험대에 고였습니다 (${drops}방울). `
+        + '덮개 유리가 뜨고, 현미경으로는 색만 짙게 깔려 알갱이가 잘 보이지 않습니다.', 'overflow');
+    }
     if (drops >= 3) return happened(next, '용액이 넉넉히 퍼졌습니다.', 'excess');
     return ok(next);
   },
@@ -297,7 +306,7 @@ export const ACTIONS = {
   RINSE_SLIDE(state, { slide }) {
     const s = state.slides[slide];
     if (s.cracked) {
-      return happened(state, '씻어도 금은 그대로입니다. 이 받침 유리는 쓸 수 없습니다.', 'cracked');
+      return happened(state, '씻어도 금은 그대로입니다. 받침 유리 통에 대어 새것으로 바꾸세요.', 'cracked');
     }
     const next = withSlide(state, slide, {
       sample: null, stain: null, drops: 0, reactionT: 0,
@@ -305,6 +314,65 @@ export const ACTIONS = {
       contaminated: false, lensTouched: false,
     });
     return happened(next, '받침 유리를 씻었습니다. 처음부터 다시 만들 수 있습니다.', 'slide-rinsed');
+  },
+
+  /**
+   * 받침 유리 통에서 새것을 꺼낸다.
+   *
+   * 금이 간 유리를 씻는 것으로는 되돌릴 수 없다 — 씻어도 금은 남는다. 그런데 받침 유리가
+   * 석 장뿐이라, 금이 세 번 가면 실험이 거기서 끝났다. 막다른 길이지 결과가 아니다.
+   * 실제 실험실에서도 받침 유리는 통에 쌓여 있고 깨지면 새것을 꺼낸다.
+   *
+   * 재물대에 올라가 있던 것이면 함께 내린다 — 통에서 꺼낸 새 유리가 재물대에 있을 수는 없다.
+   */
+  NEW_SLIDE(state, { slide }) {
+    const s = state.slides[slide];
+    if (!s) return happened(state, '어느 받침 유리를 바꿀지 알 수 없습니다.');
+    const fresh = { ...initialSlide(slide), seed: s.seed };
+    let next = { ...state, slides: { ...state.slides, [slide]: fresh } };
+    if (state.microscope.stage === slide) next = withScope(next, { stage: null });
+    if (s.cracked) {
+      return happened(next, '금 간 받침 유리를 버리고 통에서 새것을 꺼냈습니다. 처음부터 다시 만드세요.', 'slide-replaced');
+    }
+    return happened(next, '통에서 새 받침 유리를 꺼냈습니다. 쓰던 것에 있던 시료와 시약은 사라졌습니다.', 'slide-replaced');
+  },
+
+  /**
+   * 기록한 결과를 지운다.
+   *
+   * 결과 기록은 누르는 데 힘이 안 들어서 열 장이 금세 쌓인다. 그중 남기고 싶은 것을 고를
+   * 길이 없으면 탐구 노트 「5. 결과」 가 실패작 목록이 되고, 보고서에도 그대로 실린다.
+   * 지우는 것은 관찰을 무르는 것이 아니다 — 무엇을 근거로 삼을지 고르는 일이다.
+   *
+   * `at` 은 캡처가 만들어질 때 한 번 붙는 번호다. 배열 인덱스로 지우면 안 된다 —
+   * 앞엣것을 지운 순간 뒤엣것들의 인덱스가 밀려, 배율 답(notes['mag.N'])이 남의 것이 된다.
+   */
+  DELETE_CAPTURE(state, { at }) {
+    const captures = state.session.captures.filter((c) => c.at !== at);
+    if (captures.length === state.session.captures.length) {
+      return happened(state, '그 기록은 이미 없습니다.');
+    }
+    // 그 기록에 딸린 배율 답도 함께 지운다. 남겨 두면 다음에 같은 번호가 붙었을 때
+    // 쓴 적 없는 답이 칸에 들어가 있다.
+    const notes = { ...state.session.notes };
+    delete notes[`mag.${at}`];
+    return happened(
+      { ...state, session: { ...state.session, captures, notes } },
+      '기록을 지웠습니다.', 'capture-deleted'
+    );
+  },
+
+  /**
+   * 탐구 노트의 한 단계를 읽었다고 표시한다.
+   *
+   * 실험대는 이것이 다 차야 열린다 (`src/ui/bench.js`). 조작을 막는 것이 아니라
+   * **시작하기 전에 무엇을 하려는지 읽게 하는 것**이라, 하드 게이트(AGENTS.md §2.1)가 아니다.
+   * 열린 뒤에는 어떤 조작도 막지 않는다.
+   */
+  MARK_READ(state, { stage }) {
+    const read = state.session.readStages ?? [];
+    if (!stage || read.includes(stage)) return ok(state);
+    return ok({ ...state, session: { ...state.session, readStages: [...read, stage] } });
   },
 
   /**
@@ -400,10 +468,15 @@ export const ACTIONS = {
     // 기록은 그때 본 시야를 **그대로 다시 그릴 수 있는** 값 한 벌이다.
     // fieldParams 를 통째로 담으므로 탐구 노트가 캡처마다 시야를 되살릴 수 있고,
     // 결과 보드(T06)에 보낼 값도 이것과 같다 — 두 벌을 따로 만들면 어긋난다.
+    // `at` 은 순번이 아니라 **한 번 붙으면 안 바뀌는 번호**다.
+    // 배열 길이를 쓰면 중간 것을 지운 뒤 같은 번호가 다시 붙어, 지운 기록의 배율 답이
+    // 새 기록 칸에 들어간다 (DELETE_CAPTURE 참조).
+    const nextAt = state.session.captures.reduce((n, c) => Math.max(n, (c.at ?? -1) + 1), 0);
     const capture = {
       slide: m.stage,
       drops: s.drops,
-      at: state.session.captures.length,
+      at: nextAt,
+      eyepiece: EYEPIECE,
       ...fieldParams(state, m.stage),
     };
     const next = {

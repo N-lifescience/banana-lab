@@ -44,11 +44,13 @@ export const CONTRACT = {
     file: 'slide.js',
     realSizeMm: 76,    // 표준 슬라이드글라스 76 × 26 mm 의 긴 변
     viewBox: '0 0 400 300',
-    states: ['sample', 'stain', 'reaction', 'coverslip', 'bubbles'],
+    states: ['sample', 'stain', 'reaction', 'excess', 'coverslip', 'bubbles'],
     nodes: {
       '#glass':       { required: true,  mutable: [] },
       '#glass-shade': { required: true,  mutable: [] },
       '#smear':       { required: true,  mutable: ['fill', 'fill-opacity', 'transform'] },
+      // 흘러넘친 액. 방울을 세 개 넘게 떨어뜨리면 나타난다 (state.excess).
+      '#spill':       { required: true,  mutable: ['opacity'] },
       '#coverslip':   { required: true,  mutable: ['transform', 'opacity'] },
       '#bubbles':     { required: true,  mutable: ['children'] },
       '#label':       { required: false, mutable: ['children'] },
@@ -78,6 +80,21 @@ export const CONTRACT = {
       '#box':       { required: true,  mutable: [] },
       '#box-shade': { required: true,  mutable: [] },
       '#stack':     { required: true,  mutable: [] },
+    },
+  },
+
+  // 받침 유리도 통에서 꺼내 쓴다. 석 장을 세다가 금이 세 번 가면 실험이 끝나 버렸다 —
+  // 그건 결과로 답한 것이 아니라 그냥 막다른 길이었다 (rules.js 의 NEW_SLIDE).
+  // 상태가 없다 — 몇 장 남았는지 세지 않는 것이 이 통을 놓는 이유다.
+  slidebox: {
+    file: 'slidebox.js',
+    realSizeMm: 100,   // 76 mm 슬라이드를 눕혀 담는 얕은 상자. 긴 변 기준
+    viewBox: '0 0 400 300',
+    states: [],
+    nodes: {
+      '#tray':       { required: true,  mutable: [] },
+      '#tray-shade': { required: true,  mutable: [] },
+      '#stack':      { required: true,  mutable: [] },
     },
   },
 
@@ -209,9 +226,10 @@ export const CONTRACT = {
  */
 export const CONTENT_BOX = {
   banana:     { x0: 52,  y0: 25,  x1: 350, y1: 312 },
-  slide:      { x0: 60,  y0: 105, x1: 344, y1: 202 },
+  slide:      { x0: 60,  y0: 105, x1: 344, y1: 209 },
   coverslip:  { x0: 20,  y0: 37,  x1: 232, y1: 215 },
   coverbox:   { x0: 80,  y0: 41,  x1: 330, y1: 246 },
+  slidebox:   { x0: 78,  y0: 160, x1: 362, y1: 268 },
   dropper:    { x0: 173, y0: 29,  x1: 228, y1: 280 },
   forceps:    { x0: 163, y0: 40,  x1: 237, y1: 271 },
   bottle:     { x0: 132, y0: 5,   x1: 286, y1: 284 },

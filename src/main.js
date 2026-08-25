@@ -5,7 +5,7 @@
  * 이 파일과 src/ui/ 의 나머지는 결과를 그리기만 한다.
  */
 
-import { initialState } from './sim/state.js';
+import { initialState, MODES } from './sim/state.js';
 import { reduce } from './sim/rules.js';
 import { createToastQueue } from './ui/toast.js';
 import { createBench } from './ui/bench.js';
@@ -54,6 +54,15 @@ function levelFromUrl() {
 }
 
 /**
+ * 혼자 하는가, 모둠으로 하는가 — `?mode=solo`.
+ * 난이도와 같은 통로다. 교사가 반마다 다른 링크를 나눠 주는 길을 여기에도 둔다.
+ */
+function modeFromUrl() {
+  const raw = new URLSearchParams(location.search).get('mode');
+  return raw === MODES.SOLO || raw === MODES.GROUP ? raw : null;
+}
+
+/**
  * 배치 편집 모드 — `?edit=1`.
  *
  * 개발 서버에서만 연다. `window.__store` 와 같은 이유다 — 배포본에 남기면 학생이
@@ -71,7 +80,7 @@ let store = null;
  * 상태는 여기서 처음 만들어진다 — `session.level` 은 세션 내내 바뀌지 않는 값이라
  * 시작 화면에서 정해진 뒤에 만들어야 한다. 도중에 단계를 바꾸는 길은 두지 않는다.
  */
-function boot(level) {
+function boot(level, mode = MODES.GROUP) {
   $('#start').hidden = true;
   $('#app').hidden = false;
 
@@ -79,7 +88,7 @@ function boot(level) {
   // store 가 이미 만들어져 있으므로 순서상 문제 없다.
   const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
   store = createStore(
-    initialState(level),
+    initialState(level, undefined, mode),
     (message, outcome, tag) => toast.push(message, outcome, tag)
   );
   // 검증 스크립트(scripts/check-*.mjs)가 상태를 만들고 되돌리기 기록을 들여다보는 통로다.
@@ -116,5 +125,6 @@ function startClock() {
 }
 
 const fromUrl = levelFromUrl();
-if (fromUrl) boot(fromUrl);
-else createStart($('#start'), boot);
+const modeUrl = modeFromUrl();
+if (fromUrl) boot(fromUrl, modeUrl ?? MODES.GROUP);
+else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP);

@@ -18,6 +18,9 @@ export function liquidFill(state = {}) {
   const kind = state.kind;
   if (kind === 'IKI' || kind === 'iodine') return PALETTE.iodine[0];
   if (kind === 'SUDAN3' || kind === 'sudan') return PALETTE.sudan[0];
+  // 물은 무색이다. 유리색을 그대로 쓰면 병이 비어 보이므로 음영 쪽을 써서
+  // "안에 무언가 들어 있다" 는 것만 보이게 한다 — 색으로 말하지 않는 것이 물의 성질이다.
+  if (kind === 'WATER' || kind === 'water') return PALETTE.glass[1];
   return PALETTE.glass[0];
 }
 
@@ -56,6 +59,10 @@ export function labelTextContent(kind) {
     return `<text x="200" y="162" font-size="11" font-weight="bold" text-anchor="middle" fill="${INK}">수단 Ⅲ</text>` +
       `<text x="200" y="178" font-size="9" text-anchor="middle" fill="${INK}">용액</text>` +
       `<text x="200" y="196" font-size="8" text-anchor="middle" fill="${INK}">Sudan Ⅲ (지질)</text>`;
+  }
+  if (kind === 'WATER' || kind === 'water') {
+    return `<text x="200" y="168" font-size="11" font-weight="bold" text-anchor="middle" fill="${INK}">증류수</text>` +
+      `<text x="200" y="188" font-size="8" text-anchor="middle" fill="${INK}">H₂O (봉입액)</text>`;
   }
   return `<text x="200" y="178" font-size="10" text-anchor="middle" fill="${INK}">시약병</text>`;
 }

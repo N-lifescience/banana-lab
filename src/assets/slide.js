@@ -8,7 +8,7 @@ import { PALETTE, INK, STROKE, GROUND_SHADOW, PATH_ATTRS } from '../style/tokens
 import { rng, clamp } from './geometry.js';
 
 export const NODES = [
-  '#glass', '#glass-shade', '#smear', '#coverslip', '#bubbles', '#label',
+  '#glass', '#glass-shade', '#smear', '#spill', '#coverslip', '#bubbles', '#label',
 ];
 
 /**
@@ -18,8 +18,13 @@ export const NODES = [
 export const COVERSLIP_FILL = PALETTE.glass[0];
 export const COVERSLIP_INK = INK;
 
-/** 확대 뷰의 스포이트에 담긴 시약 색. 시약병·시야와 같은 색을 쓴다. */
-export const REAGENT_TINT = { IKI: PALETTE.iodine[0], SUDAN3: PALETTE.sudan[0] };
+/**
+ * 확대 뷰의 스포이트에 담긴 시약 색. 시약병·시야와 같은 색을 쓴다.
+ * 물은 무색이라 유리 음영색으로 둔다 — 관 안이 비어 보이지 않을 만큼만.
+ */
+export const REAGENT_TINT = {
+  WATER: PALETTE.glass[1], IKI: PALETTE.iodine[0], SUDAN3: PALETTE.sudan[0],
+};
 
 /**
  * 확대 뷰의 손도구(핀셋 · 스포이트 관) 색.
@@ -73,6 +78,34 @@ export function smearOpacity(state = {}) {
 }
 
 /**
+ * 흘러넘친 액.
+ *
+ * 앞서는 "액이 받침 유리 밖으로 흘러넘쳤습니다" 라는 **말만** 있었다. 열여섯 방울을 떨어뜨려도
+ * 그림은 두 방울 때와 똑같아서, 학생 눈에는 아무 일도 일어나지 않은 것과 같았다.
+ * 결과로 답한다는 것은 화면이 달라진다는 뜻이다.
+ *
+ * `excess` 는 파생값이다 (`src/sim/state.js`) — 세 방울부터 생기고 다섯 방울에서 1이 된다.
+ */
+export function spillOpacity(state = {}) {
+  const e = clamp(state.excess ?? 0, 0, 1);
+  if (e <= 0) return '0';
+  return clamp(0.35 + e * 0.55, 0, 1).toFixed(2);
+}
+
+/** 넘친 액의 색. 검출 용액을 넣었으면 그 색으로, 물뿐이면 유리색으로 고인다. */
+export function spillFill(state = {}) {
+  const stain = state.stain;
+  const reaction = state.reaction ?? (stain ? 1 : 0);
+  if (stain === 'IKI' || stain === 'iodine') {
+    return reaction >= 0.7 ? PALETTE.stainStarchPale[0] : PALETTE.iodine[0];
+  }
+  if (stain === 'SUDAN3' || stain === 'sudan') {
+    return reaction >= 0.7 ? PALETTE.stainLipidPale[0] : PALETTE.sudan[0];
+  }
+  return PALETTE.glass[1];
+}
+
+/**
  * 덮개유리 불투명도
  */
 export function coverslipOpacity(state = {}) {
@@ -117,6 +150,8 @@ export function bubbleShapes(count = 0, seed = 1234) {
 export function render(state = {}) {
   const sFill = smearFill(state);
   const sOpacity = smearOpacity(state);
+  const spFill = spillFill(state);
+  const spOpacity = spillOpacity(state);
   const csOpacity = coverslipOpacity(state);
   const csTransform = coverslipTransform(state);
   const bubblesHtml = bubbleShapes(state.bubbles, state.seed);
@@ -139,6 +174,16 @@ export function render(state = {}) {
   <!-- 시료 도말 (중앙) -->
   <path id="smear" d="M 180,140 C 168,145 165,155 175,162 C 185,168 215,166 228,158 C 238,150 232,138 218,136 C 202,134 190,136 180,140 Z" fill="${sFill}" fill-opacity="${sOpacity}"/>
 
+  <!-- 흘러넘친 액. 덮개 유리 밖으로 번져 받침 유리 앞 모서리까지 닿고, 아래로 한 방울 맺힌다.
+       **유리 밖으로 크게 흘리지 않는다.** 그림이 프레임 아래까지 자라면 그려진 범위가
+       그만큼 넓어지고, 실험대에서 이 물건이 잡히는 영역과 이름표 자리가 함께 내려간다
+       (contract.js 의 CONTENT_BOX.slide · scripts/check-bench.mjs 가 이 어긋남을 잡는다).
+       넘쳤다는 것은 크기가 아니라 **덮개 유리 밖까지 색이 번졌다는 것**으로 말한다. -->
+  <g id="spill" opacity="${spOpacity}">
+    <path d="M 118,152 C 112,126 148,110 200,108 C 254,106 296,120 300,150 C 304,178 268,196 226,199 C 226,205 214,208 206,203 C 200,200 194,199 188,198 C 146,196 124,178 118,152 Z" fill="${spFill}" fill-opacity="0.55"/>
+    <ellipse cx="214" cy="201" rx="7" ry="6" fill="${spFill}" fill-opacity="0.65"/>
+  </g>
+
   <!-- 덮개유리 (커버글라스)
        유리는 비쳐야 한다. 불투명하게 두면 덮는 순간 시료가 통째로 사라져,
        덮은 뒤에 일어나는 일(색 변화, 가장자리로 새는 용액)이 화면에서 보이지 않는다. -->
@@ -159,6 +204,13 @@ export function applyState(root, state = {}) {
   const smear = root.querySelector('#smear');
   smear.setAttribute('fill', smearFill(state));
   smear.setAttribute('fill-opacity', smearOpacity(state));
+
+  const spill = root.querySelector('#spill');
+  spill.setAttribute('opacity', spillOpacity(state));
+  // 계약상 #spill 은 opacity 만 바꾼다. 색은 안쪽 도형이 갖고 있으므로 함께 손본다 —
+  // 반응이 진행되면 넘친 액의 색도 따라 변한다.
+  const spFill = spillFill(state);
+  spill.querySelectorAll('[fill]').forEach((el) => el.setAttribute('fill', spFill));
 
   const cs = root.querySelector('#coverslip');
   cs.setAttribute('opacity', coverslipOpacity(state));

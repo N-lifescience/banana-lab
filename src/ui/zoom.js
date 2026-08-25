@@ -13,7 +13,8 @@
 import { renderFOV } from '../render/fov.js';
 import { bubblesFromAngle } from '../sim/rules.js';
 import { observability } from '../sim/quality.js';
-import { fieldParams, focusError, brightness, isFloating, PAN_LIMIT, SLIDE_IDS } from '../sim/state.js';
+import { EYEPIECE, magnification } from '../sim/optics.js';
+import { fieldParams, focusError, brightness, isFloating, excess, PAN_LIMIT, SLIDE_IDS } from '../sim/state.js';
 import { UI } from './strings.js';
 import { ASSETS } from '../assets/index.js';
 import * as slideModule from '../assets/slide.js';
@@ -26,6 +27,9 @@ function clamp(v, a, b) {
 export function createZoom(root, store) {
   root.className = 'zoom-overlay';
   root.hidden = true;
+  // 닫기 단추는 패널의 **첫 자식**이고 sticky 다. 앞서는 절대 위치라, 창보다 긴 내용이
+  // 들어간 작은 화면(스마트폰 가로)에서 아래로 스크롤하면 화면 밖으로 밀려 나갔다 —
+  // Esc 도 배경 탭도 닿지 않는 자리에서 나갈 방법이 없었다.
   root.innerHTML = `
     <div class="zoom-panel" role="dialog" aria-modal="true" tabindex="-1">
       <button type="button" id="zoom-close" class="zoom-close"></button>
@@ -141,7 +145,7 @@ export function createZoom(root, store) {
     // 받침 유리 그림을 **먼저** 넣는다. 도구는 자기가 유리 위에 있는지를 크기로 재는데,
     // 그림이 없는 동안에는 그 칸의 높이가 0 이라 언제나 "유리 밖" 이 된다.
     body.querySelector('#slide-stage').innerHTML = slideModule.render({
-      sample: s.sample, stain: s.stain, reaction: s.reactionT,
+      sample: s.sample, stain: s.stain, reaction: s.reactionT, excess: excess(s),
       coverslip: s.coverslip.placed, bubbles: s.coverslip.bubbles, seed: s.seed,
     });
 
@@ -253,7 +257,9 @@ export function createZoom(root, store) {
 
   function dropperSvg(dropper) {
     const level = Math.max(0, Math.min(1, dropper.level ?? 0));
-    const fill = dropper.holds === 'IKI' ? REAGENT_TINT.IKI : REAGENT_TINT.SUDAN3;
+    // 표에 없는 것(비었을 때)은 관 색으로 둔다. `undefined` 가 fill 로 나가면
+    // 브라우저가 검게 칠해, 빈 스포이트가 먹물을 담은 것처럼 보인다.
+    const fill = REAGENT_TINT[dropper.holds] ?? slideModule.COVERSLIP_FILL;
     const h = (34 * level).toFixed(1);
     const M = slideModule.TOOL_METAL;
     return `<svg viewBox="0 0 44 140" class="dropper-svg" aria-hidden="true">
@@ -427,12 +433,20 @@ export function createZoom(root, store) {
     // "저배율에서 초점을 맞추지 않고 올렸습니다" 라고 경고하는데, 정작 학생은 아무것도
     // 하지 않았고 초점은 이미 맞아 있는 것처럼 보인다 — 화면과 문구가 서로 다른 말을 했다.
     // 저배율부터 올라가는 것이 이 실험에서 배우는 절차이므로 그 손을 뺏지 않는다.
+    //
+    // 단추에 적힌 숫자가 **대물렌즈 배율**이 되도록 고쳤다.
+    // 앞서는 「대물렌즈」 라는 이름 아래 총배율(40·100·400배)이 적혀 있었다.
+    // 그래서 탐구 노트의 결과 카드가 "대물렌즈 4배" 라고 적으면 학생이 본 숫자와 달랐고,
+    // 「총배율은 몇 배인가요」 에 무엇을 곱해야 하는지 알 길이 없었다.
+    // 접안렌즈(고정 10배)와 지금 총배율을 옆에 함께 적어 둔다 — 곱하는 일만 남긴다.
     const objectivePicker = `
         <div class="ctrl-group" role="group" aria-label="${UI.controls.objective}">
           <span>${UI.controls.objective}</span>
           ${[4, 10, 40].map((o) => `<button type="button" data-obj="${o}"
-            aria-pressed="${st.microscope.objective === o}">${UI.units.mag(o * 10)}</button>`).join('')}
-        </div>`;
+            aria-pressed="${st.microscope.objective === o}">${UI.units.mag(o)}</button>`).join('')}
+        </div>
+        <p class="zoom-mag-line">${UI.zoom.magLine(EYEPIECE, st.microscope.objective,
+          magnification(st.microscope.objective))}</p>`;
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
       <p class="zoom-slide-label">${UI.slideShort[slideId]} · ${p.reagent ? UI.reagents[p.reagent] : UI.noReagent}</p>

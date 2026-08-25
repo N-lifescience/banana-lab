@@ -9,6 +9,7 @@ import * as banana from './banana.js';
 import * as slide from './slide.js';
 import * as coverslip from './coverslip.js';
 import * as coverbox from './coverbox.js';
+import * as slidebox from './slidebox.js';
 import * as dropper from './dropper.js';
 import * as forceps from './forceps.js';
 import * as bottle from './bottle.js';
@@ -21,7 +22,7 @@ import * as tissue from './tissue.js';
 import * as bench from './bench.js';
 
 export const ASSETS = {
-  banana, slide, coverslip, coverbox, dropper, forceps, bottle,
+  banana, slide, coverslip, coverbox, slidebox, dropper, forceps, bottle,
   microscope, dish, waste, sink, bin, tissue, bench,
 };
 
@@ -44,12 +45,14 @@ export const SAMPLE_STATES = {
     { sample: { thickness: 0.3 }, stain: null },
     { sample: { thickness: 0.3 }, stain: 'IKI', reaction: 1 },
     { sample: { thickness: 0.3 }, stain: 'IKI', reaction: 1, coverslip: true, bubbles: 3 },
+    { sample: { thickness: 0.3 }, stain: 'SUDAN3', reaction: 1, excess: 1 },
   ],
   coverslip: [{ angle: 45 }, { angle: 90 }],
   coverbox: [{}],
+  slidebox: [{}],
   dropper: [{ holds: null }, { holds: 'IKI', level: 1 }, { holds: 'SUDAN3', level: 0.4 }],
   forceps: [{ closed: false }, { closed: true, holding: 'coverslip' }],
-  bottle: [{ kind: 'IKI', level: 1 }, { kind: 'SUDAN3', level: 0.3, capOpen: true }],
+  bottle: [{ kind: 'IKI', level: 1 }, { kind: 'SUDAN3', level: 0.3, capOpen: true }, { kind: 'WATER', level: 0.8 }],
   microscope: [
     { objective: 4, diaphragm: 0.6, lamp: true },
     { objective: 40, diaphragm: 1, lamp: true, stage: 'B' },

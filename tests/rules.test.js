@@ -13,6 +13,8 @@ import {
 } from '../src/sim/state.js';
 import { reduce, ACTIONS, bubblesFromAngle, BLOCKING_REASONS } from '../src/sim/rules.js';
 import { observability } from '../src/sim/quality.js';
+import { renderFOV } from '../src/render/fov.js';
+import { PALETTE } from '../src/style/tokens.js';
 
 const S0 = () => initialState(1, 12345);
 
@@ -37,6 +39,7 @@ function fuzzPayloads(slide) {
     FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
     NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
     MOVE_STAGE: { dx: 20, dy: 0 },
+    NEW_SLIDE: { slide }, DELETE_CAPTURE: { at: 0 }, MARK_READ: { stage: '1' },
   };
 }
 
@@ -648,10 +651,11 @@ test('하드 게이트는 두 종류뿐이다', () => {
   }
 });
 
-test('방울이 있는 슬라이드는 반드시 시약이 정해져 있다', () => {
-  // 시야 렌더러가 이 불변식에 기대고 있다. (가) 대조군은 방울이 0개인 한 가지 상태뿐이라
-  // "대조군에 두 방울" 같은 조합은 존재하지 않는다.
-  // 이게 깨지면 시약 없이 염색된 시야가 나올 수 있다.
+test('시약이 없는 슬라이드는 몇 방울이 떨어져도 색이 나타나지 않는다', () => {
+  // 앞서는 "방울이 있으면 반드시 stain 이 있다" 로 적혀 있었다. 물(REAGENTS.WATER)이
+  // 생기면서 그 형태로는 성립하지 않는다 — 물은 봉입액이라 방울 수만 늘리고 stain 은
+  // 비워 둔다. 지키려던 것은 애초에 **시약 없이 염색된 시야가 나오지 않는 것**이었으므로,
+  // 그것을 그대로 검사한다. 시야 렌더러에 물어보는 편이 불변식보다 정확하다.
   const payloads = fuzzPayloads('A');
   const types = Object.keys(ACTIONS);
   // 시드로 순서를 정해 결정적으로 훑는다. Math.random() 을 쓰면 실패가 재현되지 않는다.
@@ -660,11 +664,25 @@ test('방울이 있는 슬라이드는 반드시 시약이 정해져 있다', ()
     const type = types[(step * 7 + Math.floor(step / types.length) * 3) % types.length];
     s = run(s, type, payloads[type] ?? {}).state;
     for (const id of SLIDE_IDS) {
-      const sl = s.slides[id];
-      assert.ok(!(sl.stain === null && sl.drops > 0),
-        `${step}번째 ${type} 뒤 슬라이드 ${id} 에 시약 없이 ${sl.drops}방울이 생겼습니다`);
+      if (s.slides[id].stain !== null) continue;
+      const svg = renderFOV(fieldParams(s, id));
+      assert.ok(!svg.includes(PALETTE.stainStarch[0]) && !svg.includes(PALETTE.stainLipid[0]),
+        `${step}번째 ${type} 뒤 슬라이드 ${id} — 시약이 없는데 염색색이 나왔습니다`);
     }
   }
+});
+
+test('물은 방울 수만 늘리고 색을 내지 않는다', () => {
+  // 교과서 절차의 봉입액이다. (가) 대조군이 대조군인 이유이기도 하다.
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'A', thickness: 0.3 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.WATER }).state;
+  s = run(s, 'DROP', { slide: 'A', count: 2 }).state;
+  assert.equal(s.slides.A.drops, 2, '물도 방울로 센다 — 넘치면 넘친다');
+  assert.equal(s.slides.A.stain, null, '물이 검출 용액 자리를 차지하면 안 됩니다');
+  assert.equal(coverage(s.slides.A), 1);
+  s = tickUntilReacted(s);
+  assert.equal(s.slides.A.reactionT, 0, '물은 반응하지 않습니다');
 });
 
 test('reduce 는 원본 상태를 바꾸지 않는다', () => {

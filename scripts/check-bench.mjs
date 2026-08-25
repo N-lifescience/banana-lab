@@ -1,5 +1,9 @@
 ﻿/** T08 브라우저 검증 — 어포던스가 실제로 화면에 나타나는지. */
 import { chromium } from 'playwright';
+import { benchLayout } from '../src/ui/bench.js';
+
+/** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 여기에 숫자를 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
+const ITEM_COUNT = benchLayout().length;
 
 const BASE = process.env.BASE ?? 'http://localhost:5173';
 const out = [];
@@ -15,6 +19,49 @@ async function box(sel) {
   return page.locator(sel).boundingBox();
 }
 const center = (b) => [b.x + b.width / 2, b.y + b.height / 2];
+
+/**
+ * 실험대 자물쇠를 연다.
+ *
+ * 실험대는 탐구 노트 1~4 쪽을 읽어야 열린다 (`src/ui/bench.js`). 학생에게는 그것이 절차지만,
+ * 여기서 보려는 것은 그 뒤의 어포던스라 매번 노트를 클릭해 넘길 이유가 없다.
+ * 자물쇠 자체는 아래 「탐구 노트를 읽기 전」 항목에서 따로 본다.
+ */
+async function unlock(p) {
+  await p.evaluate(() => {
+    for (const stage of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage });
+  });
+  await p.waitForTimeout(80);
+}
+
+/**
+ * 보고서를 낼 수 있는 상태로 만든다.
+ *
+ * 「보고서 만들기」 단추는 다 마무리해야 나온다 (`notebook.js` 의 reportReadiness).
+ * 여기서 보려는 것은 그 뒤의 창이라, 필요한 것을 상태로 채워 둔다.
+ */
+async function finishForReport(p) {
+  await p.evaluate(() => {
+    const s = window.__store;
+    const put = (step, text) => s.dispatch('SAVE_NOTE', { step, text });
+    s.dispatch('PEEL_BANANA', {});
+    for (const id of ['A', 'B', 'C']) {
+      s.dispatch('SMEAR', { slide: id, thickness: 0.3 });
+      s.dispatch('PICK_COVERSLIP', {});
+      s.dispatch('PLACE_COVERSLIP', { slide: id, angleDeg: 45 });
+      s.dispatch('UNMOUNT', {});
+      s.dispatch('SET_OBJECTIVE', { objective: 4 });
+      s.dispatch('MOUNT', { slide: id });
+      s.dispatch('CAPTURE', {});
+      put(`predict.${id}`, '청람색 알갱이가 보인다');
+    }
+    put('q.a', '(가)에서는 색이 없어 구분할 수 없었는데 용액을 넣으니 색이 나타나 알 수 있었다');
+    put('q2', '녹말은 청람색으로 빽빽했고 지방은 선홍색 방울이 드물었다');
+    put('q3', '다른 모둠과 비슷했다');
+    for (const k of ['process', 'evidence', 'careful', 'safety', 'retry']) put(`selfeval.${k}`, '4');
+  });
+  await p.waitForTimeout(120);
+}
 
 /** 한 물건을 다른 물건 한가운데로 끌어다 놓는다. */
 async function drag(from, to) {
@@ -32,7 +79,8 @@ async function drag(from, to) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 
 ok(await page.locator('#start .start-card').isVisible(), '시작 화면이 먼저 뜬다');
-ok(await page.locator('.start-level').count() === 3, '난이도 세 단계를 고를 수 있다');
+ok(await page.locator('.start-level[data-level]').count() === 3, '난이도 세 단계를 고를 수 있다');
+ok(await page.locator('.start-level[data-mode]').count() === 2, '혼자/모둠을 고를 수 있다');
 const startText = await page.locator('#start').innerText();
 ok(!/[A-Za-z]{4,}/.test(startText.replace(/level=\d/g, '')), '시작 화면이 한글이다',
    JSON.stringify(startText.slice(0, 40)));
@@ -49,6 +97,11 @@ ok(await page.locator('#app').isVisible() && await page.locator('#start').isHidd
    '시작하면 실험대로 넘어간다');
 ok(await page.evaluate(() => window.__store.getState().session.level) === 1,
    '고른 단계로 시작한다');
+
+// 자물쇠가 실제로 걸려 있는가 — 열기 전에 한 번 본다.
+ok(await page.locator('#bench-lock').isVisible(), '탐구 노트를 읽기 전에는 실험대가 잠겨 있다');
+await unlock(page);
+ok(await page.locator('#bench-lock').isHidden(), '1~4 쪽을 읽으면 실험대가 열린다');
 
 /* ---------- 1단계 ---------- */
 
@@ -155,6 +208,7 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
 {
   const kb = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await kb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(kb);
   await kb.waitForTimeout(250);
   const state = () => kb.evaluate(() => window.__store.getState());
   // 말풍선은 포커스가 옮겨 온 다음 프레임에 뜬다. 고정 시간으로 기다리면
@@ -195,6 +249,7 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
   // 3단계도 조작은 똑같이 된다 — 줄어드는 것은 설명뿐이다.
   const kb3 = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await kb3.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+  await unlock(kb3);
   await kb3.waitForTimeout(250);
   await kb3.locator('[data-id="banana"]').focus();
   await kb3.waitForTimeout(200);
@@ -465,6 +520,7 @@ ok(cleaned === false, '휴지를 현미경에 대면 렌즈를 닦는다', `lens
 {
   const nb = await browser.newPage({ viewport: { width: 900, height: 1000 } });
   await nb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(nb);
   await nb.waitForTimeout(250);
 
   // 아무것도 안 쓴 칸에 첨삭이 먼저 뜨면, 학생은 쓰기도 전에 부족하다는 말부터 듣는다.
@@ -559,6 +615,7 @@ await checkButtonContrast(page, '라이트');
 const darkPage = await browser.newPage({ viewport: { width: 1400, height: 900 }, colorScheme: 'dark' });
 // 다크 모드 대비 검사는 실험대부터 본다. 주소로 단계를 주면 시작 화면을 건너뛴다.
 await darkPage.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+await unlock(darkPage);
 await darkPage.evaluate(() => window.__store.dispatch('MOUNT', { slide: 'A' }));
 await darkPage.locator('[data-id="microscope"]').click();
 await darkPage.waitForTimeout(200);
@@ -576,6 +633,7 @@ await darkPage.close();
 
 /* ---------- 3단계 — 안내만 줄고 조작은 그대로인가 ---------- */
 await page.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+await unlock(page);
 const b3 = await box('[data-id="banana"]');
 await page.mouse.move(...center(b3));
 await page.waitForTimeout(120);
@@ -612,11 +670,11 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const bananaLine = code.split('\n').find((l) => l.includes("id: 'banana'"));
   ok(/^\s*surface\(\d+,/.test(bananaLine ?? ''),
      '아래로 끌면 작업면에 붙고, 그 자리가 코드로 나온다', JSON.stringify(bananaLine));
-  ok(code.split('\n').filter((l) => l.includes('labelKey')).length === 14,
-     '코드에 실험대 물건 14개가 모두 나온다');
+  ok(code.split('\n').filter((l) => l.includes('labelKey')).length === ITEM_COUNT,
+     `코드에 실험대 물건 ${ITEM_COUNT}개가 모두 나온다`);
 
   // 화면에도 좌표가 보여야 한다 — 스크린샷 한 장으로 읽을 수 있어야 하기 때문이다.
-  ok(await ed.locator('.edit-x-tag').count() === 14, '물건마다 x 좌표가 화면에 붙는다');
+  ok(await ed.locator('.edit-x-tag').count() === ITEM_COUNT, '물건마다 x 좌표가 화면에 붙는다');
 
   // 핀셋을 덮개 유리 통에 끌어다 댄다. 평소라면 한 장 집는다.
   //
@@ -695,9 +753,10 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   // 이름이 말풍선에만 있으면 마우스를 하나씩 올려 보기 전에는 실험대에 무엇이 있는지 모른다.
   const nm = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await nm.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+  await unlock(nm);
   const names = await nm.evaluate(() => [...document.querySelectorAll('.token-name')]
     .map((n) => ({ text: n.textContent.trim(), r: n.getBoundingClientRect().toJSON() })));
-  ok(names.length === 14, '실험대 물건 14개에 모두 이름표가 붙는다', `${names.length}개`);
+  ok(names.length === ITEM_COUNT, `실험대 물건 ${ITEM_COUNT}개에 모두 이름표가 붙는다`, `${names.length}개`);
   ok(names.every((n) => n.text.length > 0), '빈 이름표가 없다');
   // 3단계에서도 이름은 보인다 — 난이도가 줄이는 것은 설명이지 물건이 무엇인지가 아니다.
   ok(names.some((n) => n.text === '현미경'), '3단계에서도 이름표가 보인다');
@@ -746,6 +805,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   // 휴지 그림을 겨눠도 개수대가 잡혔고, 받침 유리가 씻겨 시료가 사라졌다.
   const aim = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await aim.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(aim);
   await aim.evaluate(() => {
     window.__store.dispatch('PEEL_BANANA', {});
     window.__store.dispatch('SMEAR', { slide: 'B', thickness: 0.3 });
@@ -771,6 +831,13 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   // 인쇄 창이 뜨면 스크립트가 거기서 멈춘다. 브라우저 창을 여는 것 자체가 검사 대상은 아니다.
   await rp.addInitScript(() => { window.print = () => {}; });
   await rp.goto(`${BASE}/?level=2`, { waitUntil: 'networkidle' });
+  await unlock(rp);
+
+  // 다 마무리하기 전에는 단추 대신 "무엇이 남았는지" 가 있어야 한다.
+  ok(await rp.locator('#make-report').count() === 0 && await rp.locator('.report-todo').count() === 1,
+     '마무리 전에는 보고서 단추 대신 남은 것이 적혀 있다');
+  await finishForReport(rp);
+  ok(await rp.locator('#make-report').count() === 1, '다 마무리하면 보고서 단추가 나온다');
 
   await rp.locator('#make-report').click();
   await rp.waitForTimeout(150);
@@ -790,11 +857,24 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await rp.locator('#rp-name').fill('홍길동');
   await rp.locator('#rp-grade').fill('2');
   await rp.locator('#rp-make').click();
-  await rp.waitForTimeout(200);
+  // 시야를 그림으로 굽고 나서야 인쇄가 걸린다 (src/ui/report.js). 그동안 기다린다.
+  await rp.waitForTimeout(1200);
 
   const sheet = await rp.locator('#report-sheet').innerHTML();
   ok(sheet.includes('홍길동') && sheet.includes('탐구 보고서'),
      '넣은 이름이 보고서에 실린다', `종이 ${sheet.length}자`);
+
+  // 파일 이름 — 서른 명이 낸 파일 이름이 전부 같으면 받는 쪽에서 누구 것인지 알 수 없다.
+  const docTitle = await rp.title();
+  ok(docTitle.includes('홍길동'), '저장되는 파일 이름에 학번·이름이 붙는다', docTitle);
+
+  // 시야는 그림으로 구워져야 한다. 작은 기기에서 SVG 필터가 까맣게 인쇄되던 자리다.
+  const baked = await rp.evaluate(() => ({
+    imgs: document.querySelectorAll('#report-sheet .rp-fov img').length,
+    svgs: document.querySelectorAll('#report-sheet .rp-fov svg').length,
+  }));
+  ok(baked.imgs > 0 && baked.svgs === 0,
+     '보고서의 시야가 그림으로 구워진다 (모바일 인쇄에서 까맣게 나오던 자리)', JSON.stringify(baked));
 
   // 가장 중요한 것 — 이름이 상태로 새지 않는다. 새면 되돌리기 기록에 남고 화면 곳곳으로 흘러간다.
   const leaked = await rp.evaluate(() => ({

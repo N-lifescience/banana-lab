@@ -143,6 +143,19 @@
     background:var(--indigo);color:#fff;border-radius:3px;padding:1px 4px;
     font:700 11px/1.3 ui-monospace,monospace;font-style:normal;pointer-events:none}
 
+  /* 실험대 자물쇠 — 탐구 노트를 읽기 전.
+     조작을 막는 것이 아니라 조작이 **시작되기 전**의 자리다 (src/ui/bench.js).
+     덮개가 포인터를 받아 물건이 눌리지 않게 하고, 왜 안 열리는지를 글로 말한다. */
+  .bench-lock{position:absolute;inset:0;z-index:30;border-radius:6px;
+    background:rgba(18,20,26,.62);display:flex;align-items:center;justify-content:center;
+    padding:16px;text-align:center}
+  .bench-lock[hidden]{display:none}
+  .bench-lock-card{background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+    border-radius:9px;padding:16px 18px;max-width:380px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+  .bench-lock-card b{display:block;font-size:14.5px;margin-bottom:6px}
+  .bench-lock-card p{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;line-height:1.5}
+  .bench-lock-card ul{margin:0;padding-left:18px;text-align:left;font-size:13px}
+
   /* 탐구 노트 */
   #notebook{overflow-y:auto;padding:20px 22px;border-left:1px solid var(--rule);background:var(--surface)}
   #notebook h1{font-size:17px;margin:0 0 14px}
@@ -154,6 +167,24 @@
   /* 골라 놓은 탭·보기. 글자를 #fff 로 박아 두면 다크 모드에서 --indigo 가 밝아지면서
      밝은 바탕에 흰 글씨가 된다 (대비 2.35). 바탕색 토큰을 쓰면 두 테마에서 함께 뒤집힌다. */
   .note-tab[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  /* 읽은 쪽에는 표시를 남긴다 — 어디를 더 봐야 실험대가 열리는지 탭만 보고 알 수 있어야 한다. */
+  .note-tab[data-read="true"]::after{content:" ✓";color:var(--good);font-weight:700}
+  .note-tab[aria-selected="true"][data-read="true"]::after{color:var(--surface)}
+
+  /* 「읽었습니다」 — 실험대의 자물쇠를 여는 단추. 1~4 쪽 아래에만 붙는다. */
+  .read-mark{border-top:1px solid var(--rule);margin-top:18px;padding-top:12px;
+    font-size:12.5px;color:var(--ink-mute)}
+  .read-mark p{margin:0 0 8px}
+  .read-mark[data-done="true"]{color:var(--good)}
+  .read-confirm{background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+    padding:9px 14px;font-size:13.5px;font-weight:600}
+
+  /* 보고서 자리 — 다 마무리하기 전에는 남은 것을 적어 둔다 */
+  .report-slot{flex:0 0 auto;max-width:58%}
+  .report-todo{font-size:12px;color:var(--warn);border:1px solid var(--rule);
+    border-radius:6px;padding:6px 9px;background:var(--sunk)}
+  .report-todo summary{cursor:pointer;white-space:nowrap}
+  .report-todo ul{margin:6px 0 0;padding-left:16px;color:var(--ink-mute);line-height:1.5}
   .note-step{margin-bottom:18px}
   .substep-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
   .substep{border:1px solid var(--rule);border-radius:6px;padding:10px}
@@ -206,12 +237,18 @@
   .start-go{width:100%;background:var(--indigo);color:var(--surface);border-color:var(--indigo);
     padding:12px;font-size:15px;font-weight:600}
   .start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
+  .start-sub{font-size:13.5px;margin:0 0 10px}
+  .start-modes{margin-bottom:20px}
   .predict-compare-row{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px}
   /* 예상과 실제를 나란히. 라벨과 답이 한 줄에 붙어 있으면 어디까지가 질문인지 안 읽힌다. */
   .compare-pair{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:6px 0 0}
   .compare-pair dt{color:var(--ink-mute);font-size:12px;white-space:nowrap}
   .compare-pair dd{margin:0}
   .capture-card{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:12px}
+  .capture-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .capture-head h3{margin:0}
+  .capture-del{font-size:11.5px;padding:4px 8px;border-radius:4px;color:var(--warn);
+    white-space:nowrap}
   .capture-readout{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
   .capture-readout dt{color:var(--ink-mute)}
   .capture-readout dd{margin:0}
@@ -244,22 +281,42 @@
   #violations{margin:0;padding-left:18px;font-size:13px}
   .no-violations{color:var(--ink-mute)}
 
-  /* 토스트 */
-  #toast-region{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
-    display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(90vw,480px)}
+  /* 토스트 — 언제나 **화면 위쪽**에 뜬다.
+     아래쪽에 두었더니, 세로로 쌓이는 작은 화면에서는 그 자리가 탐구 노트였다.
+     실험대에서 한 조작의 결과 문구가 노트 위에 겹쳐 떠서 어느 쪽 이야기인지 알 수 없었다.
+     기기마다 다른 자리에 두지 않는다 — 큰 화면에서도 조작한 손이 향하는 쪽은 위다. */
+  #toast-region{position:fixed;left:50%;top:14px;transform:translateX(-50%);
+    display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(90vw,480px);
+    pointer-events:none}
   .toast{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--good);
     border-radius:6px;padding:10px 14px;font-size:13.5px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
   .toast--blocked{border-left-color:var(--warn)}
 
-  /* 확대 뷰 */
+  /* 확대 뷰.
+     ── 작은 화면에서 잘리지 않게 ──────────────────────────────────
+     앞서는 `align-items:center` + `max-height:92vh` 였다. 모바일 브라우저에서 `vh` 는
+     주소창이 숨겨졌을 때의 **가장 큰** 높이를 가리키므로, 92vh 가 실제로 보이는 높이를
+     넘어선다. 넘친 부분은 화면 밖에 있고, 덮개(#zoom)가 스크롤되지 않으니 닿을 수가 없었다.
+     이제 셋을 함께 쓴다:
+       · #zoom 자체가 스크롤된다 (align-items 대신 패널의 margin:auto 로 가운데 정렬 —
+         center 정렬은 넘칠 때 위쪽을 잘라 먹는다)
+       · 패널 높이는 dvh 로 잰다. 주소창을 뺀 실제 높이다
+       · 닫기 단추는 sticky 라 아래로 내려도 따라온다 */
   #zoom{position:fixed;inset:0;background:rgba(10,12,8,.55);display:flex;
-    align-items:center;justify-content:center;z-index:100;padding:20px}
+    justify-content:center;z-index:100;padding:16px;
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   #zoom[hidden]{display:none}
   .zoom-panel{position:relative;background:var(--surface);border-radius:10px;
-    max-width:640px;width:100%;max-height:92vh;overflow-y:auto;padding:22px}
-  .zoom-close{position:absolute;top:12px;right:12px;border:1px solid var(--rule);
+    max-width:640px;width:100%;margin:auto;padding:22px;
+    max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;
+    display:flex;flex-direction:column}
+  .zoom-close{position:sticky;top:0;align-self:flex-end;z-index:3;
+    border:1px solid var(--rule);
     background:var(--sunk);border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12.5px}
-  .zoom-body h2{font-size:16px;margin:0 26px 14px 0}
+  .zoom-body h2{font-size:16px;margin:0 0 14px}
+  /* 지금 배율이 어떻게 나오는지 한 줄. 접안 × 대물 = 총배율. */
+  .zoom-mag-line{font-size:12.5px;color:var(--ink-mute);margin:2px 0 0;
+    font-family:ui-monospace,monospace}
   /* 색만으로 용액을 구분하지 않도록 시야 위에 어느 슬라이드·용액인지 글자로도 밝혀 둔다 */
   .zoom-slide-label{font-size:12.5px;color:var(--ink-mute);margin:-8px 0 10px}
   .zoom-slide-stage,.zoom-fov{background:var(--sunk);border-radius:6px;padding:10px;
@@ -295,6 +352,13 @@
   .scope-figure svg{width:100%;height:auto;display:block}
   .zoom-fov{flex:1;min-width:0}
   .zoom-fov svg{max-width:290px;margin:0 auto}
+  /* 좁은 화면에서는 위아래로 쌓는다. 나란히 두면 시야가 손톱만 해지는데,
+     이 화면에서 봐야 하는 것은 현미경 그림이 아니라 시야다 — 그래서 시야가 위로 온다. */
+  @media (max-width:560px){
+    .scope-stage{flex-direction:column-reverse;align-items:stretch}
+    .scope-figure{flex:0 0 auto;width:140px;margin:0 auto}
+    .zoom-fov svg{max-width:min(100%,320px)}
+  }
 
   /* 조동·미동나사 — 실물처럼 돌린다 */
   .dial-row{display:flex;gap:22px;align-items:flex-start}
@@ -316,6 +380,10 @@
   .ctrl-group span,.ctrl-group label{color:var(--ink-mute);min-width:70px}
   .ctrl-group button{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
     padding:5px 9px;cursor:pointer}
+  /* 지금 고른 배율. 단추에 적힌 숫자를 대물렌즈 배율로 바꾸고 나니, 어느 것이 지금인지가
+     화면에 없으면 아래 「접안 × 대물」 줄과 맞춰 볼 수가 없다. */
+  .ctrl-group button[aria-pressed="true"]{background:var(--indigo);color:var(--surface);
+    border-color:var(--indigo);font-weight:600}
   .ctrl-group input[type=range]{flex:1;accent-color:var(--indigo)}
   .zoom-empty{color:var(--ink-mute);font-size:13.5px}
 
@@ -324,9 +392,18 @@
   .note-head h1{margin-bottom:14px}
   #make-report{padding:6px 11px;font-size:12.5px;white-space:nowrap}
   .report-dialog{border:1px solid var(--rule);border-radius:10px;background:var(--surface);
-    color:var(--ink);max-width:460px;width:calc(100% - 40px);padding:22px}
+    color:var(--ink);max-width:460px;width:calc(100% - 32px);padding:22px;
+    /* 확대 뷰와 같은 이유다 — 작은 화면에서 창이 화면보다 길면 아래를 볼 수 없었다. */
+    max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
   .report-dialog::backdrop{background:rgba(10,12,8,.55)}
   .report-dialog h2{font-size:16px;margin:0 0 10px}
+  /* 활동지 종류 — 개별 / 모둠. 같은 기록에서 두 가지 종이가 나온다. */
+  .rp-kinds{display:flex;gap:6px;margin:0 0 8px}
+  .rp-kind{flex:1;padding:8px 10px;font-size:13px;border-radius:5px}
+  .rp-kind[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  .rp-kind-note{font-size:12px;color:var(--ink-mute);margin:0 0 14px;min-height:1.4em}
+  .rp-fields--group{margin-top:10px}
+  .rp-fields--group[hidden]{display:none}
   .rp-privacy{font-size:12.5px;color:var(--ink-mute);margin:0 0 16px;line-height:1.55}
   /* input 은 아무것도 안 하면 기본 너비(약 20자)를 최소 폭으로 우긴다. 세 칸을 나란히 놓으면
      그 합이 창보다 넓어져 번호 칸이 잘리고 가로 스크롤이 생겼다. 실제로 그랬다.
@@ -387,7 +464,9 @@
     .rp-captures{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .rp-capture{border:1px solid #999;border-radius:4px;padding:8px;break-inside:avoid}
     /* 시야는 정사각형이라 칸을 꽉 채우면 한 장이 종이 반쪽을 먹는다. 셋이 한 쪽에 들어가게 묶는다. */
-    .rp-fov svg{width:100%;max-width:55mm;height:auto;display:block;margin:0 auto}
+    /* 작은 기기에서는 시야가 SVG 가 아니라 구운 PNG 로 바뀌어 있다 (src/ui/report.js).
+       둘 다 같은 크기로 앉아야 종이 배치가 기기마다 달라지지 않는다. */
+    .rp-fov svg,.rp-fov img{width:100%;max-width:55mm;height:auto;display:block;margin:0 auto}
     .rp-readout{margin:6px 0 0;font-size:9.5pt}
     .rp-readout div{display:flex;gap:6px}
     .rp-readout dt{color:#555}

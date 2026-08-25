@@ -10,11 +10,12 @@
  * session.notes 를 직접 대입하지 않는다.
  */
 
-import { SLIDE_IDS } from '../sim/state.js';
+import { SLIDE_IDS, MODES } from '../sim/state.js';
 import { ASSETS } from '../assets/index.js';
 import { renderFOV } from '../render/fov.js';
 import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
+import { EYEPIECE } from '../sim/optics.js';
 import { UI } from './strings.js';
 
 const N = UI.notebook;
@@ -90,17 +91,72 @@ export function actualSummary(st, slideId) {
   return `${seen} (${UI.observability.label} ${observability(cap).score})`;
 }
 
+/** 모둠으로 하는 세션인가. 혼자라면 토의·모둠 비교 문항을 아예 내지 않는다. */
+export function isGroup(st) {
+  return (st.session.mode ?? MODES.GROUP) === MODES.GROUP;
+}
+
+/**
+ * 보고서를 낼 수 있는가, 아직 무엇이 남았는가.
+ *
+ * 「보고서 만들기」 를 늘 띄워 두면 첫 화면에서부터 눌러 빈 종이를 뽑는다. 그 종이를 낸
+ * 학생은 자기가 무엇을 안 했는지 **종이를 보고서야** 안다.
+ * 막는 것이 목적이 아니므로, 감추는 자리에 **무엇이 남았는지**를 대신 적는다.
+ *
+ * 5~7 단계는 결과가 있어야 채울 수 있어서 여기에 넣고, 1·2 단계(문제 인식·준비물)는
+ * 읽기만 하는 쪽이라 넣지 않는다 — 그쪽은 실험대 자물쇠가 이미 챙긴다 (`src/ui/bench.js`).
+ *
+ * @returns {{ready: boolean, missing: string[]}}
+ */
+export function reportReadiness(st) {
+  const notes = st.session.notes;
+  const has = (key) => String(notes[key] ?? '').trim().length > 0;
+  const missing = [];
+
+  if (!SLIDE_IDS.every((id) => has(`predict.${id}`))) missing.push(N.reportTodo.predict);
+  // (가)(나)(다)를 한 번씩은 봐야 한다. 이 실험이 하려는 일이 그것이다.
+  // 금이 가서 못 본 슬라이드가 있어도 받침 유리 통에서 새로 만들 수 있다.
+  const seen = new Set(st.session.captures.map((c) => c.slide));
+  if (!SLIDE_IDS.every((id) => seen.has(id))) missing.push(N.reportTodo.captures);
+
+  const wrapupKeys = ['q.a', 'q2', ...(isGroup(st) ? ['q3'] : [])];
+  if (!wrapupKeys.every(has)) missing.push(N.reportTodo.wrapup);
+  if (!N.selfEvalItems.every(({ key }) => has(`selfeval.${key}`))) missing.push(N.reportTodo.selfEval);
+
+  return { ready: missing.length === 0, missing };
+}
+
 export function createNotebook(root, store, { onOpenZoom, onReport }) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
-      <button type="button" id="make-report">${UI.report.button}</button>
+      <div id="report-slot" class="report-slot"></div>
     </div>
     <div id="note-tabs" class="note-tabs" role="tablist"></div>
     <div id="note-panel" class="note-panel"></div>`;
 
-  // 보고서는 탐구 노트가 내놓는 것이라 여기 둔다. 여는 일만 넘기고, 만드는 일은 report.js 가 한다.
-  root.querySelector('#make-report').addEventListener('click', () => onReport?.());
+  const reportSlot = root.querySelector('#report-slot');
+
+  /**
+   * 보고서 단추는 **다 마무리했을 때** 나온다. 그 전에는 남은 것을 적어 둔다.
+   *
+   * 단추를 회색으로 죽여 두지 않는다 — 눌리지 않는 단추는 왜 안 눌리는지 말해 주지 못한다.
+   * 그 자리에 남은 것을 적은 목록을 대신 그린다.
+   */
+  function renderReportSlot(st) {
+    const { ready, missing } = reportReadiness(st);
+    if (ready) {
+      reportSlot.innerHTML = `<button type="button" id="make-report">${UI.report.button}</button>`;
+      // 보고서는 탐구 노트가 내놓는 것이라 여기 둔다. 여는 일만 넘기고, 만드는 일은 report.js 가 한다.
+      reportSlot.querySelector('#make-report').addEventListener('click', () => onReport?.());
+      return;
+    }
+    reportSlot.innerHTML = `
+      <details class="report-todo">
+        <summary>${N.reportLockedHint} (${missing.length})</summary>
+        <ul>${missing.map((m) => `<li>${m}</li>`).join('')}</ul>
+      </details>`;
+  }
 
   const tabsEl = root.querySelector('#note-tabs');
   const panelEl = root.querySelector('#note-panel');
@@ -265,25 +321,37 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
   function renderStage5(st) {
     const caps = st.session.captures;
     if (caps.length === 0) return `<p class="stage-empty">${N.noCaptures}</p>`;
-    return `<div class="capture-list">${caps.map((c, i) => {
-      const key = `mag.${i}`;
-      const domId = `note-mag-${i}`; // id 에는 '.' 을 안 쓴다 — CSS 선택자에서 클래스로 오해된다
+    return `<p class="stage-empty">${N.captureListHint}</p>
+      <div class="capture-list">${caps.map((c, i) => {
+      // 저장 키는 배열 인덱스가 아니라 캡처에 붙은 번호(`at`)다.
+      // 가운데 기록을 지우면 인덱스가 밀려, 아래 카드의 배율 답이 통째로 한 칸씩 어긋난다.
+      const at = c.at ?? i;
+      const key = `mag.${at}`;
+      const domId = `note-mag-${at}`; // id 에는 '.' 을 안 쓴다 — CSS 선택자에서 클래스로 오해된다
       const saved = st.session.notes[key] ?? '';
       const check = saved !== '' ? gradeMagnification(saved, c.objective) : null;
+      const eyepiece = c.eyepiece ?? EYEPIECE;
       // 제목에는 짧은 이름을 쓴다. UI.slides 는 이름에 시약까지 담고 있어서 뒤에 시약을
       // 또 붙이면 겹친다 — "(나) 아이오딘–아이오딘화 칼륨 · 아이오딘–아이오딘화 칼륨".
       return `
         <div class="capture-card">
-          <h3>${UI.slideShort[c.slide]} · ${c.reagent ? UI.reagents[c.reagent] : UI.noReagent}</h3>
+          <div class="capture-head">
+            <h3>${UI.slideShort[c.slide]} · ${c.reagent ? UI.reagents[c.reagent] : UI.noReagent}</h3>
+            <button type="button" class="capture-del" data-del="${at}"
+              aria-label="${N.captureDeleteLabel(i + 1)}">${N.captureDelete}</button>
+          </div>
           <!-- 기록한 시야를 그대로 되살린다. 캡처가 fieldParams 한 벌을 통째로 담고 있으므로
                그때 본 것과 같은 그림이 나온다. idPrefix 를 카드마다 달리 주지 않으면
-               모든 카드가 첫 카드의 흐림·잘라내기를 쓴다 — 에러 없이 조용히 틀린다. -->
-          <div class="capture-fov">${renderFOV(c, { idPrefix: `cap${i}-` })}</div>
+               모든 카드가 첫 카드의 흐림·잘라내기를 쓴다 — 에러 없이 조용히 틀린다.
+               번호(at)로 붙인다 — 지우고 나서도 남은 카드의 접두사가 바뀌지 않는다. -->
+          <div class="capture-fov">${renderFOV(c, { idPrefix: `cap${at}-` })}</div>
           <dl class="capture-readout">
-            <!-- 대물렌즈 칸에 총배율(=접안 10 × 대물)을 적고 있었다. 이름과 값이 어긋난 데다,
-                 바로 아래 "배율 입력" 이 묻는 답을 화면이 먼저 알려 주고 있었다.
-                 여기는 대물렌즈 배율만 보여 준다 — 곱하는 일은 학생 몫이다. -->
-            <div><dt>${UI.controls.objective}</dt><dd>${UI.units.mag(c.objective)}</dd></div>
+            <!-- 곱할 두 수를 **둘 다** 보여 준다.
+                 앞서는 대물렌즈 한 줄뿐이었고, 정작 현미경 화면의 단추에는 총배율이 적혀 있어서
+                 두 숫자가 서로 달랐다 — 무엇에 무엇을 곱하라는 건지 알 수가 없었다.
+                 곱한 답은 여전히 알려 주지 않는다. 그건 아래 칸이 묻는 것이다. -->
+            <div><dt>${N.eyepieceLabel}</dt><dd>${UI.units.mag(eyepiece)}</dd></div>
+            <div><dt>${N.objectiveLabel}</dt><dd>${UI.units.mag(c.objective)}</dd></div>
             <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
           </dl>
           <label class="notes-label" for="${domId}">${N.magInput}</label>
@@ -364,6 +432,22 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
     return `<p id="grade-${id}" class="grade-line" data-grade="${g.status}">${g.message ?? N.gradeOk}</p>`;
   }
 
+  /**
+   * 모둠 토의 기록 — 모둠으로 하는 세션에만 나온다.
+   * 혼자 하는 학생에게 "누가 무엇을 맡았나요" 를 물으면 답할 것이 없고,
+   * 빈칸으로 남은 문항은 보고서에서 "안 한 일" 로 읽힌다.
+   */
+  function renderDiscussion(st) {
+    if (!isGroup(st)) return '';
+    const items = N.discussionItems.map(({ key, label, eg }) => `
+      <div class="self-eval-item">
+        <label class="notes-label" for="note-discuss-${key}">${label}</label>
+        <textarea data-note="discuss.${key}" id="note-discuss-${key}"
+          placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`discuss.${key}`] ?? '')}</textarea>
+      </div>`).join('');
+    return `<section class="grade-block"><h3>${N.discussionHeading}</h3>${items}</section>`;
+  }
+
   function renderStage6(st) {
     const qa = st.session.notes['q.a'] ?? '';
     const q2 = st.session.notes.q2 ?? '';
@@ -385,11 +469,13 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
         <textarea data-note="q2" id="note-q2">${escapeHtml(q2)}</textarea>
         ${gradeLine('q2', 'q2', q2)}
       </section>
+      ${isGroup(st) ? `
       <section class="grade-block">
         <label class="notes-label" for="note-q3">${N.q3Label}</label>
         <textarea data-note="q3" id="note-q3">${escapeHtml(q3)}</textarea>
         ${gradeLine('q3', 'q3', q3)}
-      </section>
+      </section>` : ''}
+      ${renderDiscussion(st)}
       ${renderReflect(st)}`;
   }
 
@@ -476,15 +562,50 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
     panelEl.querySelectorAll('[data-retry]').forEach((btn) => {
       btn.addEventListener('click', () => onOpenZoom('scope', btn.dataset.retry, btn));
     });
+    panelEl.querySelectorAll('[data-del]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        store.dispatch('DELETE_CAPTURE', { at: Number(btn.dataset.del) });
+      });
+    });
+    panelEl.querySelector('#mark-read')?.addEventListener('click', () => {
+      store.dispatch('MARK_READ', { stage: activeStage });
+    });
+  }
+
+  /**
+   * 「읽었습니다」 — 실험대의 자물쇠를 여는 단추.
+   *
+   * 1~4 쪽 아래에만 붙는다. 5~7 쪽은 결과가 있어야 채울 수 있어 "읽는" 쪽이 아니다.
+   * 다 읽었는지를 기계가 재는 방법은 없다 — 스크롤 끝까지 내렸는지는 손가락이 움직였다는
+   * 증거일 뿐이다. 그래서 학생에게 묻는다. 누르는 것 자체가 약속이 된다.
+   */
+  function readFooter(st) {
+    const required = UI.bench.lock.required;
+    if (!required.includes(activeStage)) return '';
+    const read = st.session.readStages ?? [];
+    const left = required.filter((id) => !read.includes(id));
+    if (read.includes(activeStage)) {
+      return `<p class="read-mark" data-done="true">${N.readDone}${
+        left.length === 0 ? ` ${N.readAllDone}` : ''}</p>`;
+    }
+    return `
+      <div class="read-mark">
+        <p>${N.readLeadIn}</p>
+        <button type="button" id="mark-read" class="read-confirm">${N.readConfirm}</button>
+      </div>`;
   }
 
   function render() {
     const st = store.getState();
     tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
       tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));
+      // 읽은 쪽에는 표시를 남긴다. 어디를 더 봐야 실험대가 열리는지 탭만 보고 알 수 있어야 한다.
+      const need = UI.bench.lock.required.includes(tab.dataset.stage);
+      tab.dataset.read = String(need && (st.session.readStages ?? []).includes(tab.dataset.stage));
     });
-    panelEl.innerHTML = STAGE_RENDERERS[activeStage](st);
+    panelEl.innerHTML = STAGE_RENDERERS[activeStage](st) + readFooter(st);
     bindPanel();
+    renderReportSlot(st);
   }
 
   store.subscribe(render);

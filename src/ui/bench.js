@@ -12,6 +12,7 @@
 
 import { ASSETS } from '../assets/index.js';
 import { CONTRACT, CONTENT_BOX, drawnBoxMm } from '../assets/contract.js';
+import { excess } from '../sim/state.js';
 import { UI } from './strings.js';
 
 /**
@@ -101,8 +102,13 @@ function defaultItems() {
     // 낱장 석 장을 늘어놓았더니 22 mm 짜리가 화면에서 12 px 이라 무엇인지 알아볼 수 없었다.
     // 통 하나로 바꾼다 — 실제 실험실도 통에서 꺼내 쓰고, 종류(kind)는 그대로라 조작표는 그대로다.
     shelf(1156, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', labelKey: 'coverbox' }),
+    // 받침 유리도 통에서 꺼내 쓴다. 덮개 유리 통 옆에 나란히 둔다 — 둘 다 "꺼내 쓰는 것" 이다.
+    shelf(802, { id: 'slidebox', asset: 'slidebox', kind: 'slidebox', labelKey: 'slidebox' }),
     surface(1301, { id: 'dropper', asset: 'dropper', kind: 'dropper', labelKey: 'dropper' }),
     surface(1380, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
+    // 물도 시약병에 담겨 있다. 교과서 절차에서 시료 위에 먼저 떨어뜨리는 봉입액이고,
+    // 이것이 없으면 (가) 대조군에 아무것도 할 일이 없어 대조군인 이유가 흐려진다.
+    shelf(1221, { id: 'bottleWATER', asset: 'bottle', kind: 'bottle', reagent: 'WATER', labelKey: 'bottleWATER' }),
     shelf(1298, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
     shelf(1375, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
     // 작업면. 씻는 곳(개수대)과 버리는 곳(쓰레기통·폐액통)을 나눠 둔다 —
@@ -181,6 +187,10 @@ export function dropTable(store, openZoom = () => {}) {
         store.dispatch('SET_OBJECTIVE', { objective: 40 });
       },
       sink: (item) => store.dispatch('RINSE_SLIDE', { slide: item.slide }),
+      // 금이 간 유리는 씻어도 그대로다. 통에 대면 그 자리를 새것이 대신한다.
+      slidebox: (item) => store.dispatch('NEW_SLIDE', { slide: item.slide }),
+      // 깨진 유리는 고형 폐기물이다. 버리는 손짓이 먼저 나오는 학생도 있으므로 같은 길을 연다.
+      bin: (item) => store.dispatch('NEW_SLIDE', { slide: item.slide }),
     },
   };
 }
@@ -221,7 +231,7 @@ export function benchLayout() {
 
 /** 실험대에 놓인 물건들. 배치를 몰라도 종류만 알면 되는 검사에 쓴다. */
 export const BENCH_KINDS = [
-  'banana', 'slide', 'coverslip', 'dropper', 'forceps',
+  'banana', 'slide', 'coverslip', 'slidebox', 'dropper', 'forceps',
   'bottle', 'microscope', 'waste', 'sink', 'bin', 'tissue',
 ];
 
@@ -268,6 +278,13 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       <div class="bench-bg" aria-hidden="true"></div>
       <div class="bench-tokens"></div>
       <div class="bench-tip" id="bench-tip" role="tooltip" hidden></div>
+      <div class="bench-lock" id="bench-lock" hidden>
+        <div class="bench-lock-card">
+          <b>${UI.bench.lock.title}</b>
+          <p>${UI.bench.lock.lead}</p>
+          <ul id="bench-lock-left"></ul>
+        </div>
+      </div>
     </div>
     ${edit ? `
       <div class="edit-panel" id="edit-panel">
@@ -372,6 +389,9 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       sample: s.sample,
       stain: s.stain,
       reaction: s.reactionT,
+      // 넘친 액은 실험대에서도 보여야 한다. 확대 뷰를 열어야만 보이면
+      // 열여섯 방울을 떨어뜨린 학생이 실험대만 보고는 아무 일도 없다고 여긴다.
+      excess: excess(s),
       coverslip: s.coverslip.placed,
       bubbles: s.coverslip.bubbles,
       seed: s.seed,
@@ -562,6 +582,14 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       hideTip();
     }, 0);
   }
+
+  // 실험대 아무 데나 누르면 말풍선을 닫는다.
+  // 마우스에는 pointerleave 가 있지만 손가락에는 없다 — 물건 밖을 눌렀을 때
+  // 닫히지 않으면 말풍선이 실험대 위에 그대로 남는다.
+  root.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.token') || tipEl.contains(e.target)) return;
+    hideTip();
+  });
 
   // 말풍선 안 버튼에서 포커스가 완전히 빠져나가면 닫는다.
   tipEl.addEventListener('focusout', (e) => {
@@ -774,10 +802,17 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       el.addEventListener('pointerup', onPointerUp);
       el.addEventListener('pointercancel', onPointerUp);
 
-      el.addEventListener('pointerenter', () => showTip(item));
+      // 말풍선은 **마우스로 올렸을 때만** 뜬다.
+      //
+      // 손가락에는 hover 가 없다. 그런데 브라우저는 터치에도 pointerenter 를 한 번 쏘므로,
+      // 이걸 그대로 받으면 스마트폰에서 물건을 누를 때마다 말풍선이 떴다가
+      // 화면 어딘가를 다시 누를 때까지 남아 실험대를 가린다. 실제로 그랬다.
+      el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showTip(item); });
       el.addEventListener('pointerleave', () => hideTip());
       // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
-      el.addEventListener('focus', () => showTip(item, true));
+      // :focus-visible 일 때만 낸다. 손가락으로 눌러도 <button> 은 포커스를 받는데,
+      // 그때까지 이 말풍선을 띄우면 누를 때마다 떠서 안 사라지는 창이 된다.
+      el.addEventListener('focus', () => { if (el.matches(':focus-visible')) showTip(item, true); });
       // 포커스가 옮겨 갈 때 blur 가 focus 보다 먼저 온다. 여기서 곧바로 닫으면
       // 옆 물건으로 Tab 한 순간 말풍선이 닫혔다가 다시 열리며 서로를 지운다.
       // 닫기를 한 프레임 미루고, 그 사이 새 포커스가 오면 취소한다.
@@ -840,6 +875,35 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     }
   }
 
+  /**
+   * 실험대는 탐구 노트를 읽기 전에는 열리지 않는다.
+   *
+   * 이것은 **조작을 막는 것이 아니다.** 조작이 시작되기 전, 무엇을 하려는 실험인지
+   * 읽는 자리를 만드는 것이다 — 열린 뒤로는 어떤 조작도 막지 않는다 (AGENTS.md §2.1).
+   * 앞서는 실험대와 탐구 노트가 따로 놀아서, 노트를 한 번도 열지 않고 물건부터 끄는
+   * 학생이 대부분이었다.
+   *
+   * 배치 편집 모드(`?edit=1`)는 자물쇠를 걸지 않는다 — 거기는 학생 화면이 아니다.
+   */
+  function lockState() {
+    if (edit) return { locked: false, left: [] };
+    const read = store.getState().session.readStages ?? [];
+    const left = UI.bench.lock.required.filter((id) => !read.includes(id));
+    return { locked: left.length > 0, left };
+  }
+
+  const lockEl = root.querySelector('#bench-lock');
+
+  function renderLock() {
+    const { locked, left } = lockState();
+    lockEl.hidden = !locked;
+    root.classList.toggle('bench--locked', locked);
+    if (!locked) return;
+    const titleOf = (id) => UI.notebook.stages.find((st) => st.id === id)?.title ?? id;
+    root.querySelector('#bench-lock-left').innerHTML =
+      left.map((id) => `<li>${id}. ${titleOf(id)}</li>`).join('');
+  }
+
   function renderBar() {
     const st = store.getState();
     const undosLeft = st.session.undosLeft;
@@ -854,8 +918,9 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   // 드래그 도중에는 다시 그리지 않는다. TICK 처럼 사용자와 무관하게 들어오는 상태 변경이
   // DOM 을 새로 만들면 setPointerCapture 가 무효화돼 드래그가 조용히 끊긴다.
   // 드래그가 끝나면 onPointerUp 이 최신 상태로 어차피 다시 그린다.
-  store.subscribe(() => { renderBar(); if (!drag) renderTokens(); });
+  store.subscribe(() => { renderBar(); renderLock(); if (!drag) renderTokens(); });
   renderTokens();
   renderBar();
+  renderLock();
   renderEditPanel();
 }

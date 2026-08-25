@@ -8,7 +8,17 @@
 /** (가) 대조군 · (나) 아이오딘 · (다) 수단 Ⅲ */
 export const SLIDE_IDS = ['A', 'B', 'C'];
 
-export const REAGENTS = { NONE: null, IKI: 'IKI', SUDAN: 'SUDAN3' };
+/**
+ * 검출 용액.
+ *
+ * WATER 는 검출 시약이 아니라 **봉입액**이다. 교과서 절차에서 시료 위에 먼저 떨어뜨리는 물이고,
+ * (가) 대조군이 대조군일 수 있는 이유이기도 하다 — 물만 떨어뜨렸으니 색이 변할 것이 없다.
+ * 그래서 물은 `slide.stain` 을 차지하지 않는다. 방울 수만 는다 (rules.js 의 DROP 참조).
+ */
+export const REAGENTS = { NONE: null, WATER: 'WATER', IKI: 'IKI', SUDAN: 'SUDAN3' };
+
+/** 색을 내는 시약인가. 물은 아니다 — 반응도 없고 stain 도 차지하지 않는다. */
+export const isStaining = (reagent) => reagent === 'IKI' || reagent === 'SUDAN3';
 
 export function initialSlide(id) {
   return {
@@ -41,7 +51,15 @@ export const HISTORY_LIMIT = 20;
  */
 export const PAN_LIMIT = 240;
 
-export function initialState(level = 1, seed = 20260823) {
+/**
+ * 혼자 하는가, 모둠으로 하는가.
+ *
+ * 활동지가 갈린다 — 혼자 하는 학생에게 "다른 모둠의 결과와 비교해 보세요" 를 물으면
+ * 답할 수 없는 것을 묻는 셈이고, 빈칸으로 남은 문항은 "못 한 일" 로 읽힌다.
+ */
+export const MODES = { SOLO: 'solo', GROUP: 'group' };
+
+export function initialState(level = 1, seed = 20260823, mode = MODES.GROUP) {
   return {
     slides: Object.fromEntries(
       SLIDE_IDS.map((id, i) => [id, { ...initialSlide(id), seed: seed + i * 977 }])
@@ -65,9 +83,13 @@ export function initialState(level = 1, seed = 20260823) {
     session: {
       level,
       seed,
+      mode,
       step: '1a',
       notes: {},          // { '3b': '관찰 기록...' }
-      captures: [],       // { slide, objective, drops, reagent, seed, quality, focusErr, bubbles }
+      captures: [],       // { at, slide, objective, drops, reagent, seed, quality, focusErr, bubbles }
+      // 탐구 노트에서 **읽은** 단계. 실험대는 이것이 다 차야 열린다 (src/ui/bench.js).
+      // 읽었다는 사실은 조작이 아니라서 되돌리기 기록에 쌓지 않는다 (rules.js TRANSIENT_ACTIONS).
+      readStages: [],
       violations: [],     // 안전 규칙 위반 기록. 감점하지 않고 보여 주기만 한다.
       log: [],            // { at, action, outcome, tag } — 되돌아보기용. at 은 순번이다
       // 되돌리기용. 세션 안에서만 쓴다 — captures 나 제출 데이터에 넣지 않는다.

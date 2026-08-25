@@ -31,7 +31,9 @@ try {
 
 mkdirSync('shots', { recursive: true });
 
-const URL_BASE = process.env.SHOT_URL ?? 'http://localhost:5173';
+// 난이도를 주소로 정하면 시작 화면을 건너뛴다. 이 스크립트가 볼 것은 그 뒤의 조작이라
+// 매번 시작 화면을 클릭해 넘길 이유가 없다 (시작 화면 자체는 check-bench.mjs 가 본다).
+const URL_BASE = process.env.SHOT_URL ?? 'http://localhost:5173/?level=1';
 const results = [];
 const record = (ok, label, detail = '') => {
   results.push({ ok, label, detail });
@@ -49,6 +51,16 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
 await page.goto(URL_BASE, { waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
+
+/**
+ * 실험대 자물쇠를 연다 — 탐구 노트 1~4 쪽을 읽어야 열린다 (`src/ui/bench.js`).
+ * 학생에게는 그것이 절차지만, 여기서 보려는 것은 그 뒤의 조작이다.
+ */
+const unlock = (p) => p.evaluate(() => {
+  for (const stage of ['1', '2', '3', '4']) window.__store?.dispatch('MARK_READ', { stage });
+});
+await unlock(page);
+await page.waitForTimeout(120);
 
 console.log('\n조작 UI 검증\n');
 record(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
@@ -166,6 +178,7 @@ if (historyMix === null) {
 await page.screenshot({ path: 'shots/ui-light.png', fullPage: true });
 const dark = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2, colorScheme: 'dark' });
 await dark.goto(URL_BASE, { waitUntil: 'networkidle' });
+await unlock(dark);
 await dark.waitForTimeout(400);
 await dark.screenshot({ path: 'shots/ui-dark.png', fullPage: true });
 record(true, '라이트/다크 스크린샷 저장', 'shots/ui-light.png · shots/ui-dark.png');

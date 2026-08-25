@@ -296,11 +296,16 @@ export function renderFOV(p, { idPrefix = '' } = {}) {
   // 여기서 갈라 두지 않으면 기포가 접안렌즈에 붙어 있는 것처럼 보인다.
   const scene = `<g id="${id('fov-scene')}" transform="translate(${(-panX).toFixed(1)},${(-panY).toFixed(1)})">${body}${bubbles}${cracks}</g>`;
 
-  // 넘친 용액이 배경까지 물들인다
+  // 넘친 용액이 배경까지 물들인다.
+  //
+  // 앞서는 최대 0.40 이라, 다섯 방울을 넘겨도 알갱이가 또렷하게 보였다. 넘친 액은
+  // 실제로 시야를 통째로 물들여 대비를 죽인다 — 그래서 두 방울이 가장 잘 보이는 것이고,
+  // 그 사실을 시야가 말해야 한다. 다 덮어 버리지는 않는다 (0.72): 무엇이 있었는지는
+  // 어렴풋이 보여야 "짙어서 안 보인다" 는 것을 알 수 있다.
   let wash = '';
   if (p.excess > 0) {
     const c = isIKI ? '#C9A23C' : isSU ? '#D6394F' : '#B9B9A8';
-    wash = `<rect x="0" y="0" width="${FS}" height="${FS}" fill="${c}" opacity="${(p.excess * (isIKI ? 0.40 : 0.30)).toFixed(2)}"/>`;
+    wash = `<rect x="0" y="0" width="${FS}" height="${FS}" fill="${c}" opacity="${(p.excess * (isIKI ? 0.72 : 0.62)).toFixed(2)}"/>`;
   }
 
   // 두껍게 바른 시료는 빛을 막는다
