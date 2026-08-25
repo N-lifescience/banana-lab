@@ -63,11 +63,32 @@ npm run dev
 `npm run check` 가 통과하지 않는 상태에서 고치기 시작하면, 나중에 무엇 때문에 깨졌는지
 알 수 없습니다. **반드시 초록불에서 출발하세요.**
 
+### 복제 직후 — 바나나랩의 기록을 치운다
+
+복제본에는 바나나랩의 진행 기록(`PROGRESS.md`)이 그대로 딸려 옵니다.
+이것은 **바나나 실험의 역사**이지 이 실험의 규칙이 아닙니다. 거기 적힌 판단들
+("총 100배 64.8 ms 는 그대로 둔다", "1단계는 400배까지 맞춰 준다" 같은)은
+바나나랩의 사정에서 나온 것이라, 이 실험에 그대로 가져오면 안 됩니다.
+
+```bash
+mv PROGRESS.md docs/banana-progress.md      # 참고용으로 보관 — 함정 사례집으로 값집니다
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+git add -A && git commit -m "바나나랩 기록을 보관하고 새 기록으로 시작"
+```
+
+새 `PROGRESS.md` 에는 **이 실험의 기록만** 씁니다. 카드 하나를 닫을 때마다 한 절씩 —
+무엇을 했고, 검토에서 무엇을 잡았고, 무엇을 판단했고, 무엇이 남았는지.
+형식은 `docs/banana-progress.md` 를 본으로 삼으세요.
+
 ---
 
 ## 3. 갈아 끼울 것 — 파일별 목록
 
 순서대로 하면 매 단계 화면에서 확인할 수 있습니다.
+
+**색이 필요해지면** — 이 실험 고유의 시약색·반응색은 전부
+`src/style/palette.experiment.js` **한 파일**에 새로 만들어 두고 거기서 import 합니다.
+`src/style/tokens.js` 는 수정하지 않습니다. 전체 규칙은 §4 에 있습니다.
 
 ### 3.1 규칙 (`src/sim/`) — 먼저
 
@@ -93,6 +114,8 @@ npm run dev
 같은 상태를 주면 같은 그림이 나와야 합니다 (난수는 `seed` 로 받습니다).
 그래야 나중에 결과를 저장해 두었다가 탐구 노트와 보고서에서 되살릴 수 있습니다.
 
+반응색이 필요하면 `palette.experiment.js` 에서 import 합니다 (§4).
+
 실물 치수를 지어내지 마세요. 세포 150 µm, 녹말립 30 µm 처럼 **실제 값**을 쓰고,
 `tests/optics.test.js` 같은 테스트로 고정하세요. "보기 좋게" 키우면 틀린 시뮬레이터가 됩니다.
 
@@ -107,7 +130,8 @@ npm run dev
 
 지켜야 할 것:
 
-- 색은 `src/style/tokens.js` 의 `PALETTE` 값만. 선 색은 `INK` 하나
+- 색은 `tokens.js` 의 `PALETTE` 값과 이 실험의 `palette.experiment.js` 값만.
+  선 색은 `INK` 하나. **기구에는 공용 색만** 씁니다 — 반응색을 기구에 쓰지 않습니다 (§4)
 - 선 두께는 `STROKE.outline(3) / .detail(2) / .hair(1.5)` 셋뿐
 - 그라데이션·필터·블러 금지. 광원은 좌상단 45° 고정, 음영은 언제나 우하단
 - 코드가 패스 좌표를 만들지 않습니다. **약속된 노드의 속성만** 바꿉니다
@@ -175,9 +199,40 @@ npm run dev  →  http://localhost:5173/?edit=1
 
 ## 4. 절대 건드리지 말 것
 
-- **`src/style/tokens.js` 의 팔레트에 색을 마음대로 추가하지 마세요.**
-  나중에 여러 실험을 합칠 때 가장 크게 부딪히는 자리입니다. 꼭 필요하면
-  `MERGE-AND-DEPLOY.md` 의 색 규칙을 먼저 읽으세요
+- **`src/style/tokens.js` 는 수정하지 않습니다. 이 실험의 색은 딴 파일에 둡니다.**
+  새 실험은 거의 반드시 새 반응색이 필요합니다 (아세트산 카민의 붉은색,
+  베네딕트의 황적색…). 그 색은 전부 `src/style/palette.experiment.js`
+  **한 파일**에 만들어 두고, 애셋은 그 파일의 `paintExp()` 로 씁니다.
+  이 파일은 클론에 **이미 비어 있는 채로 들어 있습니다** — 값만 채우면 됩니다.
+
+  ```js
+  // src/style/palette.experiment.js — 이 실험 고유의 시약색·반응색만
+  // 값은 tokens.js 의 PALETTE 와 같은 [기본색, 음영색] 쌍입니다 (음영은 우하단).
+  export const EXP_PALETTE = {
+    carmine:      ['#B3324B', '#8C2438'],   // 아세트산 카민 원액
+    nucleusStain: ['#8C2F45', '#6B2233'],   // 붉게 물든 핵
+  };
+  ```
+
+  ```js
+  // 애셋(src/assets/<name>.js)에서 — paint() 와 쓰는 법이 같습니다
+  import { paintExp } from '../style/palette.experiment.js';
+  // <path ${paintExp('nucleusStain', { shade: true })} d="..."/>
+  ```
+
+  지킬 것:
+
+  - 기구 색(`glass`, `metal`, `paper`, `bodyDark`, `rubber`, `bench`)은 `tokens.js`
+    공용 그대로 `paint()` 로 씁니다. **반응색을 기구에 쓰지 마세요** — 바나나랩에서 실험대에
+    파란 배관을 넣으려다 막았습니다. 팔레트의 파랑은 녹말 반응색(청람색)이라,
+    실험대에 그 색이 있으면 학생이 결과와 헷갈립니다
+  - **린터는 손볼 필요가 없습니다.** `scripts/check-art-direction.mjs` 가
+    `palette.experiment.js` 를 읽어 허용 색에 `EXP_PALETTE` 를 자동으로 더합니다.
+    색을 채운 뒤 `EXP_PALETTE` 에 없는 색을 애셋에 넣어 **린터가 실제로 잡는지**
+    한 번 되돌려 확인하세요
+  - 이렇게 해 두면 합칠 때 이 파일이 그대로 `experiments/<id>/palette.js` 가 됩니다.
+    합치는 사람은 `tokens.js` 의 diff 가 0건인지로 규칙 준수를 확인합니다
+    (`MERGE-AND-DEPLOY.md` §3.1)
 - 광원 방향, 선 두께 세 개, `viewBox 400×300`
 - `experiments/` 같은 공용 등록 파일 (있다면). 합치는 사람이 씁니다
 - 하드 게이트를 새로 추가하는 것
@@ -268,6 +323,7 @@ T08  배포본 확인                                      (node scripts/check-b
 ## 8. 붙여 넣을 프롬프트
 
 새 세션을 시작할 때 이대로 던지면 됩니다. `«»` 안만 바꾸세요.
+(세포와 물질대사 단원 7개 실험은 채워 둔 프롬프트가 `LAUNCH.md` §2 에 있습니다.)
 
 ```
 «양파 표피세포 관찰» 을 웹 가상실험으로 만든다.
@@ -275,6 +331,8 @@ T08  배포본 확인                                      (node scripts/check-b
 바나나랩(https://github.com/N-lifescience/banana-lab)을 복제해서 시작한다.
 복제한 뒤 NEW-EXPERIMENT.md 와 PLAYBOOK.md 를 먼저 끝까지 읽고,
 AGENTS.md 의 규칙을 그대로 따른다.
+복제 직후 PROGRESS.md 를 docs/banana-progress.md 로 옮기고
+빈 PROGRESS.md 로 새로 시작한다 (NEW-EXPERIMENT.md §2).
 
 이 실험의 내용:
 - 관찰 대상: «양파 비늘잎 안쪽 표피»
@@ -287,7 +345,8 @@ AGENTS.md 의 규칙을 그대로 따른다.
 
 지켜야 할 것:
 - 잘못된 조작을 막지 않는다. 결과가 대신 답한다
-- 팔레트에 색을 추가하지 않는다
+- tokens.js 의 팔레트를 수정하지 않는다. 이 실험의 시약색·반응색은
+  src/style/palette.experiment.js 한 파일에만 만든다 (NEW-EXPERIMENT.md §4)
 - 실물 치수를 지어내지 않는다
 - 새 의존성을 추가하지 않는다
 - 검사를 새로 넣으면 되돌려서 실제로 실패하는지 확인한다

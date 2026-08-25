@@ -35,7 +35,11 @@ Claude Code는 `CLAUDE.md`를 통해 이 파일로 들어옵니다.
 애셋 스타일은 **라인 + 플랫**으로 확정됐다. 그라데이션·블러·임의 색상은 금지다.
 `npm run check:art`가 이를 기계적으로 검사한다. 통과하지 못하는 애셋은 머지하지 않는다.
 
-- 색은 `src/style/tokens.js`의 `PALETTE`에 있는 값만 쓴다. 새 색이 필요하면 토큰을 먼저 추가한다.
+- 기구 색은 `src/style/tokens.js`의 `PALETTE`에 있는 값만 쓴다. **`tokens.js`는 수정하지 않는다.**
+  이 실험에서만 쓰는 시약색·반응색은 `src/style/palette.experiment.js`의 `EXP_PALETTE`에 넣고
+  애셋은 `paintExp()`로 쓴다 (`NEW-EXPERIMENT.md` §4). 린터가 공용 색 + `EXP_PALETTE`를 합쳐 검사한다.
+  나중에 여러 실험을 합칠 때 `tokens.js`의 diff가 0이어야 하므로, 반응색을 `tokens.js`에 넣지 않는다.
+  **반응색을 기구에 쓰지 않는다** — 결과 색과 헷갈린다.
 - 선 두께는 `STROKE.outline(3) | .detail(2) | .hair(1.5)` 셋뿐이다.
 - `<linearGradient>`, `<radialGradient>`, `<filter>`, `feGaussianBlur` 사용 금지.
 - 광원은 항상 좌상단 45°. 음영 도형은 항상 형태의 우하단에 온다.
