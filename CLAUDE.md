@@ -68,6 +68,19 @@ node scripts/perf-fov.mjs --dom  # 시야 렌더러 성능
 Claude Code에서 스크린샷으로 확인할 때는 `npm run dev` 후 Playwright를 쓰세요.
 `scripts/shot.mjs`에 최소 예시가 있습니다.
 
+## 커밋하기 전에 — 작성자 이메일
+
+```bash
+git config user.email    # 비어 있으면 안 됩니다
+```
+
+이 저장소에 `user.email` 이 없으면 git 이 **호스트명으로 가짜 주소를 지어냅니다**
+(`joseongju@joseongiMacmini.Davolink` 같은 것). 그러면 GitHub 이 커밋을 계정과 연결하지
+못하고, **Vercel 이 그 커밋의 배포를 통째로 막습니다** — 빌드 실패가 아니라 `blocked` 입니다.
+
+더 나쁜 것은 **로컬에서는 아무 이상이 없다**는 점입니다. 검사도 전부 초록불이고 push 도 됩니다.
+배포된 사이트만 조용히 옛날 것으로 남습니다. 실제로 커밋 네 개가 그렇게 묻혔습니다 (PROGRESS T27).
+
 ## 커밋 메시지
 
 한국어로 씁니다. `T03: 시야 렌더러 저배율 패턴 처리` 처럼 작업 카드 번호를 앞에 붙입니다.
