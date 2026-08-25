@@ -58,9 +58,25 @@ function substepId(group, i) {
   return `${group.id}${String.fromCharCode(97 + i)}`;
 }
 
+/**
+ * 절차 기록 키인가. `'3b'`, `'12'` 처럼 **그룹 id + 선택적 세부 단계 글자**다.
+ *
+ * 예전에는 `/^[1-6][a-z]?$/` 로 박혀 있었다. 바나나랩 절차가 여섯 그룹이라 맞아떨어졌지만,
+ * **그것은 이 실험의 사정이지 엔진의 사정이 아니다.** 일곱 번째 그룹을 둔 실험은
+ * 그 그룹의 관찰 기록이 6단계 복습과 보고서에서 **조용히 사라진다** — 화면에 빈칸이
+ * 뜨는 것이 아니라 줄 자체가 안 나오므로 아무도 모른다.
+ * (micrometer 파일럿에서 잡혔다. PROGRESS T28)
+ *
+ * 이제 개수를 세지 않고 `UI.protocol` 에 그 id 가 실제로 있는지로 본다.
+ */
+export function isStepNoteKey(key) {
+  const m = /^(\d+)([a-z])?$/.exec(String(key));
+  return Boolean(m) && UI.protocol.some((g) => g.id === m[1]);
+}
+
 /** notes 키 '3b' 를 "STEP 3 · 색 변화 관찰" 같은 사람이 읽는 문장으로. */
 export function stepNoteLabel(key) {
-  const m = /^([1-6])([a-z])?$/.exec(key);
+  const m = /^(\d+)([a-z])?$/.exec(String(key));
   if (!m) return key;
   const group = UI.protocol.find((g) => g.id === m[1]);
   if (!group) return key;
@@ -418,7 +434,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
 
   function renderStepNotesRecap(st) {
     const rows = Object.entries(st.session.notes)
-      .filter(([k, v]) => /^[1-6][a-z]?$/.test(k) && v && v.trim())
+      .filter(([k, v]) => isStepNoteKey(k) && v && v.trim())
       .map(([k, v]) => `<li><b>${stepNoteLabel(k)}</b> — ${escapeHtml(v)}</li>`);
     if (rows.length === 0) return '';
     return `<section><h3>${N.stepNotesHeading}</h3><ul class="step-notes-recap">${rows.join('')}</ul></section>`;

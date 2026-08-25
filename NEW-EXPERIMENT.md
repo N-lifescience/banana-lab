@@ -51,10 +51,20 @@
 
 **빈 폴더에서 시작하지 마세요.** 바나나랩은 참조 구현입니다. 복제한 뒤 갈아 끼웁니다.
 
+> **이 저장소는 비공개입니다.** 아래 명령은 접근 권한이 있어야 됩니다.
+> 권한이 없으면 첫 줄에서 막히니, 세션을 띄우기 전에 소유자에게 권한을 받거나
+> 저장소를 공개로 돌리세요. (micrometer 파일럿에서 잡혔습니다)
+
 ```bash
 git clone https://github.com/N-lifescience/banana-lab.git onion-lab
 cd onion-lab
 rm -rf .git && git init          # 새 실험은 새 역사로 시작합니다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없습니다. 남겨 두면 이 저장소가
+# 무엇에 관한 것인지 흐려지고, 합칠 때 같은 파일이 여덟 벌 생깁니다.
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts              # main-page.html 전용 글꼴. 검사는 알아서 넘어갑니다
+
 npm install
 npm run check                    # 통과하는 상태에서 출발하는지 먼저 확인
 npm run dev

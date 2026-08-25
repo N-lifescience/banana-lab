@@ -156,3 +156,35 @@ test('자기 평가는 난이도와 무관하게 같다', () => {
   const keys = UI.notebook.reflectionItems.map((i) => i.key);
   assert.equal(new Set(keys).size, keys.length, '느낀 점 문항 키가 겹칩니다');
 });
+
+test('절차 그룹 수에 상한을 박아 두지 않는다', async () => {
+  // 예전에는 `/^[1-6][a-z]?$/` 가 박혀 있었다. 바나나랩 절차가 여섯이라 맞아떨어졌지만
+  // 그건 **이 실험의 사정**이었다. 일곱 번째 그룹을 둔 실험은 그 그룹의 관찰 기록이
+  // 6단계 복습과 보고서에서 조용히 사라진다 — 빈칸이 뜨는 게 아니라 줄이 안 나오므로
+  // 아무도 모른다. micrometer 파일럿에서 잡혔다.
+  const { isStepNoteKey, stepNoteLabel } = await import('../src/ui/notebook.js');
+
+  for (const group of UI.protocol) {
+    assert.ok(isStepNoteKey(group.id), `STEP ${group.id} 이 절차 기록 키로 안 읽힙니다`);
+    assert.match(stepNoteLabel(group.id), new RegExp(`^STEP ${group.id} · `));
+    group.steps.forEach((step, i) => {
+      const key = `${group.id}${String.fromCharCode(97 + i)}`;
+      assert.ok(isStepNoteKey(key), `${key} 가 절차 기록 키로 안 읽힙니다`);
+      assert.ok(stepNoteLabel(key).includes(step.label),
+        `${key} 의 이름이 세부 단계 이름을 못 찾습니다`);
+    });
+  }
+
+  // 절차에 없는 id 는 절차 기록이 아니다. 'q.a' 나 'selfeval.x' 가 여기 섞이면 안 된다.
+  for (const notAKey of ['q.a', 'selfeval.process', 'predict.A', 'mag.0', '99']) {
+    assert.equal(isStepNoteKey(notAKey), false, `${notAKey} 를 절차 기록으로 잘못 읽습니다`);
+  }
+
+  // 어느 소스에도 개수 상한을 **코드로** 다시 박지 않았는가.
+  // 주석은 사람이 읽는 글이다 — 옛 정규식을 설명하는 문장까지 잡으면 검사가 아니다.
+  for (const [name, src] of uiSources()) {
+    const code = src.split('\n').map((l) => l.replace(/^\s*(\*|\/\/).*/, '')).join('\n');
+    assert.equal(/\[1-6\]\[a-z\]/.test(code), false,
+      `src/ui/${name} 에 절차 그룹 수 상한이 박혀 있습니다`);
+  }
+});
