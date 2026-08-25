@@ -1,0 +1,60 @@
+/* 이 파일은 손으로 고치지 않습니다.
+   scripts/build-fonts.mjs 가 만듭니다 — 메인 페이지 문구를 고쳤으면 다시 돌리세요.
+
+   여기 실린 글꼴은 이 페이지에 실제로 쓰인 글자만 담고 있습니다 (subset.txt).
+   통째로 실으면 13.1 MB 인데 이렇게 하면 250.2 KB 입니다.
+   라이선스는 같은 폴더의 LICENSE.md 를 보세요 — 셋 다 SIL Open Font License 1.1 입니다. */
+
+@font-face {
+  font-family: 'Gowun Batang';
+  font-style: normal;
+  font-weight: 400;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/gowun-batang-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Gowun Batang';
+  font-style: normal;
+  font-weight: 700;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/gowun-batang-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Noto Sans KR';
+  font-style: normal;
+  font-weight: 400;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/noto-sans-kr-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Noto Sans KR';
+  font-style: normal;
+  font-weight: 500;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/noto-sans-kr-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Noto Sans KR';
+  font-style: normal;
+  font-weight: 700;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/noto-sans-kr-700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  /* 글꼴이 늦게 와도 글자가 먼저 보여야 한다. 학교망에서 특히. */
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-400.woff2') format('woff2');
+}

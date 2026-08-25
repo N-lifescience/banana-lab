@@ -4,9 +4,14 @@
 <meta charset="utf-8">
 <title>세포와 물질대사 실험실</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- 글꼴은 **직접 호스팅한다.** 남의 서버에서 받아 오면 배포 헤더의 CSP(`font-src 'self'`)에
+     막혀 시스템 글꼴로 떨어지고, 학교망에서 구글 도메인이 느리거나 막히는 일도 있다.
+     이 페이지에 쓰인 글자만 잘라 담아 256 KB 다 (통째로 실으면 13.1 MB).
+     문구를 고쳤으면 `node scripts/build-fonts.mjs` 를 다시 돌린다 — 안 그러면 새 글자가
+     시스템 글꼴로 떨어진다. `--check` 가 그것을 알려 준다. -->
+<link rel="preload" href="/fonts/noto-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/gowun-batang-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts/fonts.css">
 <style>
   :root{
     --ground:#F5F7FB;

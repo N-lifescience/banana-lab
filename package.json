@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "test": "node --test \"tests/**/*.test.js\"",
     "check:art": "node scripts/check-art-direction.mjs",
-    "check": "npm run test && npm run check:art",
+    "fonts": "node scripts/build-fonts.mjs",
+    "check:fonts": "node scripts/build-fonts.mjs --check",
+    "check": "npm run test && npm run check:art && npm run check:fonts",
     "check:build": "node scripts/check-build.mjs",
     "shot": "node scripts/shot.mjs"
   },
