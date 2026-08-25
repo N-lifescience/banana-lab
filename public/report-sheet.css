@@ -1,0 +1,46 @@
+/* 탐구 보고서 "종이" 의 모양.
+ *
+ * 이 파일은 두 곳이 함께 쓴다:
+ *   · index.html — 인쇄할 때만 (media="print")
+ *   · teacher.html — 화면에서도. 선생님이 낸 것을 펼쳐 보기 때문이다.
+ *
+ * 그래서 인쇄 전용 규칙(@page, 화면 UI 감추기)은 여기 두지 않는다. 그건 각 페이지 것이다.
+ * 색은 종이 기준으로 고정한다 — 다크 모드에 맞춰 흐려지면 인쇄물이 회색이 된다.
+ */
+
+.report-sheet{font-size:11pt;line-height:1.5}
+.rp-head{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px}
+.rp-head h1{font-size:15pt;margin:0 0 10px}
+.rp-who{display:flex;flex-wrap:wrap;gap:4px 22px;margin:0;font-size:10pt}
+.rp-who div{display:flex;gap:6px}
+.rp-who dt{color:#555}
+.rp-who dd{margin:0;font-weight:600}
+.report-sheet section{break-inside:avoid;margin-bottom:16px}
+.report-sheet h2{font-size:12pt;margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid #999}
+.report-sheet h3{font-size:10.5pt;margin:0 0 4px}
+.rp-row{break-inside:avoid;margin-bottom:10px}
+.rp-row p{margin:0}
+.rp-sub{color:#555;font-size:10pt}
+.rp-steps{list-style:none;margin:0;padding:0}
+.rp-steps li{display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:10px;
+  padding:3px 0;border-bottom:1px dotted #bbb;font-size:10pt;break-inside:avoid}
+.rp-steps li span{color:#222}
+.rp-pair{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:10.5pt}
+.rp-pair div{display:contents}
+.rp-pair dt{color:#555}
+.rp-pair dd{margin:0}
+/* 결과 카드는 두 장씩 나란히. 세 장이 각각 한 쪽을 차지하면 종이가 낭비된다. */
+.rp-captures{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rp-capture{border:1px solid #999;border-radius:4px;padding:8px;break-inside:avoid}
+/* 시야는 정사각형이라 칸을 꽉 채우면 한 장이 종이 반쪽을 먹는다. 셋이 한 쪽에 들어가게 묶는다.
+   작은 기기에서는 시야가 SVG 가 아니라 구운 PNG 로 바뀌어 있다 (src/ui/report.js).
+   둘 다 같은 크기로 앉아야 종이 배치가 기기마다 달라지지 않는다. */
+.rp-fov svg,.rp-fov img{width:100%;max-width:55mm;height:auto;display:block;margin:0 auto}
+.rp-readout{margin:6px 0 0;font-size:9.5pt}
+.rp-readout div{display:flex;gap:6px}
+.rp-readout dt{color:#555}
+.rp-readout dd{margin:0}
+.rp-likert{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:12px}
+.rp-likert th,.rp-likert td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left}
+.rp-likert th{border-bottom-width:1.5px;border-bottom-color:#666}
+.rp-likert td:last-child{white-space:nowrap;width:1%}

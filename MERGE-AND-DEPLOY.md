@@ -194,7 +194,8 @@ lab/
 
 ### 지금 상태
 
-바나나랩은 **정적 사이트**입니다. 서버도 데이터베이스도 환경변수도 없습니다.
+바나나랩은 **정적 사이트**입니다. 기본 상태에서는 서버도 데이터베이스도 환경변수도 없습니다 —
+제출 기능을 켤 때만 Supabase 와 환경변수 둘이 생깁니다 (아래 「제출 기능 켜기」).
 `npm run build` 가 `dist/` 하나를 냅니다. 그게 전부입니다.
 
 ```
@@ -235,6 +236,51 @@ npm i -g vercel
 vercel login          # 브라우저가 열립니다. 사람이 해야 합니다
 vercel --prod
 ```
+
+### 제출 기능 켜기 (선택)
+
+학생이 보고서를 마치고 「선생님께 제출」을 누르면 담당 교사의 수업으로 들어가게 하는 기능이다.
+**켜지 않아도 앱은 그대로 돈다** — 설정이 없으면 제출 칸이 아예 안 그려지고, 학생은 지금처럼
+PDF 로 저장해 낸다. 학교마다 켜고 끌 수 있어야 하므로 그렇게 만들었다.
+
+켜기 전에 **반드시 확인할 것**: 이 기능은 학번과 이름을 저장한다. 만 14세 미만 학생이 있으면
+법정대리인 동의가 필요하고, 그 절차는 학교의 개인정보 처리 절차를 따른다. 절차가 준비되지
+않았으면 켜지 마라 (`privacy.html` 제8조).
+
+```
+1. supabase.com → New project
+   - Region 을 **Northeast Asia (Seoul)** 로 고른다. 국외 이전 문제가 여기서 사라진다
+   - 프로젝트 이름과 DB 비밀번호는 아무거나. 비밀번호는 이 앱이 쓰지 않는다
+
+2. SQL Editor → supabase/schema.sql 을 통째로 붙여 넣고 Run
+   - 여러 번 실행해도 괜찮게 써 두었다
+   - 끝나면 Table Editor 에서 classes · reports 두 표가 보이고,
+     둘 다 "RLS enabled" 라고 떠 있어야 한다
+
+3. Settings → API 에서 두 값을 복사한다
+   - Project URL              →  VITE_SUPABASE_URL
+   - Project API keys의 anon  →  VITE_SUPABASE_ANON_KEY
+   - **service_role 키는 절대 쓰지 않는다.** 그 키는 RLS 를 통째로 건너뛴다
+
+4. Vercel → 프로젝트 → Settings → Environment Variables 에 둘을 넣는다
+   - Production · Preview 둘 다 체크
+   - 넣은 뒤 **다시 배포**해야 반영된다 (환경변수는 빌드 때 박힌다)
+
+5. Supabase → Database → Extensions 에서 pg_cron 을 켜고, SQL Editor 에서 한 번 실행한다
+   select cron.schedule('purge-expired-classes', '0 3 * * *',
+     $ delete from classes where expires_at < now() $);
+   - 이게 없으면 기한이 지나도 **데이터가 남는다.** 정책이 가려 줄 뿐이다
+```
+
+확인:
+
+```bash
+BASE=https://<배포주소> node scripts/check-build.mjs   # 「설정 여부에 따라…」가 "켜짐" 으로 나와야 한다
+```
+
+쓰는 법은 간단하다. 선생님이 `/teacher.html` 을 열어 수업을 만들면 **여섯 자리 코드 · 학생용
+링크 · QR · 관리 링크**가 나온다. 앞의 셋은 학생에게 주고, **관리 링크는 선생님만 갖는다** —
+그 주소를 아는 사람이 그 반의 보고서를 본다. 잃어버리면 되찾을 길이 없다.
 
 ### 배포한 뒤 반드시 확인할 것
 

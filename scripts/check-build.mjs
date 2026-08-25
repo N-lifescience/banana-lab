@@ -175,6 +175,18 @@ if (ready) {
   await page.keyboard.press('Escape');
 }
 
+/* ---------- 선생님 화면 ----------
+   제출 서버를 설정하지 않은 배포본에서는 **꺼진 채로** 떠야 한다.
+   설정 안 한 학교에서 이 화면이 반쯤 도는 것이 가장 나쁘다. */
+const teacher = await page.goto(`${BASE}/teacher.html`, { waitUntil: 'networkidle' }).catch(() => null);
+ok(teacher?.status() === 200, '선생님 화면이 열린다', teacher ? `HTTP ${teacher.status()}` : '응답 없음');
+const teacherText = await page.locator('body').innerText().catch(() => '');
+const configured = await page.locator('#tc-go').count() > 0;
+ok(configured || teacherText.includes('아직 설정되지 않았습니다'),
+   '설정 여부에 따라 켜지거나 꺼진 채로 뜬다', configured ? '켜짐(수업 열기)' : '꺼짐(안내)');
+ok(!/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(await page.content()),
+   '선생님 화면에 서비스 키가 새지 않는다');
+
 /* ---------- 개인정보처리방침 ----------
    자바스크립트가 그리는 링크는 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에 안 보인다.
    정적 HTML 에 들어 있는지를 본다. */

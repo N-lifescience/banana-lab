@@ -11,6 +11,8 @@ export default defineConfig({
       input: {
         main: 'index.html',
         privacy: 'privacy.html',
+        // 선생님이 수업을 열고 제출물을 받는 화면. 학생 앱과 코드를 나눠 쓴다.
+        teacher: 'teacher.html',
       },
       output: { manualChunks: undefined }
     }

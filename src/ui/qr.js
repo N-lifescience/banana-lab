@@ -1,0 +1,326 @@
+/**
+ * QR 코드를 그린다 — 버전 2~7, 오류 정정 M, 바이트 모드.
+ *
+ * ── 왜 직접 만드는가 ────────────────────────────────────────────────
+ * 여기서 담을 것은 참여 링크 하나(60자 안팎)뿐이다. 그것 하나 때문에 의존성을 늘리지
+ * 않는다 (AGENTS.md §3.3). 대신 **필요한 만큼만** 만든다 — 숫자·한자 모드도, 큰 버전도,
+ * 다른 정정 수준도 넣지 않았다. 담을 것이 길어지면 버전 표를 늘리면 된다.
+ *
+ * ── 안 읽히면 어쩌나 ────────────────────────────────────────────────
+ * 교사 화면은 QR **과 함께 링크와 여섯 자리 코드를 늘 같이** 보여 준다. QR 은 편의이고,
+ * 링크가 본체다. 카메라가 없는 학교 컴퓨터에서도 수업이 돌아가야 한다.
+ *
+ * 규격: ISO/IEC 18004. 용어를 규격 그대로 쓴다 (codeword, mask, format info).
+ */
+
+/* ── 갈루아 체 GF(256). 오류 정정 부호가 여기서 돈다. ───────────────── */
+const EXP = new Uint8Array(512);
+const LOG = new Uint8Array(256);
+(() => {
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    EXP[i] = x;
+    LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11d;        // 원시 다항식 x^8+x^4+x^3+x^2+1
+  }
+  for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+})();
+
+const mul = (a, b) => (a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]]);
+
+/** 생성 다항식 g(x) = (x-α^0)(x-α^1)…(x-α^(n-1)) */
+function generator(n) {
+  let g = [1];
+  for (let i = 0; i < n; i++) {
+    const next = new Array(g.length + 1).fill(0);
+    // 계수는 **높은 차수부터** 담는다. g(x)·x 는 자리를 그대로 두고(next[j]),
+    // g(x)·α^i 는 한 칸 뒤로 간다(next[j+1]). 이 둘을 바꿔 쓰면 다항식이 뒤집혀
+    // g[0] 이 1이 아니게 되고, 나눗셈이 조용히 엉뚱한 값을 낸다.
+    for (let j = 0; j < g.length; j++) {
+      next[j] ^= g[j];
+      next[j + 1] ^= mul(g[j], EXP[i]);
+    }
+    g = next;
+  }
+  return g;
+}
+
+/** 데이터 코드워드에 대한 오류 정정 코드워드 n개. */
+function ecCodewords(data, n) {
+  const g = generator(n);
+  const buf = [...data, ...new Array(n).fill(0)];
+  for (let i = 0; i < data.length; i++) {
+    const factor = buf[i];
+    if (factor === 0) continue;
+    for (let j = 0; j < g.length; j++) buf[i + j] ^= mul(g[j], factor);
+  }
+  return buf.slice(data.length);
+}
+
+/* ── 버전 표 (오류 정정 M 만). ──────────────────────────────────────
+   [ 총 코드워드, 블록당 EC 코드워드, 그룹1 블록수, 그룹1 데이터수, 그룹2 블록수, 그룹2 데이터수 ] */
+const VERSIONS = {
+  2: [44, 16, 1, 28, 0, 0],
+  3: [70, 26, 1, 44, 0, 0],
+  4: [100, 18, 2, 32, 0, 0],
+  5: [134, 24, 2, 43, 0, 0],
+  6: [172, 16, 4, 27, 0, 0],
+  7: [196, 18, 4, 31, 0, 0],
+};
+
+/** 정렬 패턴 중심 좌표 (버전 2~7). */
+const ALIGN = { 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34], 7: [6, 22, 38] };
+
+/** 담을 수 있는 바이트 수 = 데이터 코드워드 − (모드 4비트 + 길이 8비트) */
+function capacityBytes(v) {
+  const [, ecPer, g1, d1, g2, d2] = VERSIONS[v];
+  const dataCw = g1 * d1 + g2 * d2;
+  void ecPer;
+  return dataCw - 2;
+}
+
+/* ── 비트 버퍼 ─────────────────────────────────────────────────────── */
+class Bits {
+  constructor() { this.bits = []; }
+  put(value, length) {
+    for (let i = length - 1; i >= 0; i--) this.bits.push((value >>> i) & 1);
+  }
+  get length() { return this.bits.length; }
+}
+
+/**
+ * 문자열을 데이터 코드워드로. 바이트 모드(0100) + 8비트 길이 + UTF-8 바이트.
+ */
+function encodeData(text, version) {
+  const bytes = new TextEncoder().encode(text);
+  const [, ecPer, g1, d1, g2, d2] = VERSIONS[version];
+  const dataCw = g1 * d1 + g2 * d2;
+  void ecPer;
+
+  const b = new Bits();
+  b.put(0b0100, 4);
+  b.put(bytes.length, 8);          // 버전 1~9 의 바이트 모드 길이 필드는 8비트다
+  for (const byte of bytes) b.put(byte, 8);
+
+  // 종단자 + 바이트 경계 맞추기
+  const total = dataCw * 8;
+  b.put(0, Math.min(4, total - b.length));
+  while (b.length % 8) b.bits.push(0);
+
+  const cw = [];
+  for (let i = 0; i < b.length; i += 8) {
+    let v = 0;
+    for (let j = 0; j < 8; j++) v = (v << 1) | b.bits[i + j];
+    cw.push(v);
+  }
+  // 채움 코드워드는 규격이 정한 두 값을 번갈아 쓴다
+  const PAD = [0xec, 0x11];
+  for (let i = 0; cw.length < dataCw; i++) cw.push(PAD[i % 2]);
+  return cw;
+}
+
+/** 블록으로 나눠 인터리브한 최종 코드워드 열. */
+function interleave(dataCw, version) {
+  const [, ecPer, g1, d1, g2, d2] = VERSIONS[version];
+  const blocks = [];
+  let at = 0;
+  for (let i = 0; i < g1; i++) { blocks.push(dataCw.slice(at, at + d1)); at += d1; }
+  for (let i = 0; i < g2; i++) { blocks.push(dataCw.slice(at, at + d2)); at += d2; }
+  const ecs = blocks.map((blk) => ecCodewords(blk, ecPer));
+
+  const out = [];
+  const maxData = Math.max(...blocks.map((b) => b.length));
+  for (let i = 0; i < maxData; i++) for (const b of blocks) if (i < b.length) out.push(b[i]);
+  for (let i = 0; i < ecPer; i++) for (const e of ecs) out.push(e[i]);
+  return out;
+}
+
+/* ── 모듈 배치 ─────────────────────────────────────────────────────── */
+
+function placeFunctionPatterns(size, version) {
+  const m = Array.from({ length: size }, () => new Array(size).fill(null));
+  const set = (r, c, v) => { if (r >= 0 && r < size && c >= 0 && c < size) m[r][c] = v; };
+
+  // 위치 검출 패턴 셋 + 분리자
+  for (const [br, bc] of [[0, 0], [0, size - 7], [size - 7, 0]]) {
+    for (let r = -1; r <= 7; r++) {
+      for (let c = -1; c <= 7; c++) {
+        const on = r >= 0 && r <= 6 && c >= 0 && c <= 6
+          && (r === 0 || r === 6 || c === 0 || c === 6
+            || (r >= 2 && r <= 4 && c >= 2 && c <= 4));
+        set(br + r, bc + c, on);
+      }
+    }
+  }
+  // 정렬 패턴 — 위치 검출 패턴과 겹치는 자리는 건너뛴다
+  const centers = ALIGN[version];
+  for (const r of centers) {
+    for (const c of centers) {
+      if ((r === 6 && c === 6) || (r === 6 && c === centers.at(-1))
+        || (r === centers.at(-1) && c === 6)) continue;
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const on = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+          set(r + dr, c + dc, on);
+        }
+      }
+    }
+  }
+  // 타이밍 패턴
+  for (let i = 8; i < size - 8; i++) {
+    if (m[6][i] === null) m[6][i] = i % 2 === 0;
+    if (m[i][6] === null) m[i][6] = i % 2 === 0;
+  }
+  // 항상 검은 모듈 하나
+  m[size - 8][8] = true;
+  return m;
+}
+
+/** 형식 정보 자리 — 데이터가 들어가면 안 되는 칸. */
+function reserveFormat(m, size) {
+  for (let i = 0; i < 9; i++) {
+    if (m[8][i] === null) m[8][i] = false;
+    if (m[i][8] === null) m[i][8] = false;
+  }
+  for (let i = 0; i < 8; i++) {
+    if (m[8][size - 1 - i] === null) m[8][size - 1 - i] = false;
+    if (m[size - 1 - i][8] === null) m[size - 1 - i][8] = false;
+  }
+}
+
+const MASKS = [
+  (r, c) => (r + c) % 2 === 0,
+  (r) => r % 2 === 0,
+  (r, c) => c % 3 === 0,
+  (r, c) => (r + c) % 3 === 0,
+  (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+  (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+  (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
+  (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0,
+];
+
+/** 형식 정보 15비트 — 오류 정정 M(=00) + 마스크 번호, BCH(15,5) + 마스크 0x5412. */
+function formatBits(maskNo) {
+  const data = (0b00 << 3) | maskNo;
+  let bch = data << 10;
+  for (let i = 4; i >= 0; i--) {
+    if ((bch >>> (i + 10)) & 1) bch ^= 0b10100110111 << i;
+  }
+  return ((data << 10) | bch) ^ 0b101010000010010;
+}
+
+function placeFormat(m, size, maskNo) {
+  const bits = formatBits(maskNo);
+  const bit = (i) => ((bits >>> i) & 1) === 1;
+  for (let i = 0; i <= 5; i++) m[8][i] = bit(i);
+  m[8][7] = bit(6);
+  m[8][8] = bit(7);
+  m[7][8] = bit(8);
+  for (let i = 9; i <= 14; i++) m[14 - i][8] = bit(i);
+
+  for (let i = 0; i <= 7; i++) m[size - 1 - i][8] = bit(i);
+  for (let i = 8; i <= 14; i++) m[8][size - 15 + i] = bit(i);
+  m[size - 8][8] = true;
+}
+
+/** 규격의 네 가지 벌점. 낮을수록 잘 읽힌다. */
+function penalty(m, size) {
+  let score = 0;
+  const at = (r, c) => m[r][c] === true;
+
+  for (let i = 0; i < size; i++) {
+    for (const line of [
+      Array.from({ length: size }, (_, j) => at(i, j)),
+      Array.from({ length: size }, (_, j) => at(j, i)),
+    ]) {
+      let run = 1;
+      for (let j = 1; j < size; j++) {
+        if (line[j] === line[j - 1]) run++;
+        else { if (run >= 5) score += 3 + (run - 5); run = 1; }
+      }
+      if (run >= 5) score += 3 + (run - 5);
+      // 1:1:3:1:1 무늬 — 위치 검출 패턴으로 오인되는 자리
+      for (let j = 0; j + 7 <= size; j++) {
+        const p = line.slice(j, j + 7).map(Boolean).join('');
+        if (p === '1011101' && (j === 0 || !line[j - 1]) ) score += 40;
+      }
+    }
+  }
+  for (let r = 0; r < size - 1; r++) {
+    for (let c = 0; c < size - 1; c++) {
+      const v = at(r, c);
+      if (v === at(r, c + 1) && v === at(r + 1, c) && v === at(r + 1, c + 1)) score += 3;
+    }
+  }
+  let dark = 0;
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (at(r, c)) dark++;
+  const pct = (dark * 100) / (size * size);
+  score += Math.floor(Math.abs(pct - 50) / 5) * 10;
+  return score;
+}
+
+/**
+ * 문자열 하나를 QR 모듈 격자로. `true` 가 검은 칸이다.
+ * @returns {{size:number, modules:boolean[][], version:number}}
+ */
+export function encodeQR(text) {
+  const version = Object.keys(VERSIONS)
+    .map(Number).sort((a, b) => a - b)
+    .find((v) => new TextEncoder().encode(text).length <= capacityBytes(v));
+  if (!version) throw new Error(`QR 로 담기에 너무 깁니다: ${text.length}자`);
+
+  const size = version * 4 + 17;
+  const cw = interleave(encodeData(text, version), version);
+
+  const base = placeFunctionPatterns(size, version);
+  reserveFormat(base, size);
+
+  // 데이터는 오른쪽 아래에서 두 칸 폭 세로줄을 지그재그로 거슬러 올라가며 채운다.
+  const bitsOf = [];
+  for (const byte of cw) for (let i = 7; i >= 0; i--) bitsOf.push((byte >>> i) & 1);
+
+  let best = null;
+  for (let maskNo = 0; maskNo < 8; maskNo++) {
+    const m = base.map((row) => row.slice());
+    let bi = 0;
+    let upward = true;
+    for (let right = size - 1; right > 0; right -= 2) {
+      if (right === 6) right = 5;            // 세로 타이밍 패턴 열은 건너뛴다
+      for (let step = 0; step < size; step++) {
+        const r = upward ? size - 1 - step : step;
+        for (const c of [right, right - 1]) {
+          if (m[r][c] !== null) continue;
+          const bit = bi < bitsOf.length ? bitsOf[bi++] : 0;
+          m[r][c] = (bit === 1) !== MASKS[maskNo](r, c) ? true : false;
+        }
+      }
+      upward = !upward;
+    }
+    placeFormat(m, size, maskNo);
+    const score = penalty(m, size);
+    if (!best || score < best.score) best = { score, modules: m };
+  }
+
+  return { size, version, modules: best.modules.map((r) => r.map(Boolean)) };
+}
+
+/**
+ * QR 을 SVG 문자열로. 사각형 하나로 배경을 깔고 검은 칸만 path 로 그린다 —
+ * 모듈마다 rect 를 내면 노드가 1000개를 넘어 화면이 느려진다.
+ */
+export function qrSVG(text, { size = 220, quiet = 4, dark = '#111', light = '#fff' } = {}) {
+  const { size: n, modules } = encodeQR(text);
+  const total = n + quiet * 2;
+  let d = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (modules[r][c]) d += `M${c + quiet} ${r + quiet}h1v1h-1z`;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}"
+    width="${size}" height="${size}" shape-rendering="crispEdges" role="img">
+    <rect width="${total}" height="${total}" fill="${light}"/>
+    <path d="${d}" fill="${dark}"/>
+  </svg>`;
+}

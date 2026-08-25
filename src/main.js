@@ -49,6 +49,17 @@ function createStore(initial, onMessage) {
  * 화면에 선택기를 두면 학생이 어려운 단계를 슬쩍 낮출 수 있고, 그건 이 앱이 볼 일이 아니다.
  * 이 통로가 없으면 `docs/06` 의 난이도 3단계가 구현돼 있어도 아무도 2·3단계에 닿지 못한다.
  */
+/**
+ * 선생님이 나눠 준 수업 코드. `?code=482013` 또는 QR 로 들어온다.
+ *
+ * 상태(store)에 넣지 않는다. 실험의 일부가 아니라 **보고서를 낼 곳**일 뿐이고,
+ * 상태에 넣으면 되돌리기 기록에 쌓이고 화면 곳곳으로 흘러 다닌다.
+ */
+function classCodeFromUrl() {
+  const raw = new URLSearchParams(location.search).get('code') ?? '';
+  return raw.replace(/\D/g, '').slice(0, 6);
+}
+
 function levelFromUrl() {
   const raw = Number(new URLSearchParams(location.search).get('level'));
   return raw === 1 || raw === 2 || raw === 3 ? raw : null;
@@ -105,7 +116,7 @@ function boot(level, mode = MODES.GROUP) {
     onOpenZoom: openZoom,
     // 보고서를 여는 것이 곧 "실험을 마친다" 는 뜻이다. 그때 정리를 했는지 한 번 본다
     // (rules.js CHECK_TIDY). 안 했어도 막지 않는다 — 자기 평가 쪽에 적힐 뿐이다.
-    onReport: () => { store.dispatch('CHECK_TIDY', {}); report.open(); },
+    onReport: () => { store.dispatch('CHECK_TIDY', {}); report.open({ classCode: classCodeFromUrl() }); },
     // 보고서를 낼 수 있게 된 순간은 탐구 노트 위쪽에서 조용히 일어난다.
     // 그때 학생은 대개 실험대를 보고 있다 — 알려 주지 않으면 한참 뒤에야 안다.
     onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),

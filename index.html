@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>바나나에서 탄수화물과 지질 관찰하기</title>
+<!-- 보고서 "종이" 모양. 인쇄할 때만 필요하다 (teacher.html 도 같은 파일을 쓴다). -->
+<link rel="stylesheet" href="/report-sheet.css" media="print">
 <!-- 교사가 링크를 채팅방에 붙일 때 무엇인지 보이도록. 이미지는 두지 않는다 —
      이 앱의 화면은 학생이 조작해서 만드는 것이라 대표 그림이 따로 없다. -->
 <meta name="description" content="중학교 과학 관찰 실험을 웹에서 직접 해 보는 탐구형 가상실험. 슬라이드를 만들고 현미경을 조작해 녹말과 지방을 찾습니다. 개인정보를 수집하지 않습니다.">
@@ -481,8 +483,18 @@
   .rp-field input{min-width:0;border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
     color:var(--ink);padding:8px;font:inherit}
   .rp-howto{font-size:12.5px;color:var(--ink-mute);margin:14px 0 0}
-  .rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  .rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
   .rp-actions button{padding:9px 14px;font-size:13.5px}
+  /* 제출은 눈에 띄어야 한다. PDF 저장은 늘 있던 길이라 그대로 둔다. */
+  #rp-submit{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
+
+  /* 수업 코드 — 여섯 자리를 손으로 친다. 작게 만들면 스마트폰에서 못 친다. */
+  .rp-code input{font-family:ui-monospace,monospace;font-size:19px;letter-spacing:.22em;
+    text-align:center}
+  .rp-code-hint{font-size:12px;color:var(--ink-mute);margin:4px 0 0;line-height:1.5}
+  .rp-submit-msg{font-size:13px;margin:10px 0 0;line-height:1.55;min-height:1.2em}
+  .rp-submit-msg[data-kind="done"]{color:var(--good);font-weight:600}
+  .rp-submit-msg[data-kind="warn"]{color:var(--warn);font-weight:600}
   #rp-make{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
   /* 종이는 화면에 두지 않는다. 인쇄할 때만 나타난다. */
   .report-sheet{display:none}
@@ -506,42 +518,8 @@
     .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
     .report-sheet{display:block}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .report-sheet{font-size:11pt;line-height:1.5}
-    .rp-head{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px}
-    .rp-head h1{font-size:15pt;margin:0 0 10px}
-    .rp-who{display:flex;flex-wrap:wrap;gap:4px 22px;margin:0;font-size:10pt}
-    .rp-who div{display:flex;gap:6px}
-    .rp-who dt{color:#555}
-    .rp-who dd{margin:0;font-weight:600}
-    .report-sheet section{break-inside:avoid;margin-bottom:16px}
-    .report-sheet h2{font-size:12pt;margin:0 0 8px;padding-bottom:4px;border-bottom:1px solid #999}
-    .report-sheet h3{font-size:10.5pt;margin:0 0 4px}
-    .rp-row{break-inside:avoid;margin-bottom:10px}
-    .rp-row p{margin:0}
-    .rp-sub{color:#555;font-size:10pt}
-    .rp-steps{list-style:none;margin:0;padding:0}
-    .rp-steps li{display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:10px;
-      padding:3px 0;border-bottom:1px dotted #bbb;font-size:10pt;break-inside:avoid}
-    .rp-steps li span{color:#222}
-    .rp-pair{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:10.5pt}
-    .rp-pair div{display:contents}
-    .rp-pair dt{color:#555}
-    .rp-pair dd{margin:0}
-    /* 결과 카드는 두 장씩 나란히. 세 장이 각각 한 쪽을 차지하면 종이가 낭비된다. */
-    .rp-captures{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .rp-capture{border:1px solid #999;border-radius:4px;padding:8px;break-inside:avoid}
-    /* 시야는 정사각형이라 칸을 꽉 채우면 한 장이 종이 반쪽을 먹는다. 셋이 한 쪽에 들어가게 묶는다. */
-    /* 작은 기기에서는 시야가 SVG 가 아니라 구운 PNG 로 바뀌어 있다 (src/ui/report.js).
-       둘 다 같은 크기로 앉아야 종이 배치가 기기마다 달라지지 않는다. */
-    .rp-fov svg,.rp-fov img{width:100%;max-width:55mm;height:auto;display:block;margin:0 auto}
-    .rp-readout{margin:6px 0 0;font-size:9.5pt}
-    .rp-readout div{display:flex;gap:6px}
-    .rp-readout dt{color:#555}
-    .rp-readout dd{margin:0}
-    .rp-likert{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:12px}
-    .rp-likert th,.rp-likert td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left}
-    .rp-likert th{border-bottom-width:1.5px;border-bottom-color:#666}
-    .rp-likert td:last-child{white-space:nowrap;width:1%}
+    /* 종이의 모양은 public/report-sheet.css 에 있다 — 선생님 화면(teacher.html)이
+       같은 종이를 화면에서도 그리기 때문이다. 두 벌로 두면 언젠가 서로 달라진다. */
   }
 
   /* 터치 기기에서 손가락으로 누르는 버튼은 44px 이상. 실험대 물건(.token)은

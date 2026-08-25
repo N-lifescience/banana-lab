@@ -11,7 +11,13 @@
  *   - localStorage·서버 어디에도 저장하지 않는다.
  *   - 인쇄 창이 닫히면(`afterprint`) 입력칸과 종이 양쪽에서 지운다.
  * 남는 것은 학생이 저장한 PDF 파일 하나뿐이고, 그건 학생 손에 있다.
- * (AGENTS.md §6 — 학생 개인정보는 저장하지 않는다)
+ * ── 이름·학번을 다루는 규칙 ────────────────────────────────────────
+ * 기본은 그대로다: 이 화면에서만 받고, 상태에도 브라우저 저장소에도 넣지 않으며,
+ * 인쇄가 끝나면 지운다 (tests/report.test.js 가 소스에서 막고 있다).
+ *
+ * 예외는 하나뿐이다 — 학생이 **수업 코드를 넣고 「선생님께 제출」을 누를 때.** 그때만
+ * 이름·학번이 담당 선생님의 수업으로 간다. 그 경우 화면의 안내 문구도 함께 바뀐다
+ * (`R.privacySubmit`) — "저장하지 않습니다" 를 띄워 놓고 저장하지 않기 위해서다.
  */
 
 import { SLIDE_IDS } from '../sim/state.js';
@@ -21,6 +27,8 @@ import { EYEPIECE } from '../sim/optics.js';
 import { isGroup } from './notebook.js';
 import { actualSummary, escapeHtml } from './notebook.js';
 import { UI } from './strings.js';
+import { manifest } from '../manifest.js';
+import { enabled as submitEnabled, findClass, submitReport } from '../net/supabase.js';
 
 const R = UI.report;
 const N = UI.notebook;
@@ -278,6 +286,27 @@ function fileTag(who) {
   return [no, name].filter(Boolean).join(' ');
 }
 
+/**
+ * 제출용 꾸러미.
+ *
+ * 보고서를 **그대로 다시 그릴 수 있는 값 한 벌**이다. 그림이 아니라 시드와 파라미터라
+ * 몇 KB 밖에 안 되고, 선생님 화면이 같은 그림을 다시 그린다.
+ *
+ * 되돌리기 기록(history)은 뺀다 — 세션 안에서만 쓰는 값이고, 통째로 보내면 꾸러미가
+ * 몇 배로 커진다. 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
+ */
+function payloadOf(st, who, kind) {
+  const { history, ...session } = st.session;
+  void history;
+  return {
+    kind,
+    school: String(who.school ?? '').trim(),
+    team: String(who.team ?? '').trim(),
+    state: { ...st, session },
+    app: UI.appTitle,
+  };
+}
+
 export function createReport(root, store) {
   const fieldHtml = (f) => `
     <label class="rp-field${f.width === 'wide' ? ' rp-field--wide' : ''}">
@@ -289,20 +318,33 @@ export function createReport(root, store) {
   const kindTabs = R.kinds.map((k) => `
     <button type="button" class="rp-kind" role="tab" data-kind="${k.id}">${k.label}</button>`).join('');
 
+  // 제출 서버가 설정돼 있을 때만 제출 칸이 생긴다. 설정 안 한 학교에서는 화면이 지금 그대로다.
+  const canSubmit = submitEnabled();
+  const submitHtml = canSubmit ? `
+    <label class="rp-field rp-field--wide rp-code">
+      <span>${R.submit.codeLabel}</span>
+      <input type="text" id="rp-code" inputmode="numeric" maxlength="6"
+        placeholder="${R.submit.codePlaceholder}" autocomplete="off">
+    </label>
+    <p class="rp-code-hint">${R.submit.codeHint}</p>
+    <p class="rp-submit-msg" id="rp-submit-msg" role="status" aria-live="polite"></p>` : '';
+
   // <dialog> 를 쓴다. 포커스 가두기·Esc 로 닫기·바깥 비활성화를 브라우저가 이미 해 준다.
   root.innerHTML = `
     <dialog id="report-dialog" class="report-dialog" aria-labelledby="report-title">
       <h2 id="report-title">${R.dialogTitle}</h2>
       <div class="rp-kinds" role="tablist" aria-label="${R.kindLabel}">${kindTabs}</div>
       <p class="rp-kind-note" id="rp-kind-note"></p>
-      <p class="rp-privacy">${R.privacy}</p>
+      <p class="rp-privacy" id="rp-privacy">${R.privacy}</p>
       <div class="rp-fields">${R.fields.map(fieldHtml).join('')}</div>
       <div class="rp-fields rp-fields--group" id="rp-group-fields">
         ${R.groupFields.map(fieldHtml).join('')}
       </div>
+      ${submitHtml}
       <p class="rp-howto">${R.howto}</p>
       <div class="rp-actions">
         <button type="button" id="rp-cancel">${R.cancel}</button>
+        ${canSubmit ? `<button type="button" id="rp-submit">${R.submit.button}</button>` : ''}
         <button type="button" id="rp-make">${R.make}</button>
       </div>
     </dialog>
@@ -316,6 +358,40 @@ export function createReport(root, store) {
 
   /** 어떤 활동지를 뽑는가. 열 때 세션이 정한 대로 맞춰 두고, 여기서 바꿀 수 있다. */
   let kind = 'group';
+
+  const codeInput = root.querySelector('#rp-code');
+  const submitBtn = root.querySelector('#rp-submit');
+  const submitMsg = root.querySelector('#rp-submit-msg');
+  const privacyEl = root.querySelector('#rp-privacy');
+  /** 확인해 둔 수업. 코드를 고칠 때마다 지운다 — 옛 수업에 내는 일이 없어야 한다. */
+  let klass = null;
+  let sentOnce = false;
+  /**
+   * 보내는 중인가.
+   *
+   * 단추를 죽여 두지 않는다 (AGENTS.md §2.1 · tests/ui.contract.test.js). 회색 단추는
+   * 왜 안 눌리는지 말해 주지 못한다. 대신 글자를 「보내는 중…」 으로 바꾸고 aria-busy 를
+   * 세워 두며, 그 사이에 다시 눌린 것은 조용히 넘긴다 — 두 장이 가는 것보다 낫다.
+   */
+  let sending = false;
+
+  const say = (text, kindName = '') => {
+    if (!submitMsg) return;
+    submitMsg.textContent = text;
+    submitMsg.dataset.kind = kindName;
+  };
+
+  /**
+   * 개인정보 안내는 **지금 무슨 일이 일어나는지**를 말해야 한다.
+   * 제출할 수 있는 상태에서 "어디에도 저장하지 않습니다" 를 띄우면 화면이 거짓말을 한다.
+   */
+  function paintPrivacy() {
+    if (!privacyEl) return;
+    const days = klass
+      ? Math.max(1, Math.ceil((new Date(klass.expires_at) - Date.now()) / 86400000))
+      : null;
+    privacyEl.innerHTML = days ? R.privacySubmit(days) : R.privacy;
+  }
 
   function paintKind() {
     root.querySelectorAll('.rp-kind').forEach((b) => {
@@ -338,6 +414,66 @@ export function createReport(root, store) {
     inputs.forEach((el) => { el.value = ''; });
     sheet.innerHTML = '';
     document.title = pageTitle;
+    // 수업 코드는 **지우지 않는다.** 개인정보가 아니고, 한 반이 30명씩 내는 동안
+    // 매번 다시 치게 하면 그것만으로 수업이 멈춘다. 이름·학번은 위에서 지워진다.
+    klass = null;
+    sentOnce = false;
+    say('');
+    paintPrivacy();
+  }
+
+  if (codeInput) {
+    codeInput.addEventListener('input', () => {
+      codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+      klass = null;
+      sentOnce = false;
+      say('');
+      paintPrivacy();
+    });
+  }
+
+  if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+      const who = Object.fromEntries(inputs.map((el) => [el.dataset.field, el.value]));
+      const name = String(who.name ?? '').trim();
+      const studentNo = R.studentNo(who.grade, who.classNo, who.number);
+      const code = String(codeInput.value ?? '').trim();
+
+      if (!name || !studentNo) return say(R.submit.needName, 'warn');
+      if (code.length !== 6) return say(R.submit.needCode, 'warn');
+      if (sentOnce) say(R.submit.again, 'warn');
+
+      if (sending) return;
+      sending = true;
+      const label = submitBtn.textContent;
+      submitBtn.textContent = R.submit.sending;
+      submitBtn.setAttribute('aria-busy', 'true');
+      try {
+        if (!klass || klass.code !== code) klass = await findClass(code);
+        if (!klass) { say(R.submit.badCode, 'warn'); return; }
+        paintPrivacy();
+        const st = store.getState();
+        await submitReport({
+          classCode: code,
+          classId: klass.id,
+          exp: manifest.id,
+          studentNo,
+          studentName: name,
+          mode: isGroup(st) ? 'group' : 'solo',
+          level: st.session.level,
+          payload: payloadOf(st, who, kind),
+        });
+        sentOnce = true;
+        say(R.submit.done(name), 'done');
+      } catch (e) {
+        console.error(e);
+        say(R.submit.failed, 'warn');
+      } finally {
+        sending = false;
+        submitBtn.textContent = label;
+        submitBtn.removeAttribute('aria-busy');
+      }
+    });
   }
 
   root.querySelector('#rp-cancel').addEventListener('click', () => {
@@ -361,8 +497,12 @@ export function createReport(root, store) {
   window.addEventListener('afterprint', forget);
 
   return {
-    open() {
+    /** @param {{classCode?: string}} [opts]  주소(?code=)로 들어온 수업 코드 */
+    open(opts = {}) {
       forget();
+      if (codeInput && opts.classCode && !codeInput.value) {
+        codeInput.value = String(opts.classCode).replace(/\D/g, '').slice(0, 6);
+      }
       kind = isGroup(store.getState()) ? 'group' : 'solo';
       paintKind();
       dialog.showModal();
