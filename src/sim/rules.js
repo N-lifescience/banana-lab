@@ -5,8 +5,8 @@
  * 조작을 막는 대신 상태를 바꾸고, 무슨 일이 일어났는지 말한다.
  *
  * 결과 종류는 셋뿐이다:
- *   'ok'       진행됐다. 별말 없음.
- *   'happened' 진행됐다. 다만 이런 일이 일어났다. (대부분 여기 해당)
+ *   'ok'       뜻대로 됐다. 무엇이 바뀌었는지만 말한다. (말이 없을 수도 있다)
+ *   'happened' 진행은 됐는데 뜻대로는 아니다. 무슨 일이 일어났는지 말한다.
  *   'blocked'  진행되지 않았다. **아래 BLOCKING_REASONS 두 가지에만 허용된다.**
  *
  * 새 'blocked' 를 추가하려면 사람에게 먼저 물어볼 것. AGENTS.md §2.1 참조.
@@ -30,6 +30,8 @@ export { PAN_LIMIT };
  */
 export const TRANSIENT_ACTIONS = new Set([
   'TICK', 'MOVE_STAGE', 'NOTE_VIOLATION',
+  // 정리했는지 보는 것은 학생이 "한" 조작이 아니다. 되돌릴 것도 아니다.
+  'CHECK_TIDY',
   // 탐구 노트의 어느 쪽을 읽었는지는 학생이 "한" 조작이 아니다. 되돌릴 것도 아니다.
   'MARK_READ',
 ]);
@@ -47,7 +49,32 @@ export const BLOCKING_REASONS = {
   BROKEN: 'broken',           // 기구가 파손돼 재제작이 필요함
 };
 
-const ok = (state) => ({ state, outcome: 'ok', message: null, tag: null });
+/**
+ * 뜻대로 됐다.
+ *
+ * 예전에는 말이 없었다. 그런데 조작이 **성공했을 때 화면이 아무 말도 안 하면**, 학생은
+ * 방금 누른 것이 먹힌 것인지 아닌지를 그림에서 혼자 읽어내야 한다. 받침 유리 위의
+ * 20 mm 짜리 변화는 교실 프로젝터에서 보이지 않는다. 그래서 무엇이 바뀌었는지 말한다.
+ *
+ * 말은 **선택**이다. 시간이 흐르거나(TICK) 시야를 둘러보는 것(MOVE_STAGE)처럼
+ * 학생이 "했다" 고 느끼지 않는 일에는 붙이지 않는다 — 붙이면 화면이 쉬지 않고 떠든다.
+ */
+const ok = (state, message = null, tag = null) => ({ state, outcome: 'ok', message, tag });
+
+/** 받침 조사. 마지막 글자에 받침이 있으면 '을', 없으면 '를'. 한글이 아니면 '을' 로 둔다. */
+const eul = (w) => {
+  const c = w.charCodeAt(w.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return '을';
+  return (c - 0xac00) % 28 ? '을' : '를';
+};
+
+/** 토스트에 쓸 짧은 이름. 화면 문구(strings.js)와 같은 표기를 쓴다. */
+const SLIDE_NAME = { A: '(가)', B: '(나)', C: '(다)' };
+const REAGENT_NAME = {
+  WATER: '증류수',
+  IKI: '아이오딘–아이오딘화 칼륨 용액',
+  SUDAN3: '수단 Ⅲ 용액',
+};
 const happened = (state, message, tag) => ({ state, outcome: 'happened', message, tag: tag ?? null });
 const blocked = (state, message, reason) => {
   if (!Object.values(BLOCKING_REASONS).includes(reason)) {
@@ -80,15 +107,25 @@ function snapshot(state) {
  * 마개·손·폐액은 시야에 나타나지 않으므로 결과로 말할 수 없다.
  * 늦게라도 지키면 위반 기록에서 지운다. 감점은 애초에 없다. docs/04 「안전 규칙만은 예외」 참조.
  */
-function safetyAction(kind, message) {
+/**
+ * 정리 동작 하나 — 손 씻기 · 마개 닫기 · 폐액 버리기.
+ *
+ * 두 가지를 한다: **했다고 기록**하고, 이미 붙은 위반이 있으면 **지운다.**
+ * 벌이 아니라 기록이므로 늦게 해도 지워진다.
+ */
+function safetyAction(kind, message, doneMessage) {
   return function (state) {
-    const { violations } = state.session;
-    if (!violations.includes(kind)) return ok(state);
+    const { violations, tidy } = state.session;
     const next = {
       ...state,
-      session: { ...state.session, violations: violations.filter((v) => v !== kind) },
+      session: {
+        ...state.session,
+        violations: violations.filter((v) => v !== kind),
+        tidy: tidy.includes(kind) ? tidy : [...tidy, kind],
+      },
     };
-    return happened(next, message, 'safety-recovered');
+    if (violations.includes(kind)) return ok(next, message, 'safety-recovered');
+    return ok(next, doneMessage, 'tidy');
   };
 }
 
@@ -109,8 +146,9 @@ export const ACTIONS = {
 
   /** R-01 바나나 껍질 벗기기 */
   PEEL_BANANA(state) {
-    if (state.tools.banana.peeled) return ok(state);
-    return ok(withTools(state, { banana: { ...state.tools.banana, peeled: true } }));
+    if (state.tools.banana.peeled) return ok(state, '바나나는 이미 껍질이 벗겨져 있습니다.');
+    return ok(withTools(state, { banana: { ...state.tools.banana, peeled: true } }),
+      '바나나 껍질을 벗겼습니다.', 'peeled');
   },
 
   /**
@@ -126,7 +164,7 @@ export const ACTIONS = {
     if (thickness > 0.6) {
       return happened(next, '시료가 두껍게 발렸습니다. 현미경으로 보면 빛이 잘 통과하지 않습니다.', 'too-thick');
     }
-    return ok(next);
+    return ok(next, `${SLIDE_NAME[slide]} 받침 유리에 바나나 과육을 얇게 발랐습니다.`, 'smeared');
   },
 
   /** R-04 스포이트에 용액을 채운다 */
@@ -137,12 +175,14 @@ export const ACTIONS = {
     if (contaminating) {
       return happened(next, '스포이트에 다른 용액이 남아 있는 채로 채웠습니다.', 'cross-contamination');
     }
-    return ok(next);
+    const rn = REAGENT_NAME[reagent] ?? '용액';
+    return ok(next, `스포이트에 ${rn}${eul(rn)} 담았습니다.`, 'filled');
   },
 
   /** 스포이트 세척 */
   RINSE_DROPPER(state) {
-    return ok(withTools(state, { dropper: { holds: REAGENTS.NONE, level: 0, rinsed: true } }));
+    return ok(withTools(state, { dropper: { holds: REAGENTS.NONE, level: 0, rinsed: true } }),
+      '스포이트를 헹궜습니다. 안에 남은 용액이 없습니다.', 'rinsed');
   },
 
   /**
@@ -177,7 +217,8 @@ export const ACTIONS = {
         + '덮개 유리가 뜨고, 현미경으로는 색만 짙게 깔려 알갱이가 잘 보이지 않습니다.', 'overflow');
     }
     if (drops >= 3) return happened(next, '용액이 넉넉히 퍼졌습니다.', 'excess');
-    return ok(next);
+    const dn = REAGENT_NAME[reagent] ?? '용액';
+    return ok(next, `${SLIDE_NAME[slide]}에 ${dn}${eul(dn)} ${drops}방울 떨어뜨렸습니다.`, 'dropped');
   },
 
   /** 시간 경과 — 색 변화 진행 */
@@ -194,7 +235,8 @@ export const ACTIONS = {
 
   /** 핀셋으로 덮개 유리를 집는다 */
   PICK_COVERSLIP(state) {
-    return ok(withTools(state, { forceps: { holding: 'coverslip' } }));
+    return ok(withTools(state, { forceps: { holding: 'coverslip' } }),
+      '핀셋으로 덮개 유리를 집었습니다.', 'picked');
   },
 
   /**
@@ -224,7 +266,7 @@ export const ACTIONS = {
     if (s.stain && s.reactionT < 1) {
       return happened(next, '색 변화가 끝나기 전에 덮었습니다. 반응은 덮개 유리 아래에서 계속됩니다.', 'early-cover');
     }
-    return ok(next);
+    return ok(next, `${SLIDE_NAME[slide]}에 덮개 유리를 기포 없이 덮었습니다.`, 'covered');
   },
 
   /**
@@ -244,7 +286,7 @@ export const ACTIONS = {
     // 세 장을 차례로 올려 보는 것이 이 실험의 정상 경로이고, 거기에 알림을 달면
     // 제대로 하고 있을 때마다 경고가 뜨는 꼴이 된다.
     // 무엇이 올라가 있는지는 실험대의 내리기 버튼이 이름으로 말한다 (bench.js).
-    return ok(next);
+    return ok(next, `${SLIDE_NAME[slide]} 슬라이드를 재물대에 올렸습니다.`, 'mounted');
   },
 
   /**
@@ -264,7 +306,7 @@ export const ACTIONS = {
       withSlide(state, slide, { coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 } }),
       { forceps: { holding: 'usedCoverslip' } }
     );
-    return happened(next, '덮개 유리를 들어냈습니다. 한 번 쓴 것이니 쓰레기통에 버리세요.', 'coverslip-lifted');
+    return ok(next, '덮개 유리를 들어냈습니다. 한 번 쓴 것이니 쓰레기통에 버리세요.', 'coverslip-lifted');
   },
 
   /**
@@ -278,11 +320,11 @@ export const ACTIONS = {
   CLEAN_LENS(state) {
     const dirty = SLIDE_IDS.filter((id) => state.slides[id].lensTouched);
     if (dirty.length === 0) {
-      return happened(state, '렌즈는 깨끗합니다.');
+      return ok(state, '렌즈는 깨끗합니다.');
     }
     let next = state;
     for (const id of dirty) next = withSlide(next, id, { lensTouched: false });
-    return happened(next, '대물렌즈를 닦았습니다. 시야가 다시 맑아집니다.', 'lens-cleaned');
+    return ok(next, '대물렌즈를 닦았습니다. 시야가 다시 맑아집니다.', 'lens-cleaned');
   },
 
   /** 쓴 덮개 유리를 쓰레기통에 버린다. */
@@ -290,7 +332,8 @@ export const ACTIONS = {
     if (!state.tools.forceps.holding) {
       return happened(state, '핀셋이 비어 있습니다.');
     }
-    return ok(withTools(state, { forceps: { holding: null } }));
+    return ok(withTools(state, { forceps: { holding: null } }),
+      '쓴 덮개 유리를 쓰레기통에 버렸습니다.', 'discarded');
   },
 
   /**
@@ -313,7 +356,7 @@ export const ACTIONS = {
       coverslip: { placed: false, angleAtDrop: 0, bubbles: 0 },
       contaminated: false, lensTouched: false,
     });
-    return happened(next, '받침 유리를 씻었습니다. 처음부터 다시 만들 수 있습니다.', 'slide-rinsed');
+    return ok(next, `${SLIDE_NAME[slide]} 받침 유리를 씻었습니다. 처음부터 다시 만들 수 있습니다.`, 'slide-rinsed');
   },
 
   /**
@@ -332,9 +375,9 @@ export const ACTIONS = {
     let next = { ...state, slides: { ...state.slides, [slide]: fresh } };
     if (state.microscope.stage === slide) next = withScope(next, { stage: null });
     if (s.cracked) {
-      return happened(next, '금 간 받침 유리를 버리고 통에서 새것을 꺼냈습니다. 처음부터 다시 만드세요.', 'slide-replaced');
+      return ok(next, `금 간 ${SLIDE_NAME[slide]}를 버리고 통에서 새것을 꺼냈습니다. 처음부터 다시 만드세요.`, 'slide-replaced');
     }
-    return happened(next, '통에서 새 받침 유리를 꺼냈습니다. 쓰던 것에 있던 시료와 시약은 사라졌습니다.', 'slide-replaced');
+    return ok(next, `${SLIDE_NAME[slide]}를 새 받침 유리로 바꿨습니다. 쓰던 것의 시료와 시약은 사라졌습니다.`, 'slide-replaced');
   },
 
   /**
@@ -356,7 +399,7 @@ export const ACTIONS = {
     // 쓴 적 없는 답이 칸에 들어가 있다.
     const notes = { ...state.session.notes };
     delete notes[`mag.${at}`];
-    return happened(
+    return ok(
       { ...state, session: { ...state.session, captures, notes } },
       '기록을 지웠습니다.', 'capture-deleted'
     );
@@ -383,8 +426,10 @@ export const ACTIONS = {
    * 실제 실험에서 슬라이드를 도로 집어 드는 것은 아무 대가가 없는 동작이므로 여기서도 그렇다.
    */
   UNMOUNT(state) {
-    if (!state.microscope.stage) return ok(state);
-    return ok(withScope(state, { stage: null }));
+    const on = state.microscope.stage;
+    if (!on) return ok(state);
+    return ok(withScope(state, { stage: null }),
+      `${SLIDE_NAME[on]} 슬라이드를 재물대에서 내렸습니다.`, 'unmounted');
   },
 
   /**
@@ -403,7 +448,7 @@ export const ACTIONS = {
     if (objective === 40 && !m.lowMagFocused) {
       return happened(next, '저배율에서 초점을 맞추지 않고 올렸습니다. 초점 맞는 범위가 매우 좁습니다.', 'skipped-low-mag');
     }
-    return ok(next);
+    return ok(next, `대물렌즈를 ${objective}배로 바꿨습니다. 접안렌즈 ${EYEPIECE}배와 곱해 총 ${objective * EYEPIECE}배입니다.`, 'objective');
   },
 
   /**
@@ -486,7 +531,7 @@ export const ACTIONS = {
     if (capture.focusErr > focusTolerance(m.objective)) {
       return happened(next, '흐린 채로 기록됐습니다. 정리 단계에서 왜 흐렸는지 적게 됩니다.', 'blurry-capture');
     }
-    return ok(next);
+    return ok(next, `${SLIDE_NAME[m.stage]} 시야를 기록했습니다. 지금까지 ${next.session.captures.length}장입니다.`, 'captured');
   },
 
   /** 안전 규칙 위반 기록. 진행을 막지 않고 자기 평가에 보여 주기만 한다. */
@@ -498,13 +543,43 @@ export const ACTIONS = {
   },
 
   /** 손을 씻는다 */
-  WASH_HANDS: safetyAction('hands-unwashed', '늦었지만 손을 씻었습니다. 위반 기록에서 지웠습니다.'),
+  WASH_HANDS: safetyAction('hands-unwashed',
+    '늦었지만 손을 씻었습니다. 위반 기록에서 지웠습니다.', '손을 씻었습니다.'),
 
   /** 시약병 마개를 닫는다 */
-  CLOSE_CAP: safetyAction('cap-left-open', '늦었지만 마개를 닫았습니다. 위반 기록에서 지웠습니다.'),
+  CLOSE_CAP: safetyAction('cap-left-open',
+    '늦었지만 마개를 닫았습니다. 위반 기록에서 지웠습니다.', '시약병 마개를 닫았습니다.'),
 
   /** 폐액을 처리한다 */
-  DISPOSE_WASTE: safetyAction('waste-left', '늦었지만 폐액을 처리했습니다. 위반 기록에서 지웠습니다.'),
+  DISPOSE_WASTE: safetyAction('waste-left',
+    '늦었지만 폐액을 처리했습니다. 위반 기록에서 지웠습니다.', '폐액을 폐액통에 버렸습니다.'),
+
+  /**
+   * 실험을 마칠 때 정리를 했는지 본다. 보고서를 열 때 한 번 돈다.
+   *
+   * ── 왜 여기서 보나 ────────────────────────────────────────────────
+   * 「가치·태도 — 안전 규칙 준수」 칸은 만들어만 두고 **아무 데서도 기록되지 않고 있었다.**
+   * 그래서 무엇을 하든 늘 "위반 없음" 이었고, 학생 눈에는 아무 뜻 없는 칸이었다.
+   * 정리는 원래 **끝낼 때** 하는 일이라, 끝내는 시점에 본다.
+   *
+   * 막지 않는다. 정리를 안 했어도 보고서는 그대로 나온다 — 안 한 것이 적힐 뿐이다.
+   * 뒤늦게 실험대에서 휴지·시약병·폐액통을 누르면 기록이 지워진다.
+   */
+  CHECK_TIDY(state) {
+    const { tidy, violations } = state.session;
+    // 시약을 아예 안 썼으면 닫을 마개도 버릴 폐액도 없다. 안 한 일을 안 했다고 적지 않는다.
+    const usedReagent = SLIDE_IDS.some((id) => state.slides[id].drops > 0)
+      || state.tools.dropper.holds !== REAGENTS.NONE;
+    const want = ['hands-unwashed', ...(usedReagent ? ['cap-left-open', 'waste-left'] : [])];
+    const missed = want.filter((k) => !tidy.includes(k) && !violations.includes(k));
+    if (missed.length === 0) return ok(state);
+    const next = {
+      ...state,
+      session: { ...state.session, violations: [...violations, ...missed] },
+    };
+    return happened(next,
+      `정리하지 않은 것이 ${missed.length}가지 있습니다. 자기 평가 쪽에 남습니다.`, 'tidy-missed');
+  },
 
   /** 세부 단계별 관찰 기록 */
   SAVE_NOTE(state, { step, text = '' }) {

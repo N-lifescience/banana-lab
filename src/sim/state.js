@@ -91,6 +91,9 @@ export function initialState(level = 1, seed = 20260823, mode = MODES.GROUP) {
       // 읽었다는 사실은 조작이 아니라서 되돌리기 기록에 쌓지 않는다 (rules.js TRANSIENT_ACTIONS).
       readStages: [],
       violations: [],     // 안전 규칙 위반 기록. 감점하지 않고 보여 주기만 한다.
+      // 정리를 한 것들. 실험을 마칠 때(CHECK_TIDY) 여기 없는 것이 위반으로 남는다.
+      // 뒤늦게라도 하면 위반 기록에서 지워진다 — 벌이 아니라 기록이기 때문이다.
+      tidy: [],
       log: [],            // { at, action, outcome, tag } — 되돌아보기용. at 은 순번이다
       // 되돌리기용. 세션 안에서만 쓴다 — captures 나 제출 데이터에 넣지 않는다.
       history: [],

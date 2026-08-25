@@ -325,7 +325,8 @@ T05  탐구 노트 7단계                                  (npm run check)
 T06  난이도 세 단계                                   (npm run check)
 T07  보고서                                           (node scripts/check-bench.mjs)
 T08  배포본 확인                                      (node scripts/check-build.mjs)
-T09  매니페스트 채우기 (5분)                          (node --test tests/manifest.test.js)
+T09  절차 판정표 (progress.js)                        (node --test tests/progress.test.js)
+T10  매니페스트 채우기 (5분)                          (node --test tests/manifest.test.js)
 ```
 
 ---

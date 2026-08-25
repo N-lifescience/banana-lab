@@ -237,7 +237,9 @@ export function createZoom(root, store) {
       drag = null;
       busy = false;
       // 고무를 눌렀고, 스포이트 끝이 받침 유리 위에 있으면 한 방울.
-      if (squeeze && overlaps(el, stage())) store.dispatch('DROP', { slide: slideId, count: 1 });
+      if (squeeze && (overlaps(el, stage()) || pointerOver(stage(), e, 24))) {
+        store.dispatch('DROP', { slide: slideId, count: 1 });
+      }
       else paint();
     };
     el.addEventListener('pointerup', end);
@@ -369,7 +371,8 @@ export function createZoom(root, store) {
       tool.releasePointerCapture(e.pointerId);
       tool.classList.remove('cover-tool--dragging');
       const moved = drag.moved;
-      const touched = overlaps(tool, stage());
+      // 손끝 24 px 여유는 두께 20 mm 짜리 받침 유리를 손가락으로 맞히기 위한 것이다.
+      const touched = overlaps(tool, stage()) || pointerOver(stage(), e, 24);
       drag = null;
       busy = false;
       if (!moved || !touched) {
@@ -393,6 +396,21 @@ export function createZoom(root, store) {
     });
 
     paint();
+  }
+
+  /**
+   * 손끝이 받침 유리 위(또는 그 언저리)에서 떨어졌는가.
+   *
+   * 겹침만으로 판정하면 **가로 모드에서 덮이지 않는다.** 눕힌 화면에서는 패널이 스크롤되는데,
+   * 도구의 위치는 끌기 시작한 자리 기준의 transform 이라 스크롤한 만큼 받침 유리와 어긋난다.
+   * 눈에는 겹쳐 보이는데 사각형끼리는 안 겹치는 상태가 된다. 손끝 좌표는 스크롤과 무관하게
+   * 늘 화면 좌표라, 이쪽이 학생이 보고 있는 것과 일치한다.
+   */
+  function pointerOver(el, e, pad = 0) {
+    if (!el || typeof e?.clientX !== 'number') return false;
+    const q = el.getBoundingClientRect();
+    return e.clientX >= q.left - pad && e.clientX <= q.right + pad
+        && e.clientY >= q.top - pad && e.clientY <= q.bottom + pad;
   }
 
   /** 두 요소가 화면에서 겹치는가. 덮개 유리는 받침 유리 어디에 닿아도 덮인 것으로 본다. */

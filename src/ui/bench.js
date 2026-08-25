@@ -95,15 +95,20 @@ function defaultItems() {
     // 상단 선반
     // 받침 유리 사이를 120 mm 씩 벌려 둔다. 바나나가 180 mm 라 90 mm 간격에서는
     // 끄는 동안 바나나 그림이 이웃한 유리 두 장을 함께 덮어, 어디에 발리는지 보이지 않았다.
-    shelf(505, { id: 'banana', asset: 'banana', kind: 'banana', labelKey: 'banana' }),
-    shelf(1050, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', labelKey: 'slideA' }),
-    shelf(900, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', labelKey: 'slideB' }),
-    shelf(750, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', labelKey: 'slideC' }),
+    // 왼쪽에서 오른쪽으로 (가)·(나)·(다) 순이다. 앞서는 (다)·(나)·(가) 순이었는데,
+    // 탐구 노트와 보고서는 어디서나 (가)→(다) 로 읽히므로 실험대만 거꾸로였다.
+    // 세 번째 슬라이드를 만들면서 매번 왼쪽 끝으로 돌아가야 했다.
+    shelf(455, { id: 'banana', asset: 'banana', kind: 'banana', labelKey: 'banana' }),
+    shelf(685, { id: 'slideA', asset: 'slide', kind: 'slide', slide: 'A', labelKey: 'slideA' }),
+    shelf(835, { id: 'slideB', asset: 'slide', kind: 'slide', slide: 'B', labelKey: 'slideB' }),
+    shelf(985, { id: 'slideC', asset: 'slide', kind: 'slide', slide: 'C', labelKey: 'slideC' }),
     // 낱장 석 장을 늘어놓았더니 22 mm 짜리가 화면에서 12 px 이라 무엇인지 알아볼 수 없었다.
     // 통 하나로 바꾼다 — 실제 실험실도 통에서 꺼내 쓰고, 종류(kind)는 그대로라 조작표는 그대로다.
     shelf(1156, { id: 'coverbox', asset: 'coverbox', kind: 'coverslip', labelKey: 'coverbox' }),
-    // 받침 유리도 통에서 꺼내 쓴다. 덮개 유리 통 옆에 나란히 둔다 — 둘 다 "꺼내 쓰는 것" 이다.
-    shelf(802, { id: 'slidebox', asset: 'slidebox', kind: 'slidebox', labelKey: 'slidebox' }),
+    // 받침 유리도 통에서 꺼내 쓴다. 덮개 유리 통 **바로 왼쪽**에 붙여 둔다 —
+    // 둘 다 "통에서 꺼내 쓰는 것" 이라 나란히 있어야 한 쌍으로 읽힌다.
+    // 앞서는 받침 유리들 사이에 끼어 있어서, 낱장 유리와 통이 뒤섞여 보였다.
+    shelf(1055, { id: 'slidebox', asset: 'slidebox', kind: 'slidebox', labelKey: 'slidebox' }),
     surface(1301, { id: 'dropper', asset: 'dropper', kind: 'dropper', labelKey: 'dropper' }),
     surface(1380, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
     // 물도 시약병에 담겨 있다. 교과서 절차에서 시료 위에 먼저 떨어뜨리는 봉입액이고,
@@ -637,6 +642,10 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
   function onPointerDown(e, item, el) {
     if (e.button !== undefined && e.button !== 0) return;
+    // 손가락으로 물건을 꾹 눌러 끌면, 브라우저가 그것을 **글자를 고르려는 동작**으로 읽고
+    // 돋보기와 「복사」 메뉴를 띄운다. 그러면 끌기는 그 자리에서 끊긴다.
+    // touch-action:none 은 스크롤·확대만 막을 뿐 이 선택 동작은 못 막는다 — 여기서 막는다.
+    e.preventDefault();
     hideTip();
     el.setPointerCapture(e.pointerId);
     drag = {

@@ -17,6 +17,8 @@ import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE } from '../sim/optics.js';
 import { UI } from './strings.js';
+import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
+
 
 const N = UI.notebook;
 
@@ -108,25 +110,44 @@ export function isGroup(st) {
  *
  * @returns {{ready: boolean, missing: string[]}}
  */
-export function reportReadiness(st) {
-  const notes = st.session.notes;
-  const has = (key) => String(notes[key] ?? '').trim().length > 0;
-  const missing = [];
+/** 칸이 채워졌는가. 공백만 있는 것은 안 채운 것이다. */
+const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length > 0;
 
-  if (!SLIDE_IDS.every((id) => has(`predict.${id}`))) missing.push(N.reportTodo.predict);
+/*
+ * 쪽마다 "다 했는가". 탭의 ✓ 와 보고서 단추가 **같은 함수**를 본다.
+ * 따로 세면 언젠가 어긋나고, 그때 학생은 탭이 전부 ✓ 인데 보고서가 안 나오는 화면을 본다.
+ */
+const predictDone = (st) => SLIDE_IDS.every((id) => hasNote(st, `predict.${id}`));
+const wrapupDone = (st) =>
+  ['q.a', 'q2', ...(isGroup(st) ? ['q3'] : [])].every((k) => hasNote(st, k));
+const selfEvalDone = (st) => N.selfEvalItems.every(({ key }) => hasNote(st, `selfeval.${key}`));
+
+/**
+ * 탐구 노트의 한 쪽이 끝났는가 — 탭에 ✓ 를 붙일지 정한다.
+ *
+ * 1~4 쪽은 **읽었는가**로 본다(실험대를 여는 조건이 그것이다).
+ * 5~7 쪽은 **채워졌는가**로 본다. 같은 ✓ 를 쓰지만 뜻은 하나다 — "이 쪽은 할 일을 마쳤다".
+ */
+export function stageDone(st, id) {
+  if (UI.bench.lock.required.includes(id)) return (st.session.readStages ?? []).includes(id);
+  if (id === '5') return resultsDone(st);
+  if (id === '6') return wrapupDone(st);
+  if (id === '7') return selfEvalDone(st);
+  return false;
+}
+
+export function reportReadiness(st) {
+  const missing = [];
+  if (!predictDone(st)) missing.push(N.reportTodo.predict);
   // (가)(나)(다)를 한 번씩은 봐야 한다. 이 실험이 하려는 일이 그것이다.
   // 금이 가서 못 본 슬라이드가 있어도 받침 유리 통에서 새로 만들 수 있다.
-  const seen = new Set(st.session.captures.map((c) => c.slide));
-  if (!SLIDE_IDS.every((id) => seen.has(id))) missing.push(N.reportTodo.captures);
-
-  const wrapupKeys = ['q.a', 'q2', ...(isGroup(st) ? ['q3'] : [])];
-  if (!wrapupKeys.every(has)) missing.push(N.reportTodo.wrapup);
-  if (!N.selfEvalItems.every(({ key }) => has(`selfeval.${key}`))) missing.push(N.reportTodo.selfEval);
-
+  if (!resultsDone(st)) missing.push(N.reportTodo.captures);
+  if (!wrapupDone(st)) missing.push(N.reportTodo.wrapup);
+  if (!selfEvalDone(st)) missing.push(N.reportTodo.selfEval);
   return { ready: missing.length === 0, missing };
 }
 
-export function createNotebook(root, store, { onOpenZoom, onReport }) {
+export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
@@ -143,8 +164,13 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
    * 단추를 회색으로 죽여 두지 않는다 — 눌리지 않는 단추는 왜 안 눌리는지 말해 주지 못한다.
    * 그 자리에 남은 것을 적은 목록을 대신 그린다.
    */
+  // 방금 열렸는가. 학생이 다른 쪽을 보고 있을 수도 있으니 탭의 변화만으로는 부족하다.
+  let wasReady = false;
+
   function renderReportSlot(st) {
     const { ready, missing } = reportReadiness(st);
+    if (ready && !wasReady) onReady?.();
+    wasReady = ready;
     if (ready) {
       reportSlot.innerHTML = `<button type="button" id="make-report">${UI.report.button}</button>`;
       // 보고서는 탐구 노트가 내놓는 것이라 여기 둔다. 여는 일만 넘기고, 만드는 일은 report.js 가 한다.
@@ -221,7 +247,12 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
    */
   function renderStage3(st) {
     const level = st.session.level;
-    return SLIDE_IDS.map((id) => {
+    // 무엇을 할지 모르는 채로 (가)(나)(다) 중 하나를 고르라고 하면 뜬금없다.
+    // 할 일은 밝히고, 무엇이 보일지는 밝히지 않는다 — 그게 지금 묻고 있는 것이다.
+    const lead = `<div class="predict-lead">${
+      N.predictLeadIn.map((p) => `<p>${emph(p)}</p>`).join('')
+    }</div>`;
+    return lead + SLIDE_IDS.map((id) => {
       const key = `predict.${id}`;
       const val = st.session.notes[key] ?? '';
       const whyKey = `predict.why.${id}`;
@@ -249,6 +280,11 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
     }).join('');
   }
 
+  /** `**굵게**` 만 허용한다. 문구에 강조를 넣으려고 HTML 을 통째로 열어 두지 않는다. */
+  function emph(text) {
+    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  }
+
   /* ---------------------------------------------------------------- */
   /* 4 탐구 과정 — STEP 1~6. 난이도별로 절차 제시만 달리한다 (docs/06 표). */
   /* ---------------------------------------------------------------- */
@@ -266,29 +302,43 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
             <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>
           </section>`;
       }
-      // 1단계 — 다음(아직 기록이 없는) 세부 단계를 하이라이트. 2단계 — 목록만.
-      const nextIdx = level === 1
-        ? group.steps.findIndex((_, i) => !st.session.notes[substepId(group, i)])
-        : -1;
+      // 짚어 줄 곳은 **했는데 아직 안 적은** 칸이다. 그런 칸이 없으면 아직 안 한 첫 칸이다.
+      // 읽는 순서가 아니라 하는 순서를 따라간다 — 그게 이 쪽에서 하려는 일이다.
+      const done = group.steps.map((_, i) => stepDone(st, group.id, i));
+      const written = group.steps.map((_, i) => Boolean(st.session.notes[substepId(group, i)]));
+      // 앞에서부터 **아직 끝나지 않은 첫 칸**을 짚는다. "했는데 안 적은 칸" 을 먼저 찾으면
+      // 아직 손도 안 댄 첫 칸을 건너뛰고 뒤엣것을 짚는 일이 생긴다.
+      const nextIdx = group.steps.findIndex((_, i) => !(done[i] && written[i]));
+
       const items = group.steps.map((step, i) => {
         const id = substepId(group, i);
-        const hi = i === nextIdx ? ' substep--next' : '';
+        // 하이라이트는 1단계에서만. 2단계는 목록만 보여 준다 (docs/06 표).
+        const hi = level === 1 && i === nextIdx ? ' substep--next' : '';
+        const hint = level === 1 && i === nextIdx
+          ? `<p class="substep-hint">${done[i] ? N.stepWriteNow : N.stepNotYet}</p>` : '';
         return `
-          <li class="substep${hi}">
-            <div class="substep-title">${step.label}</div>
+          <li class="substep${hi}" data-done="${done[i]}">
+            <div class="substep-title">
+              <span class="substep-mark" aria-hidden="true">${done[i] ? '✓' : '·'}</span>
+              ${step.label}
+              <span class="substep-state">${done[i] ? N.stepDoneMark : N.stepTodoMark}</span>
+            </div>
+            ${hint}
             <label class="notes-label" for="note-${id}">${N.notesLabel}</label>
             <textarea data-note="${id}" id="note-${id}"
               placeholder="${escapeHtml(notePlaceholder(level, step))}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
           </li>`;
       }).join('');
       return `
-        <section class="note-step" data-step-group="${group.id}">
-          <h3>STEP ${group.id} · ${group.title}</h3>
+        <section class="note-step" data-step-group="${group.id}" data-done="${groupDone(st, group.id)}">
+          <h3>STEP ${group.id} · ${group.title}
+            ${groupDone(st, group.id) ? '<span class="step-done-mark">✓</span>' : ''}</h3>
           <ul class="substep-list">${items}</ul>
           ${group.id === '4' ? questionA(st) : ''}
         </section>`;
     }).join('');
-    return `<div id="note-step-4">${stepsHtml}</div>`;
+    return `<p class="stage-text step-lead">${emph(N.stepLeadIn)}</p>
+      <div id="note-step-4">${stepsHtml}</div>`;
   }
 
   /**
@@ -517,10 +567,18 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
           placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`feedback.${key}`] ?? '')}</textarea>
       </div>`).join('');
 
+    // 이 칸은 학생이 채우는 곳이 아니다. 실험하는 동안 지켜본 것을 그대로 보여 준다.
+    // 지킨 것도 함께 적는다 — 빈 목록에 "위반 없음" 한 줄만 뜨면 무엇을 보고 하는 말인지
+    // 알 수 없고, 아무것도 안 해도 늘 그렇게 뜨는 줄 알게 된다.
     const violations = st.session.violations;
-    const violationItems = violations.length
-      ? violations.map((v) => `<li>${escapeHtml(N.violations[v] ?? v)}</li>`).join('')
-      : `<li class="no-violations">${N.noViolations}</li>`;
+    const violationItems = N.valuesWatched.map(({ kind, label }) => {
+      const missed = violations.includes(kind);
+      return `<li class="value-item" data-missed="${missed}">
+        <span class="value-mark" aria-hidden="true">${missed ? '✗' : '✓'}</span>
+        <span class="value-label">${label}</span>
+        <span class="value-state">${missed ? N.valuesMissed : N.valuesKept}</span>
+      </li>`;
+    }).join('');
     return `
       <div id="self-eval">
         <h3>${N.likertHeading}</h3>
@@ -529,7 +587,9 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
         ${reflections}
         <div class="self-eval-item">
           <h3>${N.valuesLabel}</h3>
-          <ul id="violations">${violationItems}</ul>
+          <p class="stage-text values-lead">${N.valuesLead}</p>
+          <ul id="violations" class="values-list">${violationItems}</ul>
+          ${violations.length === 0 ? `<p class="no-violations">${N.noViolations}</p>` : ''}
         </div>
       </div>`;
   }
@@ -599,9 +659,9 @@ export function createNotebook(root, store, { onOpenZoom, onReport }) {
     const st = store.getState();
     tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
       tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));
-      // 읽은 쪽에는 표시를 남긴다. 어디를 더 봐야 실험대가 열리는지 탭만 보고 알 수 있어야 한다.
-      const need = UI.bench.lock.required.includes(tab.dataset.stage);
-      tab.dataset.read = String(need && (st.session.readStages ?? []).includes(tab.dataset.stage));
+      // 끝낸 쪽에는 표시를 남긴다. 어디가 남았는지 탭만 보고 알 수 있어야 한다 —
+      // 앞 네 쪽은 실험대를 여는 조건이고, 뒤 세 쪽은 보고서를 내는 조건이다.
+      tab.dataset.read = String(stageDone(st, tab.dataset.stage));
     });
     panelEl.innerHTML = STAGE_RENDERERS[activeStage](st) + readFooter(st);
     bindPanel();

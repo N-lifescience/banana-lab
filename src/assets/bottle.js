@@ -5,6 +5,7 @@
  */
 
 import { PALETTE, INK, STROKE, GROUND_SHADOW, PATH_ATTRS } from '../style/tokens.js';
+import { EXP_PALETTE } from '../style/palette.experiment.js';
 import { clamp } from './geometry.js';
 
 export const NODES = [
@@ -18,9 +19,10 @@ export function liquidFill(state = {}) {
   const kind = state.kind;
   if (kind === 'IKI' || kind === 'iodine') return PALETTE.iodine[0];
   if (kind === 'SUDAN3' || kind === 'sudan') return PALETTE.sudan[0];
-  // 물은 무색이다. 유리색을 그대로 쓰면 병이 비어 보이므로 음영 쪽을 써서
-  // "안에 무언가 들어 있다" 는 것만 보이게 한다 — 색으로 말하지 않는 것이 물의 성질이다.
-  if (kind === 'WATER' || kind === 'water') return PALETTE.glass[1];
+  // 물은 실제로는 무색이다. 그래서 처음에는 유리 음영색으로 두었는데, 교실에서 보니
+  // 선반의 병이 그냥 비어 보였다. 무엇이 든 병인지 알 수 없으면 집을 이유도 없다.
+  // 밝은 하늘색을 쓴다 — 녹말 반응색(청람색)과는 채도·밝기가 충분히 멀어 헷갈리지 않는다.
+  if (kind === 'WATER' || kind === 'water') return EXP_PALETTE.water[0];
   return PALETTE.glass[0];
 }
 

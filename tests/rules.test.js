@@ -216,7 +216,7 @@ test('대조군은 방울 수로 깎이지 않는다', () => {
 
 /* ---------------- 정상 경로 통합 ---------------- */
 
-test('정상 경로: 껍질부터 캡처 세 장까지 태그 하나 없이 끝난다', () => {
+test('정상 경로: 껍질부터 캡처 세 장까지 경고 하나 없이 끝난다', () => {
   let s = S0();
   const step = (type, payload) => {
     const r = run(s, type, payload);
@@ -254,13 +254,14 @@ test('정상 경로: 껍질부터 캡처 세 장까지 태그 하나 없이 끝�
 
   assert.equal(s.session.captures.length, 3);
   assert.deepEqual(s.session.captures.map((c) => c.slide), ['A', 'B', 'C']);
-  for (const r of captureResults) {
-    assert.equal(r.outcome, 'ok');
-    assert.equal(r.tag, null, '정상 경로에서 태그가 붙으면 그건 정상 경로가 아니다');
-  }
+  for (const r of captureResults) assert.equal(r.outcome, 'ok');
 
-  const tagged = s.session.log.filter((e) => e.tag !== null);
-  assert.deepEqual(tagged, [], '정상 경로 전체에 태그가 하나라도 붙으면 안 된다');
+  // 예전에는 "태그가 하나도 없다" 로 봤다. 이제는 잘된 조작에도 태그가 붙는다 —
+  // 무엇이 바뀌었는지 말해 주기 위해서다(rules.js 의 ok()). 그래서 태그가 아니라
+  // **결과 종류**로 본다. 이쪽이 원래 지키려던 것에 더 가깝다: 정상 경로에서는
+  // 뜻대로 안 된 일이 한 번도 일어나지 않는다.
+  const notOk = s.session.log.filter((e) => e.outcome !== 'ok');
+  assert.deepEqual(notOk, [], '정상 경로 전체에 뜻대로 안 된 조작이 하나라도 있으면 안 된다');
   assert.deepEqual(s.session.log.map((e) => e.at), s.session.log.map((_, i) => i));
 });
 
@@ -345,7 +346,7 @@ test('색 변화 전에 덮으면 early-cover, 대조군은 붙지 않는다', (
   s = run(s, 'PICK_COVERSLIP').state;
   const control = run(s, 'PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 });
   assert.equal(control.outcome, 'ok');
-  assert.equal(control.tag, null);
+  assert.notEqual(control.tag, 'early-cover');
 });
 
 test('덮개 유리를 수직으로 떨어뜨리면 기포가 생긴다', () => {
@@ -431,7 +432,7 @@ test('더러워진 대물렌즈를 닦을 수 있다', () => {
   // 렌즈만 닦는다. 슬라이드에 이미 생긴 일은 그대로다.
   assert.equal(cleaned.state.slides.B.sample.thickness, 0.3);
 
-  assert.equal(run(cleaned.state, 'CLEAN_LENS').outcome, 'happened', '깨끗해도 막지 않는다');
+  assert.equal(run(cleaned.state, 'CLEAN_LENS').outcome, 'ok', '깨끗해도 막지 않는다');
 });
 
 test('받침 유리를 씻으면 처음으로 돌아간다', () => {
@@ -443,7 +444,7 @@ test('받침 유리를 씻으면 처음으로 돌아간다', () => {
   s = run(s, 'PLACE_COVERSLIP', { slide: 'B', angleDeg: 90 }).state;
 
   const washed = run(s, 'RINSE_SLIDE', { slide: 'B' });
-  assert.equal(washed.outcome, 'happened');
+  assert.equal(washed.outcome, 'ok');
   const b = washed.state.slides.B;
   assert.equal(b.sample, null);
   assert.equal(b.stain, null);
@@ -691,4 +692,33 @@ test('reduce 는 원본 상태를 바꾸지 않는다', () => {
   run(s, 'PEEL_BANANA');
   run(s, 'SMEAR', { slide: 'A', thickness: 0.9 });
   assert.equal(JSON.stringify(s), before, 'reduce 는 순수 함수여야 합니다');
+});
+
+test('정리를 안 하면 마칠 때 기록에 남고, 뒤늦게 해도 지워진다', () => {
+  // 「가치·태도 — 안전 규칙 준수」 칸은 오래 비어 있었다. 만들어만 두고 아무 데서도
+  // 기록하지 않았기 때문이다. 늘 "위반 없음" 이 뜨는 칸은 아무 말도 하지 않는 칸이다.
+  let s = run(S0(), 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
+  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
+  s = run(s, 'DROP', { slide: 'B', count: 2 }).state;
+
+  const checked = run(s, 'CHECK_TIDY');
+  assert.equal(checked.outcome, 'happened', '막지는 않는다');
+  assert.deepEqual(checked.state.session.violations.slice().sort(),
+    ['cap-left-open', 'hands-unwashed', 'waste-left']);
+
+  // 늦게라도 하면 지워진다. 벌이 아니라 기록이다.
+  let t = checked.state;
+  for (const a of ['WASH_HANDS', 'CLOSE_CAP', 'DISPOSE_WASTE']) t = run(t, a).state;
+  assert.deepEqual(t.session.violations, []);
+
+  // 두 번 봐도 같은 것이 두 번 쌓이지 않는다.
+  assert.deepEqual(run(t, 'CHECK_TIDY').state.session.violations, []);
+});
+
+test('시약을 안 썼으면 닫을 마개도 버릴 폐액도 없다', () => {
+  const s = run(S0(), 'PEEL_BANANA').state;
+  const checked = run(s, 'CHECK_TIDY');
+  assert.deepEqual(checked.state.session.violations, ['hands-unwashed'],
+    '안 한 일을 안 했다고 적지 않는다');
 });

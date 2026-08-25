@@ -13,6 +13,7 @@ import { createZoom } from './ui/zoom.js';
 import { createNotebook } from './ui/notebook.js';
 import { createStart } from './ui/start.js';
 import { createReport } from './ui/report.js';
+import { UI } from './ui/strings.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -100,7 +101,15 @@ function boot(level, mode = MODES.GROUP) {
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
   const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
-  createNotebook($('#notebook'), store, { onOpenZoom: openZoom, onReport: report.open });
+  createNotebook($('#notebook'), store, {
+    onOpenZoom: openZoom,
+    // 보고서를 여는 것이 곧 "실험을 마친다" 는 뜻이다. 그때 정리를 했는지 한 번 본다
+    // (rules.js CHECK_TIDY). 안 했어도 막지 않는다 — 자기 평가 쪽에 적힐 뿐이다.
+    onReport: () => { store.dispatch('CHECK_TIDY', {}); report.open(); },
+    // 보고서를 낼 수 있게 된 순간은 탐구 노트 위쪽에서 조용히 일어난다.
+    // 그때 학생은 대개 실험대를 보고 있다 — 알려 주지 않으면 한참 뒤에야 안다.
+    onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),
+  });
 
   startClock();
 }

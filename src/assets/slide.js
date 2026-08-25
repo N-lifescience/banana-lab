@@ -5,6 +5,7 @@
  */
 
 import { PALETTE, INK, STROKE, GROUND_SHADOW, PATH_ATTRS } from '../style/tokens.js';
+import { EXP_PALETTE } from '../style/palette.experiment.js';
 import { rng, clamp } from './geometry.js';
 
 export const NODES = [
@@ -23,7 +24,9 @@ export const COVERSLIP_INK = INK;
  * 물은 무색이라 유리 음영색으로 둔다 — 관 안이 비어 보이지 않을 만큼만.
  */
 export const REAGENT_TINT = {
-  WATER: PALETTE.glass[1], IKI: PALETTE.iodine[0], SUDAN3: PALETTE.sudan[0],
+  // 스포이트 관에 담긴 액도 병과 같은 색이어야 한다 — 옮겨 담았는데 색이 변하면
+  // 학생은 다른 것을 담은 줄 안다 (zoom.js 가 이 표를 읽는다).
+  WATER: EXP_PALETTE.water[0], IKI: PALETTE.iodine[0], SUDAN3: PALETTE.sudan[0],
 };
 
 /**
@@ -102,7 +105,8 @@ export function spillFill(state = {}) {
   if (stain === 'SUDAN3' || stain === 'sudan') {
     return reaction >= 0.7 ? PALETTE.stainLipidPale[0] : PALETTE.sudan[0];
   }
-  return PALETTE.glass[1];
+  // 물만 넘쳤으면 물빛이다. 유리색으로 두면 넘친 것이 안 보인다.
+  return EXP_PALETTE.water[0];
 }
 
 /**
