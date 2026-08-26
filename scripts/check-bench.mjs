@@ -1189,6 +1189,54 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const r2 = await pDrag('banana', 'slideA');
   ok(r2.grabbed === 'banana' && r2.hot === 'slideA',
      '폰 — 받침 유리 세 장이 붙어 있어도 겨눈 것이 잡힌다', `${r2.grabbed}→${r2.hot}`);
+
+  // **한가운데만 재면 이 버그를 못 본다.**
+  // 한가운데는 멀쩡한데 **가장자리가 새는 것**이 이 버그의 모양이다. catalase 세션이
+  // 「그림 300점 중 15점이 이웃에게 갔다」 고 점수로 알려 준 이유가 그것이다 —
+  // 그쪽에서는 원래 있던 「물건 한가운데를 짚으면 그 물건이 잡힌다」 검사가
+  // 버그가 있는 상태에서도 **초록불**이었다.
+  //
+  // 그래서 **그려진 부분 안 3×3 격자**를 실제로 눌러 본다. 프레임이 아니라 그림 안이다 —
+  // 프레임의 빈 귀퉁이는 이웃 것이 잡히는 게 옳다.
+  for (const w of [320, 420]) {
+    const gp = await browser.newPage({ viewport: { width: w, height: 900 }, hasTouch: true });
+    await gp.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await unlock(gp);
+    await gp.waitForTimeout(300);
+    const pts = await gp.evaluate(() => {
+      const out = [];
+      for (const e of document.querySelectorAll('[data-id]')) {
+        const svg = e.querySelector('svg');
+        if (!svg) continue;
+        const bb = svg.getBBox();
+        const vb = svg.viewBox.baseVal;
+        const r = e.getBoundingClientRect();
+        const sx = r.width / vb.width;
+        const sy = r.height / vb.height;
+        const x0 = r.x + bb.x * sx;
+        const y0 = r.y + bb.y * sy;
+        const dw = bb.width * sx;
+        const dh = bb.height * sy;
+        for (let i = 1; i <= 3; i++) {
+          for (let j = 1; j <= 3; j++) out.push({ id: e.dataset.id, x: x0 + dw * i / 4, y: y0 + dh * j / 4 });
+        }
+      }
+      return out;
+    });
+    const stray = [];
+    for (const pt of pts) {
+      await gp.mouse.move(pt.x, pt.y);
+      await gp.mouse.down();
+      const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
+      await gp.mouse.up();
+      if (got && got !== pt.id && stray.length < 4) stray.push(`${pt.id}→${got}`);
+      else if (got && got !== pt.id) stray.push('');
+    }
+    const n = stray.filter(Boolean).length + stray.filter((x) => !x).length;
+    ok(n === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 그 물건이 잡힌다`,
+       `${pts.length}점 중 ${n}점이 이웃에게: ${stray.filter(Boolean).join(' ')}`);
+    await gp.close();
+  }
   await ph.close();
 }
 
