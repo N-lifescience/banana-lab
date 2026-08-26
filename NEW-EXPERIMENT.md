@@ -51,14 +51,22 @@
 
 **빈 폴더에서 시작하지 마세요.** 바나나랩은 참조 구현입니다. 복제한 뒤 갈아 끼웁니다.
 
-> **이 저장소는 비공개입니다.** 아래 명령은 접근 권한이 있어야 됩니다.
-> 권한이 없으면 첫 줄에서 막히니, 세션을 띄우기 전에 소유자에게 권한을 받거나
-> 저장소를 공개로 돌리세요. (micrometer 파일럿에서 잡혔습니다)
-
 ```bash
 git clone https://github.com/N-lifescience/banana-lab.git onion-lab
 cd onion-lab
 rm -rf .git && git init          # 새 실험은 새 역사로 시작합니다
+
+# ★ 여기서 작성자를 정하지 않으면 뒤에 조용히 물립니다.
+#   `rm -rf .git` 이 저장소의 설정을 지웠고, 전역 설정이 없으면 git 은
+#   **호스트명으로 가짜 주소를 지어냅니다** (joseongju@joseongiMacmini.Davolink 같은 것).
+#   커밋은 성공하고 검사도 초록불이지만, GitHub 이 그 커밋을 계정과 연결하지 못해
+#   **Vercel 이 배포를 통째로 막습니다.** 배포된 사이트만 조용히 옛날 것으로 남습니다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email            # 비어 있으면 안 됩니다. 확인하고 넘어가세요
+
+# 바나나랩의 작업 카드는 바나나 실험의 것입니다. 새로 만들 카드와 번호가 부딪힙니다
+mv tasks docs/banana-tasks && mkdir tasks
 
 # 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없습니다. 남겨 두면 이 저장소가
 # 무엇에 관한 것인지 흐려지고, 합칠 때 같은 파일이 여덟 벌 생깁니다.

@@ -67,9 +67,58 @@
 ```
 «현미경으로 세포의 크기 측정하기» 를 웹 가상실험으로 만든다. id 는 micrometer.
 
-바나나랩(구글 드라이브의 이 저장소)을 복제해서 시작한다.
-복제한 뒤 NEW-EXPERIMENT.md 와 PLAYBOOK.md 를 먼저 끝까지 읽고, AGENTS.md 의 규칙을 그대로 따른다.
-복제 직후 PROGRESS.md 를 docs/banana-progress.md 로 옮기고 빈 PROGRESS.md 로 새로 시작한다.
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git micrometer-lab
+cd micrometer-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5174;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 
 이 실험의 내용:
 - 관찰 대상: 공변세포 영구표본 (자주달개비 잎)
@@ -94,7 +143,58 @@
 ```
 «세포에서 일어나는 삼투 현상 관찰하기» 를 웹 가상실험으로 만든다. id 는 osmosis.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git osmosis-lab
+cd osmosis-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5175;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 
 이 실험의 내용:
 - 관찰 대상: 적양파 비늘잎 안쪽 표피 (색소 든 액포로 크기 변화가 보인다)
@@ -117,7 +217,58 @@
 ```
 «효소의 작용에 영향을 미치는 요인 탐구하기(카탈레이스)» 를 웹 가상실험으로 만든다. id 는 catalase.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git catalase-lab
+cd catalase-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5176;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 
 이 실험의 내용 — 이 실험의 몸통은 "변인 설계" 다:
 - 재료: 감자즙을 묻힌 거름종이 조각, 3% 과산화수소, 10% 염산, 10% 수산화나트륨,
@@ -141,7 +292,58 @@
 ```
 «크로마토그래피로 식물의 잎에서 광합성색소 분리하기» 를 웹 가상실험으로 만든다. id 는 chromatography.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git chromatography-lab
+cd chromatography-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5177;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 
 이 실험의 내용:
 - 재료: 시금치 잎 분말, 추출액/전개액(석유에터:아세톤=7:3), TLC 판(1.5×10 cm),
@@ -165,7 +367,58 @@
 ```
 «효모의 알코올발효 실험 설계하여 수행하기» 를 웹 가상실험으로 만든다. id 는 fermentation.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git fermentation-lab
+cd fermentation-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5178;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 가능하면 catalase 세션이 만든 변인 선택 UI 를 참고해 같은 모양으로 만든다.
 
 이 실험의 내용:
@@ -187,7 +440,58 @@
 ```
 «간이 원심분리기로 혈액 원심분리하기» 를 웹 가상실험으로 만든다. id 는 centrifuge.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git centrifuge-lab
+cd centrifuge-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5179;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 ※ 이 실험은 재구성이다. ROSTER.md §6 을 먼저 읽어라 — 교과서의 종이 회전판 "제작" 단계는
   만들지 않는다. 회전판은 완성품으로 주고, 실험은 혈액 원심분리(2단계)부터다.
 
@@ -211,7 +515,58 @@
 ```
 «발아 중인 콩의 물질대사 대조 실험» 을 웹 가상실험으로 만든다. id 는 germination.
 
-(복제·문서·PROGRESS 처리·공통 규칙은 위와 같다)
+## 출발 — 이대로 실행한다
+
+```bash
+git clone https://github.com/N-lifescience/banana-lab.git germination-lab
+cd germination-lab
+rm -rf .git && git init
+
+# ★ 반드시 여기서 작성자를 정한다. rm -rf .git 이 저장소의 설정을 지웠고,
+#   이 값이 없으면 git 이 호스트명으로 가짜 주소를 지어낸다
+#   (joseongju@joseongiMacmini.Davolink 같은 것). 그러면 커밋이 계정과 연결되지 않고
+#   Vercel 이 배포를 통째로 막는다. 로컬에서는 아무 이상이 없어 아무도 모른다.
+git config user.name "조성주"
+git config user.email "shinezero77@gmail.com"
+git config user.email        # 비어 있으면 안 된다. 확인하고 넘어간다
+
+# 허브(바나나랩) 문서는 이 실험 저장소에 있을 이유가 없다
+rm -f main-page.html ROSTER.md LAUNCH.md MERGE-AND-DEPLOY.md
+rm -rf public/fonts
+
+# 바나나랩의 작업 카드는 바나나 실험의 것이다. 새 카드와 번호가 부딪힌다
+mv tasks docs/banana-tasks && mkdir tasks
+
+# 바나나랩의 진행 기록을 치우고 이 실험의 기록으로 새로 시작한다
+mv PROGRESS.md docs/banana-progress.md
+printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
+
+# ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
+sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5180;/' dev-port.js
+
+npm install
+npm run check                # 초록불에서 출발하는지 먼저 확인한다
+```
+
+복제한 뒤 `NEW-EXPERIMENT.md` 와 `PLAYBOOK.md` 를 끝까지 읽고, `AGENTS.md` 의 규칙을 그대로 따른다.
+
+## 지켜야 할 것
+
+- 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
+  `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
+- **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
+- **확정 안 된 수치는 예시로도 쓰지 않는다.** 설명하려고 넣은 임시 숫자가
+  다음 사람에게는 사실로 읽힌다 (파일럿에서 실제로 겪었다)
+- 새 의존성을 추가하지 않는다. 필요하다고 판단되면 먼저 사람에게 묻는다
+- 검사를 새로 넣으면 **되돌려서 실제로 실패하는지** 확인한다
+- 커밋 전 `npm run check` 통과. 먼저 `tasks/` 에 카드를 번호순으로 만들고,
+  카드마다 검증 명령을 적고, 브라우저로 직접 플레이한다
+- 제출 기능(`src/net/`·`teacher.html`·`supabase/`)은 손대지 않는다. 이미 돌아간다
+- 마지막에 `src/manifest.js` 를 이 실험 것으로 채운다
+
+## 이 실험의 내용
+
 ※ 이 실험은 재구성이고 8개 중 가장 얇다. ROSTER.md §7 을 먼저 읽어라.
   결과를 센서 곡선 하나로 두지 말고 챔버 그림 + 그래프 둘로 만든다.
   만들다 얇으면 억지로 키우지 말고 사람에게 축소를 물어라.
