@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initialState } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
-import { buildSheet, payloadOf } from '../src/ui/report.js';
+import { buildSheet, payloadOf, SUBMIT_TOP_KEYS, SUBMIT_SESSION_KEYS } from '../src/ui/report.js';
 import { UI } from '../src/ui/strings.js';
 
 /**
@@ -123,4 +123,46 @@ test('상태에 칸이 새로 생겨도 저절로 나가지 않는다', () => {
   const json = JSON.stringify(payloadOf(dirty, { school: '', team: '' }, 'individual'));
   assert.ok(!json.includes('나가면 안 된다'),
     '허용 목록에 없는 값이 제출 꾸러미에 실렸습니다 — payloadOf 가 다시 상태를 통째로 담고 있습니까?');
+});
+
+test('제출 목록에 군더더기가 없다 — 하나만 빼도 종이가 달라진다', () => {
+  // **동치 검사만으로는 반쪽이다.**
+  // 「보낸 값만으로 같은 종이가 나온다」 는 **빠진 것이 없다**는 말이지
+  // **군더더기가 없다**는 말이 아니다. 목록에 쓸데없는 키를 하나 더 넣어도 그 검사는
+  // 그대로 초록불이다 — 그러면 안 실리는 값이 계속 나가고 아무도 모른다.
+  // (웨이브 2 의 chromatography 세션이 이 구멍을 짚었다. 등식만 봤으면 중복인 키를
+  //  그대로 뒀을 것이라고 했다.)
+  const who = { school: '한빛고', team: '2모둠', name: '홍길동', studentNo: '10203' };
+  let st = initialState(1);
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      if (s.note) st = reduce(st, { type: 'SAVE_NOTE', payload: { step: s.id ?? g.id, text: '적음' } }).state;
+    }
+  }
+  st = { ...st, session: { ...st.session,
+    captures: [{ at: 1, reagent: 'IKI', objective: 40, ripe: 0.5, thickness: 0.3, drops: 2, seed: 7 }],
+    violations: ['pipette-mouth'],
+  } };
+
+  /** 키 하나를 뺀 꾸러미로 종이를 만든다. 터지는 것도 「달라진다」로 친다. */
+  const sheetWithout = (drop, kind) => {
+    const p = payloadOf(st, who, kind).state;
+    const trimmed = drop.startsWith('session.')
+      ? { ...p, session: { ...p.session, [drop.slice(8)]: undefined } }
+      : { ...p, [drop]: undefined };
+    try { return buildSheet(trimmed, who, kind); } catch { return '(터짐)'; }
+  };
+
+  const keys = [...SUBMIT_TOP_KEYS, ...SUBMIT_SESSION_KEYS.map((k) => `session.${k}`)];
+  const useless = [];
+  for (const k of keys) {
+    const kinds = ['individual', 'group'];
+    // 두 갈래 어디에서도 종이가 안 달라지면 그 키는 보낼 이유가 없다.
+    if (kinds.every((kind) => sheetWithout(k, kind) === buildSheet(payloadOf(st, who, kind).state, who, kind))) {
+      useless.push(k);
+    }
+  }
+  assert.deepEqual(useless, [],
+    `보내지만 종이에 아무 영향이 없는 항목이 있습니다: ${useless.join(', ')}\n`
+    + '  → SUBMIT_TOP_KEYS / SUBMIT_SESSION_KEYS 에서 빼세요. 안 실리는 것을 보내는 것은 수집입니다.');
 });
