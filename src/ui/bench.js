@@ -942,9 +942,12 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
       //
       // 앞서는 `:focus-visible` 로 걸렀다. 뜻은 맞지만 그것은 **브라우저가 「지금 키보드를
-      // 쓰는 중인가」를 어림잡는 값**이라, 마우스를 한 번 쓰고 나면 뒤이은 `element.focus()`
-      // 를 키보드로 안 쳐 준다 — **보조기기가 focus() 로 물건을 짚으면 버튼이 안 나왔다.**
-      // 막으려던 것은 「손가락 탭 직후」 하나뿐이고 그건 이미 pointerTapAt 이 재고 있다.
+      // 쓰는 중인가」를 어림잡는 값**이다. 막으려던 것은 「손가락 탭 직후」 하나뿐이고
+      // 그건 `fingerTapAt` 이 **정확히** 알고 있으니, 어림값 대신 아는 값을 쓴다.
+      //
+      // **이걸로 버그가 재현된 적은 없다.** 세 저장소가 각자 재 봤고 Chromium 은 마우스를
+      // 쓴 뒤 `focus()` 에도 focus-visible 을 잘 쳐 줬다. 「보조기기가 짚으면 안 나온다」 는
+      // 걱정이었지 관찰이 아니었다 — 그렇게 적어 두지 않으면 다음 사람이 사실로 읽는다.
       el.addEventListener('focus', () => {
         // 다른 물건으로 옮겨 갔으면 「치웠다」 는 기억을 푼다.
         if (dismissedId && dismissedId !== item.id) dismissedId = null;
