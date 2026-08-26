@@ -288,6 +288,99 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
   ok(await putsNow() > 0,
      '키보드 — 마우스를 쓴 뒤 보조기기가 focus() 로 짚어도 버튼이 나온다', await putsNow());
 
+  // ── **거기까지 갈 수 있는가** ──────────────────────────────────────
+  //
+  // 위의 검사들과 `put()` 헬퍼는 전부 `btn.focus()` 를 **부른다.** 그러면
+  // 「누르면 동작하는가」만 알 수 있고 **「Tab 으로 닿을 수 있는가」는 알 수 없다.**
+  //
+  // 실제로 닿을 수 없었다. `#bench-tip` 이 DOM 에서 `.bench-tokens` **뒤**에 있어서,
+  // 물건에서 Tab 하면 옆 물건으로 가고 그 물건의 focus 가 말풍선을 제 것으로 갈아 끼워
+  // **방금 열려 있던 버튼을 지웠다.** Tab 을 마흔 번 눌러도 못 닿았다.
+  // 버튼은 화면에 멀쩡히 떠 있었고 눌리기도 했다 — **검사만 누르고 있었다.**
+  //
+  // 그래서 여기서는 `focus()` 를 부르지 않는다. **진짜 Tab 만 친다.**
+  const activeWhat = () => kb.evaluate(() => {
+    const a = document.activeElement;
+    return a?.dataset?.onto ? `놓기:${a.dataset.onto}` : a?.dataset?.id ? `물건:${a.dataset.id}` : (a?.tagName ?? '?');
+  });
+
+  await kb.locator('[data-id="banana"]').focus();
+  await kb.waitForTimeout(200);
+  await kb.keyboard.press('Tab');
+  await kb.waitForTimeout(120);
+  const afterTab = await activeWhat();
+  ok(afterTab.startsWith('놓기:'), '키보드 — 물건에서 Tab 하면 놓을 곳 버튼에 닿는다', afterTab);
+
+  await kb.keyboard.press('Shift+Tab');
+  await kb.waitForTimeout(120);
+  const afterBack = await activeWhat();
+  ok(afterBack === '물건:banana', '키보드 — 첫 버튼에서 Shift+Tab 하면 물건으로 돌아온다', afterBack);
+
+  // 마지막 버튼에서 Tab 하면 **그 물건의 다음 물건**으로. 그냥 두면 탐구 노트로 튕겨
+  // 실험대를 다 돌기도 전에 밖으로 나간다.
+  await kb.keyboard.press('Tab');
+  let hop = await activeWhat();
+  for (let i = 0; i < 8 && hop.startsWith('놓기:'); i++) {
+    await kb.keyboard.press('Tab');
+    await kb.waitForTimeout(80);
+    hop = await activeWhat();
+  }
+  ok(hop.startsWith('물건:'), '키보드 — 마지막 버튼에서 Tab 하면 실험대의 다음 물건으로 간다', hop);
+
+  // Esc 로 말풍선을 치운다 (WCAG 1.4.13). 놓을 곳이 일곱이면 Tab 을 일곱 번 눌러
+  // 빠져나가야 하는데, 그건 길이 아니다.
+  //
+  // **앞에서 현미경을 눌러 확대 뷰가 열려 있다.** 그대로 Esc 를 치면 말풍선이 아니라
+  // 확대 뷰가 닫히고, 그 뒤 포커스가 현미경으로 돌아가 말풍선이 다시 뜬다 —
+  // 검사가 「Esc 가 안 먹는다」 고 잘못 말한다. 먼저 치워 두고 시작한다.
+  await kb.keyboard.press('Escape');
+  await kb.waitForTimeout(250);
+  ok(await kb.evaluate(() => !document.querySelector('.zoom:not([hidden]), #zoom:not([hidden])')),
+     '키보드 — Esc 로 확대 뷰를 닫는다');
+  // **마우스를 실험대 밖으로 뺀다.** 앞에서 현미경을 눌러 포인터가 그 위에 얹혀 있는데,
+  // 그대로 두면 다시 그릴 때 포인터 밑에 새 현미경이 들어서며 pointerenter 가 나고
+  // **현미경 말풍선**이 뜬다. 그건 마우스가 제 일을 한 것이지 Esc 가 안 먹은 것이 아니다.
+  // 여기서 보려는 것은 **키보드만 쓰는 사람**의 길이므로 마우스를 치우고 잰다.
+  await kb.mouse.move(4, 4);
+  await kb.waitForTimeout(150);
+  await kb.locator('[data-id="dropper"]').focus();
+  await kb.waitForTimeout(200);
+  await kb.keyboard.press('Escape');
+  await kb.waitForTimeout(200);
+  ok(await kb.evaluate(() => document.querySelector('#bench-tip').hidden),
+     '키보드 — Esc 로 말풍선을 치운다');
+  // 치운 뒤 다시 그려도 되살아나면 안 된다 — 포커스가 그 물건에 남아 있어서
+  // focus 가 새로 나 도로 뜬다. Esc 가 안 먹은 것처럼 보이는 자리다.
+  // **상태가 실제로 달라지는 조작**이라야 다시 그린다. 이 검사 앞에서 이미 껍질을 벗겼으므로
+  // PEEL_BANANA 를 다시 부르면 아무것도 안 바뀌고, 그러면 이 검사는 아무것도 안 본다.
+  const objBefore = (await state()).microscope.objective;
+  await kb.evaluate((o) => window.__store.dispatch('SET_OBJECTIVE', { objective: o === 10 ? 4 : 10 }), objBefore);
+  await kb.waitForTimeout(300);
+  ok((await state()).microscope.objective !== objBefore, '   (앞 조건) 배율이 실제로 바뀌었다');
+  ok(await kb.evaluate(() => document.querySelector('#bench-tip').hidden),
+     '키보드 — Esc 로 치운 말풍선은 다시 그려도 안 되살아난다',
+     await kb.evaluate(() => document.activeElement?.dataset?.id ?? document.activeElement?.tagName));
+  // 다른 물건으로 옮기면 다시 떠야 한다. 안 그러면 Esc 한 번에 영영 안 뜬다.
+  await kb.locator('[data-id="forceps"]').focus();
+  await kb.waitForTimeout(250);
+  ok(!(await kb.evaluate(() => document.querySelector('#bench-tip').hidden)),
+     '키보드 — 다른 물건으로 옮기면 말풍선이 다시 뜬다');
+
+  // **Tab 만으로 실제 조작이 되는가.** 여기까지 와야 「길이 있다」 고 말할 수 있다.
+  await kb.locator('[data-id="dropper"]').focus();
+  await kb.waitForTimeout(200);
+  await kb.keyboard.press('Tab');
+  let target = await activeWhat();
+  for (let i = 0; i < 10 && !target.includes('bottleIKI'); i++) {
+    await kb.keyboard.press('Tab');
+    await kb.waitForTimeout(80);
+    target = await activeWhat();
+  }
+  await kb.keyboard.press('Enter');
+  await kb.waitForTimeout(350);
+  ok((await state()).tools.dropper.holds === 'IKI',
+     '키보드 — Tab 과 Enter 만으로 스포이트를 채운다', target);
+
   // 3단계도 조작은 똑같이 된다 — 줄어드는 것은 설명뿐이다.
   const kb3 = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await kb3.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });

@@ -544,6 +544,10 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
   function showTip(item, withActions = false) {
     if (drag) return;
+    // **Esc 로 치운 것은 여기 한 곳에서 막는다.**
+    // 부르는 자리마다(pointerenter·focus·다시 그리기 뒤 포커스 복원) 따로 막으면
+    // 반드시 한 곳이 샌다 — 실제로 다시 그리는 경로에서 샜다.
+    if (dismissedId === item.id) return;
     tipFromKeyboard = withActions;
     clearTimeout(hideTimer);   // 옆 물건으로 옮겨 오는 중이었다면 예약된 닫기를 취소한다
     hideTimer = 0;
@@ -591,6 +595,75 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   function keyboardTipAlive() {
     return tipFromKeyboard && layer.contains(document.activeElement);
   }
+
+  /**
+   * Esc 로 치운 물건. **id 를 기억해 둬야 한다.**
+   *
+   * `hideTip()` 만으로는 안 된다 — 포커스가 그 물건에 남아 있어서 다시 그릴 때 `focus` 가
+   * 새로 나 도로 뜨고, 마우스를 물건에 얹어 둔 채면 `pointerenter` 도 되살린다.
+   * 그러면 Esc 가 아무 일도 안 한 것처럼 보인다.
+   */
+  let dismissedId = null;
+
+  /** 말풍선의 놓기 버튼들. 없으면 빈 배열. */
+  const tipButtons = () => [...tipEl.querySelectorAll('[data-onto]')];
+
+  /**
+   * **버튼까지 가는 다리.**
+   *
+   * `#bench-tip` 은 DOM 에서 `.bench-tokens` 뒤에 있다. 그래서 물건에서 Tab 하면 옆 물건으로
+   * 가고, 그 물건의 focus 가 말풍선을 제 것으로 갈아 끼워 **방금 열려 있던 버튼을 지운다.**
+   * 물건을 다 지나 말풍선 자리에 닿을 즈음엔 마지막 물건의 말풍선만 남아 있다.
+   *
+   * 즉 **버튼은 화면에 떠 있는데 키보드로는 아예 닿을 수 없었다.** Tab 을 마흔 번 눌러 확인했다.
+   * 검사가 이걸 못 잡은 이유는 `btn.focus()` 를 **불렀기** 때문이다 — 그러면
+   * 「누르면 동작하는가」만 알 수 있고 **「거기까지 갈 수 있는가」는 알 수 없다.**
+   * 마우스를 못 쓰는 사람에게 그 버튼은 실험을 시작하는 유일한 길이다.
+   */
+  function focusFirstPut() {
+    const [first] = tipButtons();
+    if (!first) return false;
+    first.focus();
+    return true;
+  }
+
+  /**
+   * 말풍선 안에서의 Tab. **양쪽 끝에서 실험대로 되돌려 준다.**
+   *
+   * 그냥 두면 마지막 버튼에서 Tab 했을 때 탐구 노트로 튕긴다 — 실험대를 다 돌기도 전에.
+   * 첫 버튼에서 Shift+Tab 은 원래 물건으로, 마지막 버튼에서 Tab 은 **그 물건의 다음 물건**으로.
+   */
+  tipEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const src = tipEl.querySelector('[data-put]')?.dataset.put;
+      e.preventDefault();
+      dismissedId = src ?? null;
+      hideTip();
+      if (src) elFor(src)?.focus();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const btns = tipButtons();
+    const at = btns.indexOf(document.activeElement);
+    if (at < 0) return;
+    const srcId = document.activeElement.dataset.put;
+    const tokens = [...layer.querySelectorAll('[data-id]')];
+    const srcAt = tokens.findIndex((t) => t.dataset.id === srcId);
+
+    if (e.shiftKey && at === 0) {
+      e.preventDefault();
+      tokens[srcAt]?.focus();
+      return;
+    }
+    if (!e.shiftKey && at === btns.length - 1) {
+      e.preventDefault();
+      // 다음 물건으로. 마지막 물건이었으면 실험대 밖으로 보낸다 —
+      // 여기서 첫 물건으로 감으면 키보드가 실험대에 갇힌다.
+      const next = tokens[srcAt + 1];
+      if (next) { dismissedId = null; next.focus(); }
+      else { hideTip(); tipEl.blur(); }
+    }
+  });
 
   function hideTipSoon() {
     clearTimeout(hideTimer);
@@ -857,9 +930,12 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       el.addEventListener('pointerenter', (e) => {
         if (e.pointerType !== 'mouse') return;
         if (keyboardTipAlive()) return;
+        // Esc 로 치운 물건은 showTip 이 알아서 막는다.
         showTip(item);
       });
       el.addEventListener('pointerleave', () => {
+        // 마우스가 벗어나면 「치웠다」 는 기억을 푼다. 다시 올리면 떠야 한다.
+        if (dismissedId === item.id) dismissedId = null;
         if (keyboardTipAlive()) return;
         hideTip();
       });
@@ -870,6 +946,8 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 를 키보드로 안 쳐 준다 — **보조기기가 focus() 로 물건을 짚으면 버튼이 안 나왔다.**
       // 막으려던 것은 「손가락 탭 직후」 하나뿐이고 그건 이미 pointerTapAt 이 재고 있다.
       el.addEventListener('focus', () => {
+        // 다른 물건으로 옮겨 갔으면 「치웠다」 는 기억을 푼다.
+        if (dismissedId && dismissedId !== item.id) dismissedId = null;
         // **손가락 탭 직후에만** 참는다. 키보드 Enter 는 참지 않는다 —
         // 참으면 키보드로 한 번 조작한 뒤 놓을 곳 버튼이 다시 안 나온다.
         if (performance.now() - fingerTapAt < POINTER_TAP_GRACE_MS) return;
@@ -891,6 +969,21 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 브라우저는 <button> 에서 Enter/Space 를 click 으로도 바꿔 주지만, 그 전에
       // Space 가 페이지를 스크롤시킨다. preventDefault 하려면 keydown 을 직접 들어야 한다.
       el.addEventListener('keydown', (e) => {
+        // Tab 으로 **놓기 버튼에 들어간다.** 브라우저의 기본 Tab 은 옆 물건으로 가는데,
+        // 그러면 그 물건의 focus 가 말풍선을 갈아 끼워 여기 버튼이 사라진다.
+        if (e.key === 'Tab' && !e.shiftKey && tipFromKeyboard && focusFirstPut()) {
+          e.preventDefault();
+          return;
+        }
+        // Esc 로 말풍선을 치운다 (WCAG 1.4.13). 놓을 곳이 일곱이면 Tab 을 일곱 번
+        // 눌러 빠져나가야 하는데, 그건 길이 아니다.
+        if (e.key === 'Escape') {
+          if (tipEl.hidden) return;
+          e.preventDefault();
+          dismissedId = item.id;
+          hideTip();
+          return;
+        }
         if (e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
         pointerTapAt = performance.now();   // 뒤따라올 click 을 삼킨다
