@@ -96,6 +96,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5174;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "micrometer-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5174) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -105,6 +128,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -172,6 +197,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5175;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "osmosis-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5175) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -181,6 +229,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -246,6 +296,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5176;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "catalase-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5176) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -255,6 +328,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -321,6 +396,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5177;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "chromatography-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5177) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -330,6 +428,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -396,6 +496,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5178;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "fermentation-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5178) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -405,6 +528,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -469,6 +594,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5179;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "centrifuge-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5179) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -478,6 +626,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다
@@ -544,6 +694,29 @@ printf '# PROGRESS.md — 진행 기록\n\n' > PROGRESS.md
 # ★ 이 실험에 배정된 개발 서버 포트. 다른 세션과 부딪히지 않게 한다
 sed -i '' 's/export const DEV_PORT = 5173;/export const DEV_PORT = 5180;/' dev-port.js
 
+
+# ★ 바나나랩의 이름표가 남아 있으면 이 세션은 **첫 화면부터 헛짚는다.**
+#   micrometer 파일럿에서 실제로 그랬다 — README 는 「바나나에서 탄수화물과 지질 관찰하기」,
+#   CLAUDE.md 는 포트를 5173 으로, AGENTS.md 의 과학적 사실은 아이오딘·수단Ⅲ 이었다.
+#   **지금 갈아 끼운다.** 나중에 하면 그때까지 읽고 판단한 것이 전부 틀린 전제 위에 선다.
+sed -i '' 's/"name": "banana-lab"/"name": "germination-lab"/' package.json
+#   손으로 갈아 끼울 것 넷:
+#     README.md        이 실험이 무엇이고 무엇을 가르치는지
+#     CLAUDE.md        포트(5180) · 이 실험의 핵심 상수 · 용어 규칙
+#     AGENTS.md §1     이 프로젝트가 무엇인가
+#     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
+
+# ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
+#   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
+#   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
+#   (파일럿에서는 이걸 한참 뒤에 알았고, 그동안 하네스를 아예 못 썼다)
+
+# ★ src/assets/index.js 에 banana 애셋이 등록돼 있다. 이 실험에 안 쓰면 목록에서 뺀다 —
+#   안 빼면 아트 시트와 린터가 계속 남의 그림을 검사한다.
+
+# ★ tests/report.test.js 의 고정값은 **바나나의 절차 단계 키**에 매여 있다.
+#   탐구 노트를 이 실험 것으로 바꾸면 이 검사가 먼저 빨간불이 된다. 버그가 아니다.
+
 npm install
 npm run check                # 초록불에서 출발하는지 먼저 확인한다
 ```
@@ -553,6 +726,8 @@ npm run check                # 초록불에서 출발하는지 먼저 확인한�
 ## 지켜야 할 것
 
 - 잘못된 조작을 **막지 않는다.** 결과가 대신 답한다 (AGENTS.md §2.1)
+- 막는 것은 두 종류뿐이다(할 수 없는 일 · 깨진 기구). 그 둘은 **빠져나갈 길을 문장에 담는다** —
+  「새것을 꺼내세요」로는 어디서 꺼내는지 알 수 없다. 어디로 가야 하는지까지 말한다
 - `src/style/tokens.js` 를 수정하지 않는다. 이 실험의 시약색·반응색은
   `src/style/palette.experiment.js` 의 `EXP_PALETTE` 에만 넣고 애셋은 `paintExp()` 로 쓴다
 - **실물 치수를 지어내지 않는다.** 확실하지 않은 값은 `[확인 필요]` 로 표시한다

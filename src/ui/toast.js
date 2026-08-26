@@ -30,8 +30,13 @@ const holdFor = (text) => Math.min(8000, Math.max(3500, 2200 + text.length * 90)
  * 3단계에서 숨기는 것은 **뜻대로 안 됐을 때의 원인**이다 (스스로 찾으라는 단계이므로).
  * 뜻대로 됐을 때 무엇이 바뀌었는지는 힌트가 아니라 조작의 확인이라, 단계와 무관하게 그대로 보여 준다.
  */
-function detail(message, tag, level, good) {
+function detail(message, tag, level, good, blocked = false) {
   if (good) return message;
+  // **막힌 이유는 3단계에서도 감추지 않는다.**
+  // 3단계가 감추는 것은 「어떻게 하면 되는지」이지 **벽이 있다는 사실**이 아니다.
+  // 막히는 것은 두 종류뿐인데(할 수 없는 일·깨진 기구), 둘 다 이유를 모르면 빠져나올
+  // 길이 없다 — 금 간 유리를 든 학생이 「결과가 나오지 않았습니다」만 보면 거기서 끝난다.
+  if (blocked) return message;
   if (level >= 3) return UI.toast.hidden;
   if (level <= 1) {
     const next = UI.toast.nextAction[tag];
@@ -47,6 +52,10 @@ export function createToastQueue(root, getLevel) {
 
   const queue = [];
   let showing = false;
+  /** 지금 화면에 떠 있는 것의 태그. 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
+  let showingTag = null;
+  /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
+  let dismiss = null;
 
   function reducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -55,7 +64,8 @@ export function createToastQueue(root, getLevel) {
   function showNext() {
     if (showing || queue.length === 0) return;
     showing = true;
-    const { message, good } = queue.shift();
+    const { message, good, tag } = queue.shift();
+    showingTag = tag ?? null;
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -64,20 +74,45 @@ export function createToastQueue(root, getLevel) {
     el.textContent = message;
     root.appendChild(el);
 
-    setTimeout(() => {
+    const timer = setTimeout(() => { dismiss?.(); }, holdFor(message));
+    dismiss = () => {
+      clearTimeout(timer);
       el.remove();
+      dismiss = null;
       showing = false;
+      showingTag = null;
       showNext();
-    }, holdFor(message));
+    };
   }
 
   return {
     /** 메시지가 없으면 아무것도 하지 않는다 — 'ok' 라도 말할 것이 있으면 띄운다. */
     push(message, outcome, tag) {
       if (!message) return;
+
+      // **같은 말을 쌓지 않는다.**
+      // 조리개·초점 슬라이더는 끄는 동안 수십 번 디스패치된다. 그때마다 같은 문장이 큐에
+      // 쌓이면 손을 뗀 뒤에도 몇십 초 동안 계속 뜬다 — 학생은 자기가 뭘 잘못했는지 몰라
+      // 같은 곳을 계속 만진다. 이미 떠 있거나 줄을 선 것과 같은 말이면 그 자리를 지킨다.
+      if (tag && (showingTag === tag || queue.some((q) => q.tag === tag))) return;
+
       const good = outcome === 'ok';
       const level = getLevel ? getLevel() : 1;
-      queue.push({ message: detail(message, tag, level, good), good });
+
+      // **막힘은 줄을 서지 않는다.**
+      // 이것은 「무슨 일이 있었다」가 아니라 **「방금 네가 한 것이 안 된 이유」**다.
+      // 뒤에 세우면, 앞선 말풍선 두어 개가 지나갈 동안 학생은 아무 답도 못 받은 채 같은
+      // 조작을 되풀이한다. micrometer 파일럿에서 재어 보니 막힌 지 **12.7초** 뒤에 설명이
+      // 도착했다 — 그 사이에 학생은 「안 되네」 하고 손을 뗀다.
+      // 줄을 **비우지는 않는다.** 앞선 것들은 실제로 일어난 일이라 지우면 앞뒤를 못 듣는다.
+      if (outcome === 'blocked') {
+        queue.unshift({ message: detail(message, tag, level, false, true), good: false, tag });
+        if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
+        else showNext();
+        return;
+      }
+
+      queue.push({ message: detail(message, tag, level, good), good, tag });
       showNext();
     },
   };
