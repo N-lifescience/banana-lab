@@ -48,6 +48,20 @@ sed -i '' 's/"name": "banana-lab"/"name": "fermentation-lab"/' package.json
 #     AGENTS.md §1     이 프로젝트가 무엇인가
 #     AGENTS.md §2.5   과학적 사실 — 바나나 것을 지우고 이 실험 것으로
 
+#   ★★ 그중 가장 잘 빠지는 것 — **HTML 머리말**:
+#      index.html · teacher.html · privacy.html 의
+#      <title> · og:title · og:description · canonical · og:url
+#      앱 안 화면은 전부 src/ui/strings.js 를 거쳐서 검사가 잡는데,
+#      **HTML 머리말만 그 그물 밖이다.** 검사가 전부 초록불인데 브라우저 탭에는
+#      바나나가 뜬다 — 웨이브 2 에서 두 실험이 그대로 밟았다.
+#      canonical·og:url 은 **바나나랩의 배포 주소를 물려받는다.** 검색엔진에
+#      「이 페이지는 저 사이트의 사본」 이라고 말하는 태그다. 틀린 주소는 없는 주소보다
+#      나쁘므로 **아예 뺀다** — 배포 주소가 정해지면 그때 넣는다.
+#      privacy.html 은 <title> 뿐 아니라 **본문 첫 줄**에도 실험 이름이 있다.
+#      갈아 끼운 뒤 `node --test tests/pages.test.js` 로 확인한다 (이미 들어 있다).
+#      그 파일에서 실험에 매인 것은 OTHER_MATERIALS 하나뿐이다 — 이 실험에 **없는**
+#      재료 낱말로 갈아 끼운다.
+
 # ★ 하네스는 **바나나 상태를 읽는다.** harness.html 의 슬라이더(익은 정도·껍질 벗김·
 #   방울 수·반응 진행도)와 src/harness.js 가 이 실험에 없는 값을 읽어, /harness.html 을
 #   여는 순간 TypeError 로 죽는다. 손잡이를 이 실험 것으로 갈아 끼운다.
