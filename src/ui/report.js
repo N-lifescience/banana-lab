@@ -287,22 +287,42 @@ function fileTag(who) {
 }
 
 /**
- * 제출용 꾸러미.
+ * 제출용 꾸러미 — **보낼 것만 적는다.**
  *
- * 보고서를 **그대로 다시 그릴 수 있는 값 한 벌**이다. 그림이 아니라 시드와 파라미터라
- * 몇 KB 밖에 안 되고, 선생님 화면이 같은 그림을 다시 그린다.
+ * ── 왜 뒤집었는가 ──────────────────────────────────────────────────
+ * 예전에는 「빼야 할 것을 뺀다」 였다 (`const { history, ...session } = st.session`).
+ * 그 방식은 **상태에 칸이 하나 생길 때마다 조용히 새어 나간다.** 실제로 이렇게 새고 있었다:
  *
- * 되돌리기 기록(history)은 뺀다 — 세션 안에서만 쓰는 값이고, 통째로 보내면 꾸러미가
- * 몇 배로 커진다. 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
+ *   session.log         학생이 **무엇을 어떤 차례로 눌렀는지** 전부
+ *   session.violations  안전 수칙 기록 (이건 종이에 실린다 — 남긴다)
+ *   session.seed · step · readStages · tidy · undosLeft
+ *   microscope · tools  기구 상태 전부
+ *
+ * 이 가운데 **보고서가 실제로 읽는 것은 다섯뿐**이다. 나머지는 종이 어디에도 안 실린다.
+ * 안 실리는 것을 보내 놓고 방침에 적어 두는 것은 고지가 아니라 **수집이다.**
+ * 방침을 고치기 전에 **보내는 것부터 줄인다.**
+ *
+ * 여기 목록에 없는 것은 상태에 새로 생겨도 나가지 않는다.
+ * 줄여도 되는 근거는 `tests/report.test.js` 의 「제출한 값만으로 같은 종이가 나온다」가
+ * 기계로 확인한다 — 눈으로 「안 쓰는 것 같다」 고 판단하지 않는다.
+ *
+ * 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
+ * 목록을 늘리면 `privacy.html` 제2조의 `data-sends` 도 함께 고쳐야 초록불이 된다
+ * (`tests/privacy.test.js`).
  */
+export const SUBMIT_TOP_KEYS = ['slides'];
+export const SUBMIT_SESSION_KEYS = ['level', 'notes', 'captures', 'violations'];
+
 export function payloadOf(st, who, kind) {
-  const { history, ...session } = st.session;
-  void history;
+  const state = {};
+  for (const key of SUBMIT_TOP_KEYS) state[key] = st[key];
+  const session = {};
+  for (const key of SUBMIT_SESSION_KEYS) session[key] = st.session[key];
   return {
     kind,
     school: String(who.school ?? '').trim(),
     team: String(who.team ?? '').trim(),
-    state: { ...st, session },
+    state: { ...state, session },
     app: UI.appTitle,
   };
 }

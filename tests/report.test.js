@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initialState } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
-import { buildSheet } from '../src/ui/report.js';
+import { buildSheet, payloadOf } from '../src/ui/report.js';
 import { UI } from '../src/ui/strings.js';
 
 /**
@@ -84,4 +84,43 @@ test('보고서는 개인정보를 상태에도 저장소에도 보내지 않는
   for (const sink of ['localStorage', 'sessionStorage', 'indexedDB', 'fetch(', 'XMLHttpRequest']) {
     assert.ok(!SOURCE.includes(sink), `report.js 가 ${sink} 를 씁니다 — 이름이 남습니다`);
   }
+});
+
+test('제출한 값만으로 선생님 화면이 같은 종이를 만든다', () => {
+  // **줄여도 되는 근거를 기계가 확인한다.**
+  // 「눈으로 보니 안 쓰는 것 같다」 로 payload 를 줄이면, 나중에 종이가 조용히 깨진다.
+  // 선생님 화면은 받은 값으로 buildSheet 을 다시 돌리므로,
+  // **줄인 것만으로 같은 종이가 나오면 그것이 전부**다 (teacher.js 의 sheetOf).
+  const who = { school: '한빛고', team: '2모둠', name: '홍길동', studentNo: '10203' };
+  let st = initialState(1);
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      if (s.note) st = reduce(st, { type: 'SAVE_NOTE', payload: { step: s.id ?? g.id, text: '적음' } }).state;
+    }
+  }
+  st = { ...st, session: { ...st.session,
+    captures: [{ at: 1, reagent: 'IKI', objective: 40, ripe: 0.5, thickness: 0.3, drops: 2, seed: 7 }],
+    violations: ['pipette-mouth'],
+    log: [{ t: '이건 종이에 안 실린다' }],
+  } };
+
+  for (const kind of ['individual', 'group']) {
+    const sent = payloadOf(st, who, kind).state;
+    assert.equal(buildSheet(sent, who, kind), buildSheet(st, who, kind),
+      `[${kind}] 보낸 값만으로는 같은 종이가 안 나옵니다 — SUBMIT_SESSION_KEYS 에 빠진 것이 있습니다`);
+  }
+});
+
+test('상태에 칸이 새로 생겨도 저절로 나가지 않는다', () => {
+  // 예전 방식(`const { history, ...session }`)은 **빼야 할 것을 뺐다.**
+  // 그러면 칸이 하나 생길 때마다 조용히 새어 나간다 — 실제로 session.log 가 그렇게 나갔다.
+  const st = initialState(1);
+  const dirty = {
+    ...st,
+    비밀상자: '나가면 안 된다',
+    session: { ...st.session, deviceId: '나가면 안 된다', log: [{ t: '나가면 안 된다' }] },
+  };
+  const json = JSON.stringify(payloadOf(dirty, { school: '', team: '' }, 'individual'));
+  assert.ok(!json.includes('나가면 안 된다'),
+    '허용 목록에 없는 값이 제출 꾸러미에 실렸습니다 — payloadOf 가 다시 상태를 통째로 담고 있습니까?');
 });

@@ -80,7 +80,14 @@ test('되돌리기 기록은 보내지 않는다', () => {
   const p = payloadOf(initialState(1), { school: '', team: '' }, 'individual');
   assert.equal(p.state.session.history, undefined,
     '되돌리기 기록이 제출 자료에 들어 있습니다 — 학생이 지운 글이 따라갑니다');
-  assert.ok(html.includes('history'), '방침이 history 를 빼고 보낸다고 말하지 않습니다');
+  // 낱말이 아니라 **약속**을 확인한다. `<code>history</code>` 가 적혀 있는지 보면
+  // 문장을 한국어로 다듬는 순간 헛발질한다 — 실제로 그랬다.
+  // 「전송하지 않습니다」 로 여는 목록 안에 「되돌리기 기록」 이 있으면 약속한 것이다.
+  const notSentBlock = html.slice(html.indexOf('전송하지 않습니다'));
+  assert.ok(notSentBlock.includes('되돌리기 기록'),
+    '방침이 되돌리기 기록을 보내지 않는다고 말하지 않습니다');
+  assert.ok(notSentBlock.includes('조작 기록'),
+    '방침이 조작 기록을 보내지 않는다고 말하지 않습니다');
 });
 
 test('개인정보처리방침에 다른 실험의 말이 없다', () => {

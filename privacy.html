@@ -93,29 +93,32 @@
 <dl data-sends>
   <dt data-sends="student_no,student_name">필수 항목</dt>
     <dd>학번(학년·반·번호를 합친 숫자), 이름</dd>
-  <dt data-sends="session.seed,session.notes,session.captures,session.step">탐구 노트</dt>
-    <dd>학생이 적은 글, 관찰 결과를 다시 그리기 위한 수치(시드·배율·초점·시약·두께 등), 진행 단계</dd>
-  <dt data-sends="slides,microscope,tools">실험대 상태</dt>
-    <dd>슬라이드·현미경·기구가 마지막에 어떤 상태였는지</dd>
-  <dt data-sends="session.log,session.violations,session.tidy,session.readStages,session.undosLeft">활동 기록</dt>
-    <dd><b>학생이 무엇을 어떤 차례로 조작했는지의 기록</b>, 안전 수칙과 정리를 지켰는지,
-        탐구 노트를 읽었다고 표시한 쪽, 남은 되돌리기 횟수</dd>
-  <dt data-sends="session.level,session.mode">활동 방식</dt>
-    <dd>선택한 난이도와 혼자/모둠 여부</dd>
+  <dt data-sends="session.notes">탐구 노트에 적은 글</dt>
+    <dd>학생이 탐구 노트의 각 칸에 직접 쓴 문장</dd>
+  <dt data-sends="session.captures,slides">관찰 결과를 다시 그리기 위한 수치</dt>
+    <dd>시약·배율·두께·방울 수·시드 등. <b>이미지가 아니라 숫자입니다</b> —
+        선생님 화면이 이 숫자로 같은 그림을 다시 그립니다</dd>
+  <dt data-sends="session.violations">안전 수칙 기록</dt>
+    <dd>스포이트를 입으로 빨았는지 같은, 활동지에 실리는 안전 항목</dd>
+  <dt data-sends="session.level">난이도</dt>
+    <dd>학생이 고른 단계</dd>
   <dt data-sends="school,team">선택 항목</dt>
     <dd>학교명, 모둠명 (학생이 입력한 경우에만)</dd>
   <dt data-sends="submitted_at">자동 생성</dt>
     <dd>제출 시각</dd>
 </dl>
 <p>
-  <b>「활동 기록」에는 학생이 잘 안 된 것도 남습니다.</b> 무엇을 어떤 차례로 조작했고 그때
-  무슨 일이 있었는지가 그대로 저장됩니다. 남는 줄 모르고 제출하는 일이 없도록 밝힙니다.
-  이 기록은 <b>선생님이 활동 과정을 보는 데 쓰이며, 점수를 매기는 근거로 쓰지 않습니다.</b>
+  <b>활동지에 실리는 것만 보냅니다.</b> 제출 자료는 <b>보낼 항목을 목록으로 정해 두고 그 목록에
+  있는 것만</b> 담습니다. 그래서 앱에 기능이 늘어도 새로운 항목이 저절로 따라 나가지 않습니다.
 </p>
 <p>
-  <b>되돌리기 기록(<code>history</code>)은 전송하지 않습니다.</b> 이전 상태를 통째로 쌓아 둔
-  것이라 그대로 보내면 <b>학생이 지운 글까지 따라갑니다.</b> 제출 자료를 만들 때 빼고 보냅니다.
+  특히 아래 것들은 <b>기기 안에만 있고 전송하지 않습니다.</b>
 </p>
+<ul>
+  <li><b>조작 기록</b> — 학생이 무엇을 어떤 차례로 눌렀는지. 활동지에 실리지 않으므로 보내지 않습니다</li>
+  <li><b>되돌리기 기록</b> — 이전 상태를 쌓아 둔 것이라 보내면 <b>학생이 지운 글까지 따라갑니다</b></li>
+  <li>탐구 노트를 읽었다고 표시한 쪽, 남은 되돌리기 횟수, 정리 여부, 현미경·기구의 마지막 상태</li>
+</ul>
 <p>
   <b>관찰 결과 이미지는 저장하지 않습니다.</b> 그림을 다시 그리는 데 필요한 수치만 저장하며,
   선생님 화면이 그 수치로 같은 그림을 다시 그립니다.
