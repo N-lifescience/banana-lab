@@ -1235,6 +1235,27 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     const n = stray.filter(Boolean).length + stray.filter((x) => !x).length;
     ok(n === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 그 물건이 잡힌다`,
        `${pts.length}점 중 ${n}점이 이웃에게: ${stray.filter(Boolean).join(' ')}`);
+
+    // **말풍선이 집힐 물건의 이름을 말하는가.**
+    // 겹친 자리에서 집는 것만 고치면, 「받침 유리 통」 이라 적힌 것을 눌렀는데
+    // **받침 유리가 끌린다.** 이름과 손이 다른 것을 가리키면 화면이 거짓말을 하는 것이다.
+    // 고치기 전 320 px 에서 예순네 점 중 열여덟 점이 그랬다.
+    const lied = [];
+    for (const pt of pts.filter((_, i) => i % 3 === 0)) {
+      await gp.mouse.move(pt.x, pt.y);
+      await gp.waitForTimeout(30);
+      const tip = await gp.evaluate(() =>
+        document.querySelector('#bench-tip')?.innerText.split('\n')[0]?.trim() ?? '');
+      await gp.mouse.down();
+      const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
+      await gp.mouse.up();
+      if (!got || !tip) continue;
+      const name = await gp.evaluate((id) =>
+        document.querySelector(`[data-id="${id}"]`)?.getAttribute('aria-label') ?? '', got);
+      if (name && tip !== name) lied.push(`"${tip}"≠"${name}"`);
+    }
+    ok(lied.length === 0, `폰 ${w}px — 말풍선이 집힐 물건의 이름을 말한다`,
+       lied.slice(0, 3).join(' '));
     await gp.close();
   }
   await ph.close();

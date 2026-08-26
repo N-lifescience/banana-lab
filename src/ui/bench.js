@@ -991,12 +991,22 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 마우스는 움직인 적이 없는데도 키보드로 열어 둔 버튼들이 사라졌다.
       // (화면 검사가 여섯 번에 두세 번 실패했고, 멈춘 순간을 찍으니 포커스는 핀셋인데
       //  말풍선은 비커 것이고 놓기 버튼이 0개였다)
-      el.addEventListener('pointerenter', (e) => {
+      // **말풍선은 집힐 물건의 이름을 말해야 한다.**
+      // 넓힌 자리가 겹치면 `aimedAt` 이 겨눈 것으로 바꿔 집는데, 말풍선이 그걸 안 따라가면
+      // 「받침 유리 통」 이라 적힌 것을 눌렀는데 **받침 유리가 끌린다.** 320 px 에서 재 보니
+      // 예순네 점 중 **열여덟 점**이 그랬다. 이름과 손이 다른 것을 가리키면 화면이
+      // 거짓말을 하는 것이고, 그건 이 저장소에서 가장 하면 안 되는 일이다.
+      // (chromatography 세션이 짚었다 — 내 목록에 없던 자리다)
+      const hoverTip = (e) => {
         if (e.pointerType !== 'mouse') return;
         if (keyboardTipAlive()) return;
         // Esc 로 치운 물건은 showTip 이 알아서 막는다.
-        showTip(item);
-      });
+        showTip(aimedAt(e, item));
+      };
+      el.addEventListener('pointerenter', hoverTip);
+      // 겹친 자리 안에서 조금 움직이면 겨눈 것이 바뀐다. 들어올 때 한 번만 재면
+      // 그 사이 이름이 굳어 버린다. 끄는 중에는 말풍선을 안 쓰므로 그때는 넘긴다.
+      el.addEventListener('pointermove', (e) => { if (!drag) hoverTip(e); });
       el.addEventListener('pointerleave', () => {
         // 마우스가 벗어나면 「치웠다」 는 기억을 푼다. 다시 올리면 떠야 한다.
         if (dismissedId === item.id) dismissedId = null;
