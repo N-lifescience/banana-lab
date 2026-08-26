@@ -461,7 +461,28 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     const h = Math.max(dh, MIN_HIT_PX);
     const cx = left + dw / 2;
     const cy = top + dh / 2;
-    return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+    return {
+      left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2,
+      // **그려진 부분**도 함께 돌려준다. 겹쳤을 때 누가 이기는지는 넓힌 자리가 아니라
+      // 그림까지의 거리로 가른다 (`distTo`).
+      drawn: { left, right: left + dw, top, bottom: top + dh },
+    };
+  }
+
+  /**
+   * 그 점이 **그림에서** 얼마나 떨어져 있는가. 그림 안이면 0.
+   *
+   * 앞서는 **그림 한가운데까지의 거리**로 갈랐다. 그러면 **크거나 긴 그림이 불리하다** —
+   * 개수대(100×75)의 가장자리는 자기 한가운데보다 옆 물건의 한가운데가 더 가깝다.
+   * 재어 보니 320 px 에서 **개수대 그림 위의 68점**이 폐액통·휴지에게 갔다.
+   * 그림 위를 눌렀는데 남이 집히는 것은 어떤 규칙으로도 옳지 않다.
+   * (centrifuge 세션이 자를 재다 찾았다 — 27×7 px 자의 0.3 px 띠에서 같은 일이 났다)
+   */
+  function distTo(rect, x, y) {
+    const d = rect.drawn ?? rect;
+    const dx = Math.max(d.left - x, 0, x - d.right);
+    const dy = Math.max(d.top - y, 0, y - d.bottom);
+    return dx * dx + dy * dy;
   }
 
   /**
@@ -509,10 +530,9 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       const or_ = drag.rects.get(other.id);
       if (!or_) continue;
       if (cx < or_.left || cx > or_.right || cy < or_.top || cy > or_.bottom) continue;
-      const dx = cx - (or_.left + or_.right) / 2;
-      const dy = cy - (or_.top + or_.bottom) / 2;
-      const dist = dx * dx + dy * dy;
-      if (dist < bestDist) { bestDist = dist; best = other; }
+      const dist = distTo(or_, cx, cy);
+      // 거리가 같으면 나중에 그려진 것 — 위에 보이는 것이 받는다.
+      if (dist <= bestDist) { bestDist = dist; best = other; }
     }
     return best;
   }
@@ -777,11 +797,11 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       if (!oe) continue;
       const r = hitRect(oe, other.asset);
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) continue;
-      const dx = e.clientX - (r.left + r.right) / 2;
-      const dy = e.clientY - (r.top + r.bottom) / 2;
-      const d = dx * dx + dy * dy;
-      // 같은 거리면 원래 눌린 것을 그대로 둔다 — 흔들리지 않게.
-      if (d < bestDist) { bestDist = d; best = other; }
+      const d = distTo(r, e.clientX, e.clientY);
+      // **거리가 같으면 나중에 그려진 것이 이긴다.** 그림끼리 진짜로 겹치는 자리에서는
+      // 둘 다 거리 0 이 되는데, 그때 앞선 것을 고르면 **눈에 보이는 것 뒤에 있는 것**이
+      // 집힌다. 학생은 보이는 것을 겨눈다. `items` 는 그린 차례라 뒤가 위다.
+      if (d <= bestDist) { bestDist = d; best = other; }
     }
     return best;
   }

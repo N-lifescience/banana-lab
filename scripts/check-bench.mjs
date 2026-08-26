@@ -1190,6 +1190,18 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   ok(r2.grabbed === 'banana' && r2.hot === 'slideA',
      '폰 — 받침 유리 세 장이 붙어 있어도 겨눈 것이 잡힌다', `${r2.grabbed}→${r2.hot}`);
 
+  // **배열 끝에 있는 물건으로도 잰다.**
+  // 「목록에서 먼저 오는 것이 이긴다」 는 옛 방식과 가장 크게 어긋나는 것이 배열 끝이다.
+  // 중간 것으로만 재면 **반쯤 우연히 맞는다** — osmosis 세션은 그 우연 때문에 놓기 판정을
+  // 고쳤다고 적어 놓고 실제로는 근거가 없는 상태였다(되돌려도 153개가 전부 초록불).
+  // 수단 Ⅲ 병은 세 병 중 배열 마지막이라 물 병(첫 번째)과 겹칠 때 갈린다.
+  const r3 = await pDrag('dropper', 'bottleSUDAN');
+  ok(r3.grabbed === 'dropper' && r3.hot === 'bottleSUDAN',
+     '폰 — 배열 끝에 있는 물건을 겨눠도 그것이 잡힌다', `${r3.grabbed}→${r3.hot}`);
+  ok(await ph.evaluate(() => window.__store.getState().tools.dropper.holds) === 'SUDAN3',
+     '폰 — 배열 끝 물건에 놓아도 그것이 받는다',
+     await ph.evaluate(() => window.__store.getState().tools.dropper.holds));
+
   // **한가운데만 재면 이 버그를 못 본다.**
   // 한가운데는 멀쩡한데 **가장자리가 새는 것**이 이 버그의 모양이다. catalase 세션이
   // 「그림 300점 중 15점이 이웃에게 갔다」 고 점수로 알려 준 이유가 그것이다 —
@@ -1235,6 +1247,44 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     const n = stray.filter(Boolean).length + stray.filter((x) => !x).length;
     ok(n === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 그 물건이 잡힌다`,
        `${pts.length}점 중 ${n}점이 이웃에게: ${stray.filter(Boolean).join(' ')}`);
+
+    // **그림의 가장자리**도 짚어 본다. 3×3 격자는 안쪽만 보므로 가장자리 띠를 놓친다.
+    //
+    // 앞서는 「그림 **한가운데**까지의 거리」로 갈랐는데, 그러면 **크거나 긴 그림이 불리하다.**
+    // 개수대(100×75)의 가장자리는 자기 한가운데보다 옆 물건의 한가운데가 더 가깝다 —
+    // 재어 보니 320 px 에서 개수대 그림 위의 **68점**이 폐액통·휴지에게 갔다.
+    // 지금은 **그림까지의 거리**(안이면 0)로 가른다.
+    // (centrifuge 세션이 27×7 px 자를 재다 같은 자리를 찾았다)
+    const edgeStray = [];
+    for (const id of ['sink', 'tissue', 'waste', 'microscope']) {
+      const epts = await gp.evaluate((id) => {
+        const e = document.querySelector(`[data-id="${id}"]`);
+        if (!e) return [];
+        const svg = e.querySelector('svg');
+        const bb = svg.getBBox();
+        const vb = svg.viewBox.baseVal;
+        const r = e.getBoundingClientRect();
+        const sx = r.width / vb.width;
+        const sy = r.height / vb.height;
+        const x0 = r.x + bb.x * sx;
+        const y0 = r.y + bb.y * sy;
+        const dw = bb.width * sx;
+        const dh = bb.height * sy;
+        const out = [];
+        for (let i = 0; i <= 4; i++) { out.push({ x: x0 + dw * i / 4, y: y0 + 1 }); out.push({ x: x0 + dw * i / 4, y: y0 + dh - 1 }); }
+        for (let j = 1; j < 4; j++) { out.push({ x: x0 + 1, y: y0 + dh * j / 4 }); out.push({ x: x0 + dw - 1, y: y0 + dh * j / 4 }); }
+        return out;
+      }, id);
+      for (const pt of epts) {
+        await gp.mouse.move(pt.x, pt.y);
+        await gp.mouse.down();
+        const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
+        await gp.mouse.up();
+        if (got && got !== id) edgeStray.push(`${id}→${got}`);
+      }
+    }
+    ok(edgeStray.length === 0, `폰 ${w}px — 큰 그림의 가장자리를 짚어도 그 물건이 잡힌다`,
+       edgeStray.slice(0, 3).join(' '));
 
     // **말풍선이 집힐 물건의 이름을 말하는가.**
     // 겹친 자리에서 집는 것만 고치면, 「받침 유리 통」 이라 적힌 것을 눌렀는데
