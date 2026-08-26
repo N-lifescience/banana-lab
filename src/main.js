@@ -32,7 +32,17 @@ function createStore(initial, onMessage) {
     dispatch(type, payload, opts = {}) {
       const result = reduce(state, { type, payload });
       state = result.state;
-      if (result.outcome !== 'ok') onMessage(result.message, result.outcome, result.tag);
+      // **잘된 조작도 말한다.** 앞서는 `outcome !== 'ok'` 일 때만 내보냈다.
+      // 그런데 `rules.js` 는 잘된 조작에도 문구를 **열여섯 개** 달아 둔다
+      // (「스포이트에 아이오딘 용액을 담았습니다」 같은 것). 그것이 전부 여기서 버려졌다.
+      //
+      // 화면에 남는 것이 없는 조작은 **한 것인지 아닌지 알 길이 없다.**
+      // 콘솔 에러도 안 나므로 아무도 모른다 — `docs/banana-progress.md` 의 T25 는
+      // 「토스트가 말을 하게 했다」 고 적어 두었는데 그 문이 열려 있지 않았다.
+      // (germination 세션이 자기 저장소에서 먼저 찾아 넘겨 주었다)
+      //
+      // `message` 가 없으면 토스트가 알아서 아무것도 안 한다.
+      onMessage(result.message, result.outcome, result.tag);
       if (!opts.skipNotify) notify(result);
       return result;
     },

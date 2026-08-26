@@ -94,9 +94,20 @@ export function createToastQueue(root, getLevel) {
       // 조리개·초점 슬라이더는 끄는 동안 수십 번 디스패치된다. 그때마다 같은 문장이 큐에
       // 쌓이면 손을 뗀 뒤에도 몇십 초 동안 계속 뜬다 — 학생은 자기가 뭘 잘못했는지 몰라
       // 같은 곳을 계속 만진다. 이미 떠 있거나 줄을 선 것과 같은 말이면 그 자리를 지킨다.
-      if (tag && (showingTag === tag || queue.some((q) => q.tag === tag))) return;
-
       const good = outcome === 'ok';
+
+      // **잘된 조작은 줄을 서지 않는다 — 마지막 것만 남는다.**
+      // 숟갈을 두 번 뜨면 「1숟갈」 뒤에 「2숟갈」이 줄을 서고, 앞의 것이 다 지나갈 때까지
+      // 화면은 **지난 수를 보여 준다.** 같은 태그를 겹침 방지로 삼키면 더 나빠서,
+      // 두 숟갈째에도 「1숟갈」이 뜬 채로 있게 된다. 지금 사실을 말해야 하므로 갈아 끼운다.
+      if (good && tag) {
+        const at = queue.findIndex((q) => q.tag === tag);
+        if (at >= 0) queue.splice(at, 1);
+      } else if (tag && (showingTag === tag || queue.some((q) => q.tag === tag))) {
+        // 뜻대로 안 된 것은 그대로 줄을 지킨다. 슬라이더를 끄는 동안 같은 경고가
+        // 수십 번 쌓이면 손을 뗀 뒤에도 몇 분 동안 계속 뜬다.
+        return;
+      }
       const level = getLevel ? getLevel() : 1;
 
       // **막힘은 줄을 서지 않는다.**

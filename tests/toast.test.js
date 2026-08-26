@@ -97,3 +97,24 @@ test('3단계도 막힌 이유는 감추지 않는다', (t) => {
   assert.equal(s2[0], '금이 간 것은 다시 올릴 수 없습니다. 새것을 꺼내세요.',
     '3단계에서 막힌 이유가 가려졌습니다 — 여기서 실험이 끝납니다');
 });
+
+test('잘된 조작도 말한다 — 마지막 것만 남는다', () => {
+  // **문이 닫혀 있었다.** store 가 `outcome !== 'ok'` 일 때만 문구를 내보내서,
+  // `rules.js` 가 잘된 조작에 달아 둔 문구 열여섯 개가 전부 버려지고 있었다.
+  // 화면에 남는 것이 없는 조작은 **한 것인지 아닌지 알 길이 없다.**
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+
+  toast.push('바나나 껍질을 벗겼습니다.', 'ok', 'peeled');
+  assert.equal(shown.at(-1), '바나나 껍질을 벗겼습니다.', '잘된 조작이 아무 말도 안 했습니다');
+
+  // 같은 종류를 이어서 하면 **지금 사실**이 떠야 한다. 앞의 것이 줄을 지키면
+  // 두 숟갈째에도 「1숟갈」이 뜬 채로 있게 된다.
+  const { root: r2, shown: s2 } = fakeDom();
+  const t2 = createToastQueue(r2, () => 1);
+  t2.push('지금까지 1숟갈입니다.', 'ok', 'scooped');
+  t2.push('지금까지 2숟갈입니다.', 'ok', 'scooped');
+  t2.push('지금까지 3숟갈입니다.', 'ok', 'scooped');
+  assert.ok(!s2.includes('지금까지 2숟갈입니다.'),
+    `지난 수가 줄을 서 있습니다: ${JSON.stringify(s2)}`);
+});

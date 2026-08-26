@@ -1192,6 +1192,38 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await ph.close();
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * **잘된 조작이 말을 하는가.**
+ *
+ * store 가 `outcome !== 'ok'` 일 때만 문구를 내보내고 있어서, `rules.js` 가 잘된 조작에
+ * 달아 둔 문구 **열여섯 개**가 전부 버려졌다. 껍질을 벗겨도, 시료를 발라도, 스포이트를
+ * 채워도 화면은 아무 말도 하지 않았다.
+ *
+ * **콘솔 에러도 안 난다.** 규칙 검사는 `reduce()` 가 문구를 돌려주는 것만 보므로 초록불이고,
+ * `docs/banana-progress.md` 의 T25 는 「토스트가 말을 하게 했다」 고 적어 두었다.
+ * 문이 안 열려 있다는 것은 **브라우저를 열어야만** 보였다.
+ * (germination 세션이 자기 저장소에서 먼저 찾아 넘겨 주었다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const sp = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await sp.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(sp);
+  await sp.waitForTimeout(250);
+
+  const said = [];
+  await sp.exposeFunction('_said', (t) => said.push(t));
+  await sp.evaluate(() => new MutationObserver(() => {
+    const t = document.querySelector('.toast');
+    if (t?.innerText.trim()) window._said(t.innerText.trim());
+  }).observe(document.body, { childList: true, subtree: true }));
+
+  const r = await sp.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
+  await sp.waitForTimeout(400);
+  ok(r.outcome === 'ok' && Boolean(r.message), '   (앞 조건) 잘된 조작이 문구를 갖고 있다', r.message);
+  ok(said.some((t) => t.includes('껍질')), '잘된 조작도 화면에서 말을 한다', said.join(' | ') || '(아무 말도 없음)');
+  await sp.close();
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
