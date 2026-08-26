@@ -7,7 +7,32 @@ import { benchLayout } from '../src/ui/bench.js';
 const ITEM_COUNT = benchLayout().length;
 
 const BASE = process.env.BASE ?? devUrl();
+
+/**
+ * 브라우저가 중간에 죽었을 때 **앱을 의심하지 않게** 한다.
+ *
+ * 이 검사는 페이지를 열댓 개 열고 닫는다. 여러 실험 저장소와 세션이 함께 도는 기계에서는
+ * 크로뮴이 자원 부족으로 그냥 죽는 일이 있다. 그때 스택만 뱉으면 다음 사람은
+ * **「끌기가 깨졌나」 하고 앱을 파기 시작한다** — 실제로는 아무것도 안 깨졌는데.
+ *
+ * 여기까지 통과한 것을 먼저 찍고, 무엇이 일어난 것인지 한 줄로 말한다.
+ * 종료 코드도 가른다 — 1 은 「검사가 틀렸다」, 2 는 「검사를 못 마쳤다」.
+ */
+function bail(e) {
+  const done = (globalThis.out ?? []).filter((r) => r.pass).length;
+  const total = (globalThis.out ?? []).length;
+  console.log(`\n${done}/${total} 까지 통과한 뒤 **검사가 중간에 멎었습니다.**`);
+  console.log(`  ${String(e?.message ?? e).split('\n')[0]}`);
+  if (/browser has been closed|Target page|Session closed|crashed/i.test(String(e?.message ?? e))) {
+    console.log('  → 브라우저가 죽은 것이지 앱이 깨진 것이 아닙니다.');
+    console.log('    다른 실험 저장소·세션이 함께 돌고 있으면 자원이 모자랍니다. 다시 돌려 보세요.');
+  }
+  process.exit(2);
+}
+process.on('uncaughtException', bail);
+process.on('unhandledRejection', bail);
 const out = [];
+globalThis.out = out;
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
 
 const browser = await chromium.launch();
@@ -1111,6 +1136,60 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   // 손가락으로 눌렀을 때 말풍선이 떠서 안 사라지면 실험대를 가린다 (실제로 그랬다).
   ok(await page.evaluate(() => document.querySelector('#bench-tip').hidden),
      '손가락 — 탭한 뒤 말풍선이 남아 실험대를 가리지 않는다');
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * 폰에서 **겨눈 것이 집히는가.**
+ *
+ * `.token::after` 가 그림을 `MIN_HIT_PX`(44) 까지 넓혀 손가락에 잡히게 한다.
+ * 데스크톱에서는 안 겹치는데 **폰(420 px)에서는 물건 자체가 14~38 px 이라 열여섯 짝이
+ * 포개진다.** 그때는 DOM 에서 나중에 그려진 것이 이벤트를 가져가므로,
+ * **스포이트 한가운데를 눌러도 겹쳐 있는 핀셋이 집혔다.**
+ *
+ * 스포이트를 병으로 끌었다고 생각했는데 실제로 끌린 것은 핀셋이었고, 핀셋은 병을 안 받으므로
+ * **아무 일도 안 일어나고 아무 말도 안 나왔다.** 데스크톱에서만 재면 영영 안 보인다 —
+ * 교실에서 쓰는 것은 태블릿이다.
+ * (웨이브 2 의 chromatography 세션이 자기 저장소에서 먼저 짚었다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const ph = await browser.newPage({ viewport: { width: 420, height: 880 }, hasTouch: true });
+  await ph.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(ph);
+  await ph.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
+  await ph.waitForTimeout(300);
+
+  const pBox = (sel) => ph.locator(sel).boundingBox();
+  const pDrag = async (from, to) => {
+    const [a, b] = [await pBox(`[data-id="${from}"]`), await pBox(`[data-id="${to}"]`)];
+    if (!a || !b) return { grabbed: '(토큰 없음)', hot: '(토큰 없음)' };
+    const [x0, y0] = center(a);
+    const [x1, y1] = center(b);
+    await ph.mouse.move(x0, y0);
+    await ph.mouse.down();
+    await ph.waitForTimeout(60);
+    const grabbed = await ph.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? '(없음)');
+    for (let i = 1; i <= 12; i++) {
+      await ph.mouse.move(x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12);
+      await ph.waitForTimeout(16);
+    }
+    const hot = await ph.evaluate(() =>
+      [...document.querySelectorAll('.token--target-hot')].map((e) => e.dataset.id).join(',') || '(없음)');
+    await ph.mouse.up();
+    await ph.waitForTimeout(200);
+    return { grabbed, hot };
+  };
+
+  // 스포이트와 핀셋은 폰에서 넓힌 자리가 겹친다. 겨눈 쪽이 집혀야 한다.
+  const r1 = await pDrag('dropper', 'bottleIKI');
+  ok(r1.grabbed === 'dropper', '폰 — 겹친 자리에서 겨눈 물건이 집힌다', `집힌것 ${r1.grabbed}`);
+  ok(r1.hot === 'bottleIKI', '폰 — 겨눈 물건 위에 놓을 곳 표시가 뜬다', `강조 ${r1.hot}`);
+  ok(await ph.evaluate(() => window.__store.getState().tools.dropper.holds) === 'IKI',
+     '폰 — 끌어다 놓으면 스포이트가 채워진다');
+
+  const r2 = await pDrag('banana', 'slideA');
+  ok(r2.grabbed === 'banana' && r2.hot === 'slideA',
+     '폰 — 받침 유리 세 장이 붙어 있어도 겨눈 것이 잡힌다', `${r2.grabbed}→${r2.hot}`);
+  await ph.close();
 }
 
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));

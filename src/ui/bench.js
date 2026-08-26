@@ -480,16 +480,41 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   }
 
   /** 끄는 물건의 **그림** 중심 아래 있는 첫 토큰. 프레임 중심은 그림 밖일 수 있다. */
+  /**
+   * 지금 끌고 있는 것이 **어느 물건 위에** 있는가.
+   *
+   * ── 겹칠 때 무엇을 고르는가 ────────────────────────────────────
+   * `hitRect` 는 그림이 손가락보다 작으면 `MIN_HIT_PX`(44) 까지 넓혀 준다. 데스크톱에서는
+   * 물건들이 충분히 떨어져 있어 넓혀도 안 겹치는데, **폰(420 px)에서는 물건 자체가
+   * 14~38 px 이라 넓힌 사각형들이 서로 포개진다** — 재어 보니 열여섯 짝이 겹쳤다.
+   *
+   * 앞서는 **목록에서 먼저 오는 것**을 골랐다. 그래서 아이오딘 병 한가운데를 겨눠도
+   * 앞선 덮개 유리 통이 가로챘고, 그 통은 스포이트를 안 받으므로
+   * **아무 일도 안 일어나고 아무 말도 안 나왔다.** 데스크톱에서는 안 겹쳐서 영영 안 보인다.
+   * 교실에서 쓰는 것이 태블릿이므로 그냥 둘 자리가 아니다.
+   *
+   * 이제 **그림 한가운데가 가장 가까운 것**이 이긴다.
+   *
+   * **받는 물건을 골라 주지는 않는다.** 「이 물건을 받아 줄 수 있는 것」만 후보로 두면
+   * 폐액통을 겨눴을 때 옆의 받침 유리가 잡혀 엉뚱한 일이 일어난다. 겨눈 것이 답해야 한다 —
+   * 못 받는 것을 겨눴으면 못 받는다는 말을 듣는 것이 옳다 (AGENTS.md §2.1).
+   */
   function targetUnder() {
     const g = hitRect(drag.el, drag.item.asset);
     const cx = (g.left + g.right) / 2;
     const cy = (g.top + g.bottom) / 2;
+    let best = null;
+    let bestDist = Infinity;
     for (const other of items) {
       const or_ = drag.rects.get(other.id);
       if (!or_) continue;
-      if (cx >= or_.left && cx <= or_.right && cy >= or_.top && cy <= or_.bottom) return other;
+      if (cx < or_.left || cx > or_.right || cy < or_.top || cy > or_.bottom) continue;
+      const dx = cx - (or_.left + or_.right) / 2;
+      const dy = cy - (or_.top + or_.bottom) / 2;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) { bestDist = dist; best = other; }
     }
-    return null;
+    return best;
   }
 
   /* ---------------------------------------------------------------- */
@@ -728,8 +753,47 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     meter.querySelector('i').style.width = `${(t * 100).toFixed(0)}%`;
   }
 
+  /**
+   * 이 자리에서 **정말로 집으려던 물건**은 무엇인가.
+   *
+   * `.token::after` 가 손가락에 잡히도록 그림을 `MIN_HIT_PX`(44) 까지 넓혀 준다.
+   * 데스크톱에서는 물건이 충분히 떨어져 있어 안 겹치는데, **폰(420 px)에서는 물건 자체가
+   * 14~38 px 이라 넓힌 자리들이 서로 포개진다** — 재어 보니 열여섯 짝이 겹쳤다.
+   *
+   * 그때는 **DOM 에서 나중에 그려진 것**이 이벤트를 가져간다. 그래서 스포이트 한가운데를
+   * 눌러도 겹쳐 있는 핀셋이 집혔다. 스포이트를 아이오딘 병으로 끌었다고 생각했는데
+   * 실제로는 핀셋이 끌려갔고, **아무 일도 안 일어나고 아무 말도 안 나왔다.**
+   * 데스크톱에서는 안 겹쳐서 영영 안 보인다. 교실에서 쓰는 것은 태블릿이다.
+   *
+   * 그래서 **그림 한가운데가 가장 가까운 것**으로 바꿔 준다. 겹치지 않는 화면에서는
+   * 자기 자신이 뽑히므로 아무것도 달라지지 않는다.
+   */
+  function aimedAt(e, item) {
+    let best = item;
+    let bestDist = Infinity;
+    for (const other of items) {
+      if (isHidden(other)) continue;
+      const oe = elFor(other.id);
+      if (!oe) continue;
+      const r = hitRect(oe, other.asset);
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) continue;
+      const dx = e.clientX - (r.left + r.right) / 2;
+      const dy = e.clientY - (r.top + r.bottom) / 2;
+      const d = dx * dx + dy * dy;
+      // 같은 거리면 원래 눌린 것을 그대로 둔다 — 흔들리지 않게.
+      if (d < bestDist) { bestDist = d; best = other; }
+    }
+    return best;
+  }
+
   function onPointerDown(e, item, el) {
     if (e.button !== undefined && e.button !== 0) return;
+    // 넓힌 자리가 겹쳤으면 **겨눈 것**으로 바꾼다.
+    const aimed = aimedAt(e, item);
+    if (aimed.id !== item.id) {
+      const ael = elFor(aimed.id);
+      if (ael) { item = aimed; el = ael; }
+    }
     // 손가락으로 물건을 꾹 눌러 끌면, 브라우저가 그것을 **글자를 고르려는 동작**으로 읽고
     // 돋보기와 「복사」 메뉴를 띄운다. 그러면 끌기는 그 자리에서 끊긴다.
     // touch-action:none 은 스크롤·확대만 막을 뿐 이 선택 동작은 못 막는다 — 여기서 막는다.
