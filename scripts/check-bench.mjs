@@ -1042,6 +1042,77 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 }
 
 /* ---------- 결과 ---------- */
+/* ────────────────────────────────────────────────────────────────
+ * 손가락으로 끌기 — **한 줄도 검사가 없었다.**
+ *
+ * 이 검사는 `page.mouse.down/move/up` 을 마흔 번 넘게 쓴다. 그래서 **마우스로 끄는 길은
+ * 촘촘히 덮여 있다** — 놓기 한 줄을 끊으면 첫 항목도 못 지나가고 죽는다.
+ *
+ * 그런데 **손가락은 한 번도 안 눌러 봤다.** 앱에는 손가락 전용 갈래가 여럿이다
+ * (`e.pointerType !== 'mouse'` · `fingerTapAt` · 「움직였는가」로 탭과 끌기를 가르는 자리).
+ * 학생은 대부분 태블릿으로 쓴다. 마우스만 재고 「끌기가 된다」 고 말하면 안 된다.
+ *
+ * Playwright 의 `touchscreen` 에는 `tap()` 밖에 없고, 손으로 만든 `PointerEvent` 는
+ * `setPointerCapture` 에서 걸린다. CDP 로 진짜 터치를 쏜다.
+ * (웨이브 2 의 catalase 세션이 알려 준 길이다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const cdp = await page.context().newCDPSession(page);
+  const touch = async (type, x, y) => {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: type === 'touchEnd' ? [] : [{ x: Math.round(x), y: Math.round(y) }],
+    });
+  };
+  /**
+   * 손가락으로 끈다.
+   *
+   * **두 끝을 한 번에, 아무것도 움직이지 않은 상태에서 잰다.** 좌표 헬퍼 안에서
+   * 스크롤을 건드리면 두 번째 호출이 화면을 움직여 첫 좌표가 썩는다 —
+   * 그러면 「좁은 화면에서는 끌기가 안 된다」 로 잘못 읽게 된다.
+   */
+  const touchDrag = async (fromSel, toSel) => {
+    const [a, b] = [await box(fromSel), await box(toSel)];
+    if (!a || !b) return false;
+    const [x0, y0] = center(a);
+    const [x1, y1] = center(b);
+    await touch('touchStart', x0, y0);
+    for (let i = 1; i <= 12; i++) {
+      await touch('touchMove', x0 + (x1 - x0) * i / 12, y0 + (y1 - y0) * i / 12);
+      await page.waitForTimeout(16);
+    }
+    await touch('touchEnd', x1, y1);
+    await page.waitForTimeout(300);
+    return true;
+  };
+
+  // 새 판에서 시작한다 — 앞 검사들이 이미 다 만들어 둔 상태를 쓰면 무엇이 일어났는지 못 가린다.
+  await page.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(page);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
+  await page.waitForTimeout(250);
+
+  const before = await page.evaluate(() => window.__store.getState().slides.A.sample);
+  await touchDrag('[data-id="banana"]', '[data-id="slideA"]');
+  const after = await page.evaluate(() => window.__store.getState().slides.A.sample);
+  ok(before === null && after !== null,
+     '손가락 — 끌어다 놓으면 받침 유리에 발린다', JSON.stringify(after));
+
+  // 손가락으로 **탭**한 것은 끌기가 아니다. 움직이지 않았으면 탭으로 갈려야 한다.
+  const tapped = await page.evaluate(() => window.__store.getState().tools.dropper.holds);
+  const db = await box('[data-id="dropper"]');
+  await touch('touchStart', ...center(db));
+  await touch('touchEnd', ...center(db));
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => window.__store.getState().tools.dropper.holds) === tapped,
+     '손가락 — 움직이지 않은 것은 끌기로 치지 않는다');
+
+  // 손가락으로 눌렀을 때 말풍선이 떠서 안 사라지면 실험대를 가린다 (실제로 그랬다).
+  ok(await page.evaluate(() => document.querySelector('#bench-tip').hidden),
+     '손가락 — 탭한 뒤 말풍선이 남아 실험대를 가리지 않는다');
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
