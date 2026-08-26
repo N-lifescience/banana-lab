@@ -90,12 +90,32 @@
 
 <h3 style="font-size:14px;margin:16px 0 6px">나. 학생이 「선생님께 제출」을 누른 경우</h3>
 <p>학생이 수업 코드를 입력하고 제출 버튼을 직접 누른 때에 한해 아래 항목이 전송·저장됩니다.</p>
-<dl>
-  <dt>필수 항목</dt><dd>학번(학년·반·번호를 합친 숫자), 이름</dd>
-  <dt>활동 내용</dt><dd>탐구 노트에 학생이 적은 글, 관찰 결과를 다시 그리기 위한 수치(시드·배율·초점 등), 선택한 난이도와 활동 방식</dd>
-  <dt>선택 항목</dt><dd>학교명, 모둠명 (학생이 입력한 경우에만)</dd>
-  <dt>자동 생성</dt><dd>제출 시각</dd>
+<dl data-sends>
+  <dt data-sends="student_no,student_name">필수 항목</dt>
+    <dd>학번(학년·반·번호를 합친 숫자), 이름</dd>
+  <dt data-sends="session.seed,session.notes,session.captures,session.step">탐구 노트</dt>
+    <dd>학생이 적은 글, 관찰 결과를 다시 그리기 위한 수치(시드·배율·초점·시약·두께 등), 진행 단계</dd>
+  <dt data-sends="slides,microscope,tools">실험대 상태</dt>
+    <dd>슬라이드·현미경·기구가 마지막에 어떤 상태였는지</dd>
+  <dt data-sends="session.log,session.violations,session.tidy,session.readStages,session.undosLeft">활동 기록</dt>
+    <dd><b>학생이 무엇을 어떤 차례로 조작했는지의 기록</b>, 안전 수칙과 정리를 지켰는지,
+        탐구 노트를 읽었다고 표시한 쪽, 남은 되돌리기 횟수</dd>
+  <dt data-sends="session.level,session.mode">활동 방식</dt>
+    <dd>선택한 난이도와 혼자/모둠 여부</dd>
+  <dt data-sends="school,team">선택 항목</dt>
+    <dd>학교명, 모둠명 (학생이 입력한 경우에만)</dd>
+  <dt data-sends="submitted_at">자동 생성</dt>
+    <dd>제출 시각</dd>
 </dl>
+<p>
+  <b>「활동 기록」에는 학생이 잘 안 된 것도 남습니다.</b> 무엇을 어떤 차례로 조작했고 그때
+  무슨 일이 있었는지가 그대로 저장됩니다. 남는 줄 모르고 제출하는 일이 없도록 밝힙니다.
+  이 기록은 <b>선생님이 활동 과정을 보는 데 쓰이며, 점수를 매기는 근거로 쓰지 않습니다.</b>
+</p>
+<p>
+  <b>되돌리기 기록(<code>history</code>)은 전송하지 않습니다.</b> 이전 상태를 통째로 쌓아 둔
+  것이라 그대로 보내면 <b>학생이 지운 글까지 따라갑니다.</b> 제출 자료를 만들 때 빼고 보냅니다.
+</p>
 <p>
   <b>관찰 결과 이미지는 저장하지 않습니다.</b> 그림을 다시 그리는 데 필요한 수치만 저장하며,
   선생님 화면이 그 수치로 같은 그림을 다시 그립니다.

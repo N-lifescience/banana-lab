@@ -295,7 +295,7 @@ function fileTag(who) {
  * 되돌리기 기록(history)은 뺀다 — 세션 안에서만 쓰는 값이고, 통째로 보내면 꾸러미가
  * 몇 배로 커진다. 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
  */
-function payloadOf(st, who, kind) {
+export function payloadOf(st, who, kind) {
   const { history, ...session } = st.session;
   void history;
   return {
