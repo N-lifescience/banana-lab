@@ -33,7 +33,16 @@ const PAGES = ['index.html', 'teacher.html', 'privacy.html'];
 const OTHER_MATERIALS =
   /삼투|원형질|적양파|카탈레이스|과산화수소|크로마토그래피|엽록소|잔토필|효모|발효|맹관부|원심분리|적혈구|버피코트|접안 마이크로미터|대물 마이크로미터/;
 
-/** 다른 실험의 저장소 이름. 자기 id 는 뺀다 — 자기 주소를 가리키는 것은 옳다. */
+/**
+ * 다른 실험의 저장소 이름. 자기 id 는 뺀다 — 자기 주소를 가리키는 것은 옳다.
+ *
+ * **이 「자기는 뺀다」 가 함정을 하나 만든다.** 갓 복제한 저장소는 `manifest.id` 가 아직
+ * `'banana'` 라, **가장 남아 있기 쉬운 바나나랩 주소가 「자기 주소」로 분류돼 안 잡힌다.**
+ * 실제로 웨이브 3 의 한 저장소가 바나나랩 주소를 도로 넣어 보고도 초록불을 받았다.
+ *
+ * 그래서 아래 「이 저장소가 자기 이름을 알고 있다」 가 먼저 있어야 한다 —
+ * `manifest.id` 를 갈지 않으면 그 검사가 **먼저** 빨간불을 낸다.
+ */
 const EXPERIMENT_IDS = [
   'banana', 'micrometer', 'osmosis', 'catalase',
   'chromatography', 'fermentation', 'centrifuge', 'germination',
@@ -57,6 +66,19 @@ function visible(src) {
 const titleOf = (src) => (src.match(/<title>([\s\S]*?)<\/title>/i) ?? [])[1]?.trim();
 const metaOf = (src, key) =>
   (src.match(new RegExp(`<meta[^>]+(?:name|property)="${key}"[^>]+content="([^"]*)"`, 'i')) ?? [])[1];
+
+test('이 저장소가 자기 이름을 알고 있다', () => {
+  // **아래 주소 검사가 눈이 멀지 않게 지키는 검사다.**
+  // 주소 검사는 `manifest.id` 를 「자기 주소」로 보고 뺀다. 복제한 뒤 id 를 안 갈면
+  // 그 값이 `'banana'` 인 채라, **하필 가장 남아 있기 쉬운 바나나랩 주소를 못 본다.**
+  // package.json 의 이름은 복제 절차 첫머리에서 갈리므로, 둘이 어긋나면 여기서 잡힌다.
+  const name = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name;
+  assert.equal(name, `${manifest.id}-lab`,
+    `package.json 의 이름과 manifest.id 가 어긋납니다:\n`
+    + `  package.json  "${name}"\n  manifest.id   "${manifest.id}"\n`
+    + '  → 복제한 저장소라면 src/manifest.js 의 id 를 이 실험 것으로 가세요.\n'
+    + '    그 전까지는 「다른 실험의 배포 주소를 가리키지 않는다」 검사가 바나나랩 주소를 못 봅니다.');
+});
 
 test('모든 페이지의 <title> 이 이 실험의 이름을 말한다', () => {
   // 탭에 뜨는 이름이다. 앱 안 제목과 어긋나 있어도 화면 안쪽만 보면 절대 모른다.

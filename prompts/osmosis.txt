@@ -64,6 +64,12 @@ sed -i '' 's/"name": "banana-lab"/"name": "osmosis-lab"/' package.json
 #      「이 페이지는 저 사이트의 사본」 이라고 말하는 태그다. 틀린 주소는 없는 주소보다
 #      나쁘므로 **아예 뺀다** — 배포 주소가 정해지면 그때 넣는다.
 #      privacy.html 은 <title> 뿐 아니라 **본문 첫 줄**에도 실험 이름이 있다.
+#      ★ **`src/manifest.js` 의 `id` 를 여기서 함께 간다.** 마지막에 채우는 값이 아니다 —
+#        주소 검사가 `manifest.id` 를 「자기 주소」로 보고 빼기 때문에, id 가 `banana` 인 채면
+#        **하필 가장 남아 있기 쉬운 바나나랩 주소를 못 본다.** 웨이브 3 의 한 저장소가
+#        바나나랩 주소를 도로 넣어 보고도 초록불을 받았다.
+#        (`tests/pages.test.js` 의 「이 저장소가 자기 이름을 알고 있다」 가 이걸 잡는다 —
+#         package.json 이름과 manifest.id 가 어긋나면 빨간불이다)
 #      갈아 끼운 뒤 `node --test tests/pages.test.js` 로 확인한다 (이미 들어 있다).
 #      그 파일에서 실험에 매인 것은 OTHER_MATERIALS 하나뿐이다 — 이 실험에 **없는**
 #      재료 낱말로 갈아 끼운다.
