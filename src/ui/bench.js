@@ -534,8 +534,17 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     (elFor(item.id) ?? elFor(target.id))?.focus();
   }
 
+  /**
+   * 지금 떠 있는 말풍선이 **키보드로 연 것인가.**
+   *
+   * 키보드로 연 말풍선에는 「여기에 놓기」 버튼이 함께 나오고, 마우스를 못 쓰는 사람에게는
+   * **그 버튼이 물건을 옮기는 길의 전부다.** 마우스가 그것을 덮어 버리면 길이 사라진다.
+   */
+  let tipFromKeyboard = false;
+
   function showTip(item, withActions = false) {
     if (drag) return;
+    tipFromKeyboard = withActions;
     clearTimeout(hideTimer);   // 옆 물건으로 옮겨 오는 중이었다면 예약된 닫기를 취소한다
     hideTimer = 0;
     const level = store.getState().session.level;
@@ -574,7 +583,13 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   function hideTip() {
     clearTimeout(hideTimer);
     hideTimer = 0;
+    tipFromKeyboard = false;
     tipEl.hidden = true;
+  }
+
+  /** 키보드로 연 말풍선이 아직 살아 있는가 — 마우스가 덮으면 안 되는 상태. */
+  function keyboardTipAlive() {
+    return tipFromKeyboard && layer.contains(document.activeElement);
   }
 
   function hideTipSoon() {
@@ -708,6 +723,19 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   let pointerTapAt = 0;
   const POINTER_TAP_GRACE_MS = 500;
 
+  /**
+   * **손가락으로** 탭한 시각. `pointerTapAt` 과 나눠 둔다.
+   *
+   * `pointerTapAt` 은 「뒤따라올 click 을 삼킨다」는 다른 일에도 쓰이고, 키보드 Enter 도
+   * 그 목적으로 이 값을 찍는다. 그걸 「말풍선을 내지 말라」는 뜻으로 같이 읽으면
+   * **키보드로 조작한 직후 포커스가 돌아와도 놓을 곳 버튼이 안 나온다** — 키보드로 쓰는
+   * 사람은 한 번 조작하고 나면 다음 조작을 못 한다. 실제로 그렇게 깨뜨렸다.
+   *
+   * 포커스 말풍선이 막아야 하는 것은 **손가락 탭 직후** 하나뿐이다. 손가락으로 눌러도
+   * <button> 은 포커스를 받는데, 그때 이 말풍선을 띄우면 누를 때마다 떠서 안 사라진다.
+   */
+  let fingerTapAt = 0;
+
   /** 탭(포인터로 움직임 없이 누르고 뗌) 또는 키보드 활성화(Enter/Space) 로 여는 동작. */
   function handleTap(item, el) {
     // 편집 모드에서 확대 뷰가 열리면 옮기던 흐름이 끊긴다. 자리만 옮기는 모드다.
@@ -733,6 +761,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 움직이지 않았다면 조작이 아니라 탭이다.
       drag = null;
       pointerTapAt = performance.now();
+      if (e.pointerType !== 'mouse') fingerTapAt = performance.now();
       handleTap(item, el);
       renderTokens();
       return;
@@ -816,12 +845,36 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 손가락에는 hover 가 없다. 그런데 브라우저는 터치에도 pointerenter 를 한 번 쏘므로,
       // 이걸 그대로 받으면 스마트폰에서 물건을 누를 때마다 말풍선이 떴다가
       // 화면 어딘가를 다시 누를 때까지 남아 실험대를 가린다. 실제로 그랬다.
-      el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') showTip(item); });
-      el.addEventListener('pointerleave', () => hideTip());
+      //
+      // **키보드로 연 말풍선은 마우스가 덮지 않는다.** 마우스를 못 쓰는 사람에게는
+      // 그 말풍선의 「여기에 놓기」 버튼이 물건을 옮기는 길의 전부다.
+      //
+      // pointerenter 가 특히 안 보이는 자리였다. 조작하면 실험대가 통째로 다시 그려지는데,
+      // **가만히 있던 포인터 밑에 새 물건이 들어서면 브라우저가 pointerenter 를 다시 쏜다.**
+      // 마우스는 움직인 적이 없는데도 키보드로 열어 둔 버튼들이 사라졌다.
+      // (화면 검사가 여섯 번에 두세 번 실패했고, 멈춘 순간을 찍으니 포커스는 핀셋인데
+      //  말풍선은 비커 것이고 놓기 버튼이 0개였다)
+      el.addEventListener('pointerenter', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        if (keyboardTipAlive()) return;
+        showTip(item);
+      });
+      el.addEventListener('pointerleave', () => {
+        if (keyboardTipAlive()) return;
+        hideTip();
+      });
       // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
-      // :focus-visible 일 때만 낸다. 손가락으로 눌러도 <button> 은 포커스를 받는데,
-      // 그때까지 이 말풍선을 띄우면 누를 때마다 떠서 안 사라지는 창이 된다.
-      el.addEventListener('focus', () => { if (el.matches(':focus-visible')) showTip(item, true); });
+      //
+      // 앞서는 `:focus-visible` 로 걸렀다. 뜻은 맞지만 그것은 **브라우저가 「지금 키보드를
+      // 쓰는 중인가」를 어림잡는 값**이라, 마우스를 한 번 쓰고 나면 뒤이은 `element.focus()`
+      // 를 키보드로 안 쳐 준다 — **보조기기가 focus() 로 물건을 짚으면 버튼이 안 나왔다.**
+      // 막으려던 것은 「손가락 탭 직후」 하나뿐이고 그건 이미 pointerTapAt 이 재고 있다.
+      el.addEventListener('focus', () => {
+        // **손가락 탭 직후에만** 참는다. 키보드 Enter 는 참지 않는다 —
+        // 참으면 키보드로 한 번 조작한 뒤 놓을 곳 버튼이 다시 안 나온다.
+        if (performance.now() - fingerTapAt < POINTER_TAP_GRACE_MS) return;
+        showTip(item, true);
+      });
       // 포커스가 옮겨 갈 때 blur 가 focus 보다 먼저 온다. 여기서 곧바로 닫으면
       // 옆 물건으로 Tab 한 순간 말풍선이 닫혔다가 다시 열리며 서로를 지운다.
       // 닫기를 한 프레임 미루고, 그 사이 새 포커스가 오면 취소한다.

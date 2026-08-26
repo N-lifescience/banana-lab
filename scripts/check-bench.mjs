@@ -247,6 +247,47 @@ ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것
   ok(await kb.evaluate(() => document.activeElement?.dataset?.id) === 'microscope',
      '키보드 — 놓은 물건이 사라지면 놓은 자리로 포커스가 간다');
 
+  // ── 키보드로 연 말풍선을 마우스가 덮지 않는가 ──────────────────────
+  //
+  // **마우스를 못 쓰는 사람에게는 이 말풍선의 「여기에 놓기」 버튼이 물건을 옮기는 길의
+  // 전부다.** 마우스가 그것을 지우면 길이 사라진다.
+  //
+  // 사람 눈으로는 거의 안 보이는 종류다 — 마우스와 키보드를 동시에 쓰는 일이 드무니까.
+  // 화면 검사에서는 여섯 번에 두세 번 실패로 나타났고, 멈춘 순간을 찍으니 포커스는
+  // 핀셋인데 말풍선은 비커 것이고 놓기 버튼이 0개였다.
+  const putsNow = () => kb.evaluate(() => document.querySelectorAll('#bench-tip [data-onto]').length);
+  await kb.locator('[data-id="dropper"]').focus();
+  await kb.waitForTimeout(200);
+  const putsAfterFocus = await putsNow();
+  ok(putsAfterFocus > 0, '키보드 — 포커스만으로 놓을 곳 버튼이 나온다', putsAfterFocus);
+
+  // 마우스를 딴 물건 위로 옮겨도, 실험대 밖으로 빼도 그 버튼이 살아 있어야 한다.
+  const overBox = await kb.locator('[data-id="microscope"]').boundingBox();
+  await kb.mouse.move(overBox.x + overBox.width / 2, overBox.y + overBox.height / 2);
+  await kb.waitForTimeout(200);
+  ok(await putsNow() === putsAfterFocus,
+     '키보드 — 마우스가 다른 물건에 올라가도 놓을 곳 버튼이 남는다', await putsNow());
+  await kb.mouse.move(5, 5);
+  await kb.waitForTimeout(200);
+  ok(await putsNow() === putsAfterFocus,
+     '키보드 — 마우스가 실험대를 벗어나도 놓을 곳 버튼이 남는다', await putsNow());
+
+  // 보조기기가 element.focus() 로 짚는 경우. `:focus-visible` 로 거르면 **마우스를 한 번
+  // 쓰고 난 뒤** 이 길이 막힌다 — 그 값은 「지금 키보드를 쓰는 중인가」의 어림값이라
+  // 프로그램이 부른 focus() 를 키보드로 안 쳐 주기 때문이다.
+  await kb.mouse.click(overBox.x + overBox.width / 2, overBox.y + overBox.height / 2);
+  await kb.waitForTimeout(200);
+  await kb.evaluate(() => document.querySelector('[data-id="forceps"]')?.focus());
+  await kb.waitForTimeout(250);
+  //
+  // **이 검사는 되돌려도 여기서는 빨간불이 나지 않는다.** `:focus-visible` 로 거른 옛 코드로
+  // 되돌려 확인해 봤는데 헤드리스 크로뮴은 마우스를 쓴 뒤에도 프로그램이 부른 focus() 를
+  // 여전히 focus-visible 로 쳐 준다. 즉 **이 검사는 그 버그를 잡은 것이 아니라, 앞으로
+  // 그 방식으로 되돌아가는 것을 막는 울타리다.** (PLAYBOOK: 못 잡으면 그 사실을 적어 둔다)
+  // 실제 보조기기·다른 브라우저에서는 갈린다.
+  ok(await putsNow() > 0,
+     '키보드 — 마우스를 쓴 뒤 보조기기가 focus() 로 짚어도 버튼이 나온다', await putsNow());
+
   // 3단계도 조작은 똑같이 된다 — 줄어드는 것은 설명뿐이다.
   const kb3 = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await kb3.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
