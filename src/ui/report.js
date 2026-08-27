@@ -74,8 +74,31 @@ function predict(st) {
  * 탐구 과정. **빈 칸도 그대로 싣는다.**
  * 적은 것만 실으면 종이만 보고는 어디를 건너뛰었는지 알 수 없다 — 보고서는 그것도 말해야 한다.
  */
+/**
+ * 탐구 과정 — **화면이 적은 자리와 같은 자리를 읽는다.**
+ *
+ * ── 왜 갈래가 필요한가 ────────────────────────────────────────────
+ * 3단계 노트는 절차를 짚어 주지 않는다. 그래서 세부 단계 칸이 없고 **STEP 하나에 칸 하나**다
+ * (`notes['1']`~). 1·2단계는 세부 단계마다 칸이 있다 (`notes['1a']`~).
+ *
+ * 그런데 종이는 **늘 세부 단계 키만** 읽고 있었다. 그 결과 3단계로 푼 학생은
+ *
+ *   · 자기가 적은 여섯 칸이 **한 자도 종이에 안 실리고**
+ *   · 준 적도 없는 스무 칸에 「적지 않았습니다」가 달렸다
+ *
+ * 선생님 눈에는 **아무것도 안 한 학생**으로 읽힌다. 배포된 앱에서 그러고 있었다.
+ * (germination 세션이 자기 저장소에서 찾아 넘겨 주었고, centrifuge·micrometer 도 같았다)
+ *
+ * 검사는 1단계로만 종이를 만들고 있어서 못 봤다 — **난이도가 바뀌면 읽는 자리도 바뀐다.**
+ */
 function process(st) {
+  const level = st.session.level ?? 1;
   const groups = UI.protocol.map((g) => {
+    // 3단계 — STEP 하나에 칸 하나. 노트가 그렇게 적는다.
+    if (level >= 3) {
+      return `<div class="rp-row"><h3>STEP ${g.id} · ${escapeHtml(g.title)}</h3>`
+        + `<ul class="rp-steps"><li><span>${or(st.session.notes[g.id], R.notWritten)}</span></li></ul></div>`;
+    }
     const items = g.steps.map((s, i) => {
       const key = `${g.id}${String.fromCharCode(97 + i)}`;
       return `<li><b>${escapeHtml(s.label)}</b><span>${or(st.session.notes[key], R.notWritten)}</span></li>`;

@@ -180,3 +180,36 @@ test('제출 목록에 군더더기가 없다 — 하나만 빼도 종이가 달
     `보내지만 종이에 아무 영향이 없는 항목이 있습니다: ${useless.join(', ')}\n`
     + '  → SUBMIT_TOP_KEYS / SUBMIT_SESSION_KEYS 에서 빼세요. 안 실리는 것을 보내는 것은 수집입니다.');
 });
+
+test('난이도가 달라도 학생이 적은 것이 종이에 실린다', () => {
+  // **화면이 적는 자리와 종이가 읽는 자리가 같아야 한다.**
+  //
+  // 3단계 노트는 절차를 짚어 주지 않아 **STEP 하나에 칸 하나**다(`notes['1']`~).
+  // 1·2단계는 세부 단계마다 칸이 있다(`notes['1a']`~).
+  // 그런데 종이는 늘 세부 단계 키만 읽고 있었다 — 3단계로 푼 학생은
+  // **적은 것이 한 자도 안 실리고** 준 적 없는 스무 칸에 「적지 않았습니다」가 달렸다.
+  // 선생님 눈에는 아무것도 안 한 학생으로 읽힌다.
+  //
+  // 앞선 검사들이 **1단계로만** 종이를 만들어서 못 봤다.
+  // 난이도가 바뀌면 **읽는 자리도 바뀐다.**
+  for (const level of [1, 2, 3]) {
+    const perStep = UI.protocol.map((g) => g.id);
+    const perSub = UI.protocol.flatMap((g) => g.steps.map((s, i) => g.id + String.fromCharCode(97 + i)));
+    const keys = level >= 3 ? perStep : perSub;
+
+    let st = initialState(level);
+    for (const k of keys) st = reduce(st, { type: 'SAVE_NOTE', payload: { step: k, text: `학생글${k}` } }).state;
+
+    const html = buildSheet(st, {}, 'individual');
+    const missing = keys.filter((k) => !html.includes(`학생글${k}`));
+    assert.deepEqual(missing, [],
+      `${level}단계에서 학생이 적은 것이 종이에 없습니다: ${missing.join(', ')}`);
+
+    // 다 적었으면 빈칸이 하나도 없어야 한다 — 남아 있으면 준 적 없는 칸을 찍은 것이다.
+    const from = html.indexOf(UI.report.sections.process);
+    const section = html.slice(from, html.indexOf('</section>', from));
+    const blanks = (section.match(new RegExp(UI.report.notWritten, 'g')) ?? []).length;
+    assert.equal(blanks, 0,
+      `${level}단계에서 다 적었는데도 「적지 않았습니다」가 ${blanks}개 남았습니다`);
+  }
+});
