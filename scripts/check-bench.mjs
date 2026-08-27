@@ -1215,6 +1215,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     await gp.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
     await unlock(gp);
     await gp.waitForTimeout(300);
+    const stateSize = await gp.evaluate(() => JSON.stringify(window.__store.getState()).length);
     const pts = await gp.evaluate(() => {
       const out = [];
       for (const e of document.querySelectorAll('[data-id]')) {
@@ -1235,18 +1236,41 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       }
       return out;
     });
+    // **누르고 그 자리에서 떼면 그것은 탭이다 — 진짜 조작이 일어난다.**
+    // 앞서는 그렇게 쟀다. 그랬더니 현미경을 짚으면 확대 뷰가 열려 실험대를 덮고,
+    // 물건을 짚으면 재물대로 올라가 화면에서 사라졌다. 그러면 아무것도 안 집혀
+    // `got` 이 null 이 되고 **「이웃에게 간 점 0개」로 초록불**이 뜬다.
+    //
+    // 재어 보니 **144점 중 19점(320px)·23점(420px)이 재지도 못한 채** 지나갔고,
+    // 실험대 상태가 1,277 → 81,019 바이트로 불었다. 뒤엣점들은 **다른 실험대**를 잰 것이다.
+    // (micrometer 세션이 자기 저장소에서 25/175 를 찾아 알려 주었다)
+    //
+    // → **빈 곳으로 조금 끌었다가 뗀다.** 움직였으니 탭이 아니고, 받는 것이 없으니
+    //   아무 일도 안 남는다.
+    const EMPTY = { x: 4, y: 4 };   // 실험대 밖 — 받는 물건이 없다
     const stray = [];
+    let missed = 0;
     for (const pt of pts) {
       await gp.mouse.move(pt.x, pt.y);
       await gp.mouse.down();
       const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
+      // 빈 곳으로 끌어 놓는다. 여기서 떼면 탭이 아니다.
+      await gp.mouse.move(EMPTY.x, EMPTY.y, { steps: 3 });
       await gp.mouse.up();
-      if (got && got !== pt.id && stray.length < 4) stray.push(`${pt.id}→${got}`);
-      else if (got && got !== pt.id) stray.push('');
+      if (!got) missed++;
+      else if (got !== pt.id) stray.push(`${pt.id}→${got}`);
     }
-    const n = stray.filter(Boolean).length + stray.filter((x) => !x).length;
-    ok(n === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 그 물건이 잡힌다`,
-       `${pts.length}점 중 ${n}점이 이웃에게: ${stray.filter(Boolean).join(' ')}`);
+
+    // **이 둘이 먼저 초록불이어야 위의 숫자가 뜻이 있다.**
+    // 아무것도 안 집혔는데 「이웃에게 간 점 0개」인 것은 재지 않은 것이다.
+    ok(missed === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 무언가 집힌다 (앞 조건)`,
+       `${pts.length}점 중 ${missed}점은 아무것도 안 집힘 — 이 숫자가 0이 아니면 아래 검사는 뜻이 없다`);
+    const moved = await gp.evaluate(() => JSON.stringify(window.__store.getState()).length);
+    ok(Math.abs(moved - stateSize) < 200, `폰 ${w}px — 다 짚어도 실험대가 안 변한다 (앞 조건)`,
+       `상태 ${stateSize} → ${moved} — 짚는 것이 조작을 일으키고 있다`);
+
+    ok(stray.length === 0, `폰 ${w}px — 그림 안 어느 점을 짚어도 그 물건이 잡힌다`,
+       `${pts.length}점 중 ${stray.length}점이 이웃에게: ${stray.slice(0, 4).join(' ')}`);
 
     // **그림의 가장자리**도 짚어 본다. 3×3 격자는 안쪽만 보므로 가장자리 띠를 놓친다.
     //
