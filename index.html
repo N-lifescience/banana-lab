@@ -124,7 +124,19 @@
   /* 포커스로 뜬 말풍선에는 놓을 곳 버튼이 함께 나온다 — 마우스 없이 놓는 길이다.
      그래서 이때만 포인터를 받아야 한다. hover 로 뜬 것은 그대로 통과시킨다. */
   .bench-tip{pointer-events:none}
-  .bench-tip:has(.tip-actions){pointer-events:auto}
+  /* **몸통이 아니라 단추만** 포인터를 받는다.
+     앞서는 `:has(.tip-actions)` 로 말풍선을 통째로 받게 해 두었다. 그러면 키보드로 물건
+     하나에 Tab 해 두는 것만으로 **그 말풍선이 덮은 자리의 물건이 눌러도 안 집힌다** —
+     말풍선이 사건을 삼키고 **콘솔 오류 한 줄 없이 아무 일도 안 일어난다.**
+     마우스만으로는 몇만 점을 눌러도 안 나오고, **키보드를 섞어야** 드러난다.
+     (germination 세션이 「반증해 보라」로 시켜 찾았다 — 「맞는지 확인해라」였으면 못 찾았다)
+     몸통이 포인터를 통과시키려면 `keyboardTipAlive()` 가 함께 있어야 한다. 없으면 마우스가
+     몸통 위를 지나는 순간 밑의 물건이 pointerenter 를 받아 hover 말풍선이 키보드 말풍선을
+     덮어쓰고, **「여기에 놓기」 단추가 사라져 키보드로 쓰는 사람이 그 단추에 닿을 수 없다.**
+     이 저장소에는 `bench.js` 에 그것이 있다. */
+     `.tip-actions` 통째가 아니라 **단추만** 받는다. 그 묶음의 여백·틈은 눌러도 아무 일이
+     없는 자리인데, 거기서도 사건을 삼키면 밑의 물건이 죽는다 (개수대가 그렇게 죽었다). */
+  .bench-tip [data-onto]{pointer-events:auto}
   .tip-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;
     border-top:1px solid var(--rule);padding-top:8px}
   .tip-actions-label{flex:0 0 100%;font-size:11.5px;color:var(--ink-mute)}

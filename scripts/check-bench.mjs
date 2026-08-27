@@ -1311,11 +1311,39 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
        edgeStray.slice(0, 3).join(' '));
 
     // **말풍선이 집힐 물건의 이름을 말하는가.**
+    //
+    // 재기 전에 **포커스를 떨군다.** 앞 단계가 물건에 포커스를 남겨 두면 「키보드로 연
+    // 말풍선」이 살아 있고, `keyboardTipAlive()` 가 hover 갱신을 **일부러 막는다** —
+    // 마우스가 그 위를 지나며 키보드 말풍선을 덮어쓰면 「여기에 놓기」 단추가 사라져
+    // 키보드로 쓰는 사람이 그 단추에 닿을 수 없기 때문이다.
+    // 그 상태에서 재면 「말풍선은 받침 유리, 집힌 것은 폐액통」이 나오는데,
+    // **앱이 옳게 동작한 것이고 검사가 틀린 것이다.** 여기서 재려는 것은 hover 말풍선이다.
+    await gp.evaluate(() => document.activeElement?.blur?.());
+    await gp.mouse.move(4, 4);
+    await gp.waitForTimeout(150);
     // 겹친 자리에서 집는 것만 고치면, 「받침 유리 통」 이라 적힌 것을 눌렀는데
     // **받침 유리가 끌린다.** 이름과 손이 다른 것을 가리키면 화면이 거짓말을 하는 것이다.
     // 고치기 전 320 px 에서 예순네 점 중 열여덟 점이 그랬다.
+    // **좌표를 다시 잰다.** 위 격자 루프가 물건을 하나씩 끌었다 놓았으므로 그 사이에
+    // 실험대가 달라졌을 수 있다. 묵은 좌표로 재면 「말풍선은 받침 유리, 집힌 것은 폐액통」
+    // 같은 값이 나오는데 — **앱이 옳고 검사가 옛 자리를 짚은 것**이다.
+    // (chromatography 세션이 매 점마다 물건을 끌면서 재다 같은 자리에 걸렸다)
+    const freshPts = await gp.evaluate(() => {
+      const out = [];
+      for (const e of document.querySelectorAll('[data-id]')) {
+        const svg = e.querySelector('svg');
+        if (!svg) continue;
+        const bb = svg.getBBox();
+        const vb = svg.viewBox.baseVal;
+        const r = e.getBoundingClientRect();
+        const sx = r.width / vb.width;
+        const sy = r.height / vb.height;
+        out.push({ id: e.dataset.id, x: r.x + (bb.x + bb.width / 2) * sx, y: r.y + (bb.y + bb.height / 2) * sy });
+      }
+      return out;
+    });
     const lied = [];
-    for (const pt of pts.filter((_, i) => i % 3 === 0)) {
+    for (const pt of freshPts) {
       await gp.mouse.move(pt.x, pt.y);
       await gp.waitForTimeout(30);
       const tip = await gp.evaluate(() =>
@@ -1411,6 +1439,98 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   ok(await ac.evaluate(() => document.querySelectorAll('#note-step-4 [disabled]').length) === 0,
      '4절 — 접힘을 잠금으로 쓰지 않는다 (disabled 0개)');
   await ac.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * **키보드 말풍선이 밑의 물건을 죽이지 않는가.**
+ *
+ * 포커스로 뜬 말풍선에는 「여기에 놓기」 단추가 붙는다. 그래서 이때만 포인터를 받아야 하는데,
+ * `:has(.tip-actions)` 로 **말풍선을 통째로** 받게 해 두면 —
+ * **키보드로 물건 하나에 Tab 해 두는 것만으로 그 말풍선이 덮은 자리의 물건이 안 집힌다.**
+ * 말풍선이 사건을 삼키고 **콘솔 오류 한 줄 없이 아무 일도 안 일어난다.**
+ *
+ * **마우스만으로는 몇만 점을 눌러도 안 나온다. 키보드를 섞어야 드러난다.**
+ * (germination 세션이 「반증해 보라」로 시켜 찾았다 — 「맞는지 확인해라」였으면 못 찾았다)
+ *
+ * 단추 자리는 그대로 둔다 — 눌리라고 있는 자리다. **몸통만** 본다.
+ *
+ * ── 정직하게: **이 검사는 이 저장소에서 그 버그를 못 잡는다** ──────
+ * CSS 를 `:has(.tip-actions){pointer-events:auto}` 로 되돌려도 **0점**이다.
+ * 재어 보니 말풍선이 그림점 위에 오더라도 `elementFromPoint` 는 여전히 **물건**을 돌려준다 —
+ * 이 저장소의 말풍선 자리와 물건 배치에서는 둘이 실제로 안 겹친다.
+ * germination 세션의 목록은 **CSS 글자**로 고른 것이지 재서 고른 것이 아니었고,
+ * 여기서 재 보니 해당이 없었다.
+ *
+ * 그러면 왜 두는가 — **배치를 옮기면 그때 생기는 버그**이기 때문이다. germination 은
+ * 숟가락에 Tab 해 둔 것만으로 챔버 그림 한가운데 24점이 통째로 죽었다.
+ * 이 검사는 「잡았다」가 아니라 **그 자리로 걸어 들어가는 것을 막는 울타리**다.
+ * ──────────────────────────────────────────────────────────────── */
+for (const w of [320, 768, 1400]) {
+  const tp = await browser.newPage({ viewport: { width: w, height: 900 } });
+  await tp.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(tp);
+  await tp.waitForTimeout(250);
+  // 키보드로 물건 하나에 포커스 → 말풍선에 놓기 단추가 붙는다
+  await tp.locator('[data-id="banana"]').focus();
+  await tp.waitForTimeout(250);
+  const puts = await tp.evaluate(() => document.querySelectorAll('#bench-tip [data-onto]').length);
+
+  const covered = await tp.evaluate(() => {
+    const rr = document.querySelector('#bench-tip').getBoundingClientRect();
+    const out = [];
+    for (const e of document.querySelectorAll('[data-id]')) {
+      const svg = e.querySelector('svg');
+      if (!svg) continue;
+      const bb = svg.getBBox();
+      const vb = svg.viewBox.baseVal;
+      const r = e.getBoundingClientRect();
+      const sx = r.width / vb.width;
+      const sy = r.height / vb.height;
+      const x0 = r.x + bb.x * sx;
+      const y0 = r.y + bb.y * sy;
+      const dw = bb.width * sx;
+      const dh = bb.height * sy;
+      for (let i = 1; i <= 3; i++) {
+        for (let j = 1; j <= 3; j++) {
+          const px = x0 + dw * i / 4;
+          const py = y0 + dh * j / 4;
+          if (px < rr.x || px > rr.x + rr.width || py < rr.y || py > rr.y + rr.height) continue;
+          if (document.elementFromPoint(px, py)?.closest('[data-onto]')) continue;  // 단추는 눌리는 게 맞다
+          out.push({ id: e.dataset.id, x: px, y: py });
+        }
+      }
+    }
+    return out;
+  });
+
+  // **「0점 중 0점」을 초록불로 내보내지 않는다.** 배치가 저마다 달라 어떤 폭에서는
+  // 말풍선이 덮는 그림점이 하나도 없다 — 그때 ✓ 를 내면 **아무것도 안 재고 통과**한 것이
+  // 「괜찮다」로 읽힌다. (germination 세션이 짚었다)
+  if (covered.length === 0) {
+    ok(true, `키보드 — ${w}px 에서는 말풍선이 덮는 그림점이 없다 (이 폭에서는 못 잼)`);
+  } else {
+    const dead = [];
+    for (const c of covered) {
+      await tp.mouse.move(c.x, c.y);
+      await tp.mouse.down();
+      const got = await tp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
+      await tp.mouse.move(4, 4, { steps: 2 });
+      await tp.mouse.up();
+      if (!got) dead.push(c.id);
+    }
+    ok(dead.length === 0,
+       `키보드 — ${w}px 말풍선 몸통이 밑의 물건을 죽이지 않는다`,
+       `덮인 그림점 ${covered.length}점 중 ${dead.length}점이 안 집힘: ${[...new Set(dead)].slice(0, 3).join(' ')}`);
+  }
+
+  // **반쪽 고침 방지** — 몸통을 통과시키면서 단추까지 죽이면 키보드 길이 사라진다.
+  await tp.locator('[data-id="banana"]').focus();
+  await tp.waitForTimeout(200);
+  await tp.keyboard.press('Tab');
+  await tp.waitForTimeout(150);
+  ok(await tp.evaluate(() => Boolean(document.activeElement?.dataset?.onto)),
+     `키보드 — ${w}px 놓을 곳 단추는 그대로 눌린다`, `단추 ${puts}개`);
+  await tp.close();
 }
 
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
