@@ -548,7 +548,14 @@ export const UI = {
      * 노트가 관찰 기록이 아니라 받아쓰기가 됐다. 이제 실제로 한 단계에는 표시가 붙고,
      * 다음에 적을 곳을 짚어 준다. 안 한 단계의 칸을 막지는 않는다 (AGENTS.md §2.1).
      */
-    stepLeadIn: '실험대에서 한 단계를 마치면 여기에 ✓ 가 붙습니다. **하고 나서** 무엇을 보았는지 적으세요.',
+    stepLeadIn: '실험대에서 한 단계를 마치면 ✓ 가 붙고 **다음 STEP 이 열립니다.** 접힌 STEP 도 눌러서 열 수 있습니다 — **하고 나서** 무엇을 보았는지 적으세요.',
+    /** 지금 할 차례인 STEP 에 붙는 표. 「여기부터」를 한눈에 알려 준다. */
+    stepNowBadge: '지금 할 차례',
+    /** 접힌 STEP 에 적어 둔다. 말하지 않으면 잠긴 것으로 읽힌다. */
+    stepPeekHint: '눌러서 미리 볼 수 있습니다',
+    stepReopenHint: '눌러서 다시 펼치고 고칠 수 있습니다',
+    stepProgress: (done, all) => `STEP ${all} 개 중 ${done} 개를 마쳤습니다.`,
+    stepAllDone: 'STEP 을 모두 마쳤습니다.',
     stepDoneMark: '했습니다',
     stepTodoMark: '아직',
     stepNotYet: '실험대에서 먼저 해 보세요.',

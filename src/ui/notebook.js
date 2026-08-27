@@ -305,27 +305,47 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   /* 4 탐구 과정 — STEP 1~6. 난이도별로 절차 제시만 달리한다 (docs/06 표). */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * 학생이 **손으로** 여닫은 STEP. 화면을 보는 방식이지 실험 기록이 아니라
+   * 상태(store)에 넣지 않는다 — 넣으면 되돌리기에 쌓이고 보고서로 흘러간다.
+   */
+  const manualOpen = new Map();
+
+  /**
+   * 탐구 과정 — **한 번에 한 STEP.**
+   *
+   * 여섯 STEP 을 한꺼번에 펼쳐 놓으면 학생이 그것을 「읽을 글」로 받는다. 주욱 읽고 내려간
+   * 다음 실험대로 가서 무엇부터 할지 몰라 멈춘다. 지금 할 것 하나만 펼치면
+   * 노트가 글이 아니라 **따라가는 길**이 된다.
+   *
+   * 「지금 STEP」은 `groupDone` 이 거짓인 **첫 STEP** 이다. **상태에서 나오므로 따로 저장하지
+   * 않는다** — 실험대에서 한 일이 그대로 노트를 넘긴다.
+   *
+   * **접힘은 잠금이 아니다** (AGENTS.md §2.1). `<details>` 라 앞으로 올 STEP 도 눌러서 열리고,
+   * 순서를 건너뛰어 실험한 학생은 거기에 적으면 된다. 눌리지 않게 죽이는 속성은 쓰지 않는다.
+   *
+   * 앞으로 올 STEP 을 **지우지 않는 것**도 같은 값이다 — 몇 칸짜리 여정인지 보여야
+   * 학생이 자기가 어디쯤인지 안다.
+   */
   function renderStage4(st) {
     const level = st.session.level;
-    const stepsHtml = UI.protocol.map((group) => {
+    const groupsDone = UI.protocol.map((g) => groupDone(st, g.id));
+    const nowIdx = groupsDone.findIndex((d) => !d);
+    const doneCount = groupsDone.filter(Boolean).length;
+    const stepsHtml = UI.protocol.map((group, gi) => {
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
         const val = st.session.notes[group.id] ?? '';
-        return `
-          <section class="note-step" data-step-group="${group.id}">
-            <h3>STEP ${group.id} · ${group.title}</h3>
-            <label class="notes-label" for="note-${group.id}">${N.goalOnlyLabel(group.title)}</label>
-            <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>
-          </section>`;
+        return stepShell(group, gi, groupsDone, `
+          <label class="notes-label" for="note-${group.id}">${N.goalOnlyLabel(group.title)}</label>
+          <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>`);
       }
-      // 짚어 줄 곳은 **했는데 아직 안 적은** 칸이다. 그런 칸이 없으면 아직 안 한 첫 칸이다.
       // 읽는 순서가 아니라 하는 순서를 따라간다 — 그게 이 쪽에서 하려는 일이다.
       const done = group.steps.map((_, i) => stepDone(st, group.id, i));
       const written = group.steps.map((_, i) => Boolean(st.session.notes[substepId(group, i)]));
       // 앞에서부터 **아직 끝나지 않은 첫 칸**을 짚는다. "했는데 안 적은 칸" 을 먼저 찾으면
       // 아직 손도 안 댄 첫 칸을 건너뛰고 뒤엣것을 짚는 일이 생긴다.
       const nextIdx = group.steps.findIndex((_, i) => !(done[i] && written[i]));
-
       const items = group.steps.map((step, i) => {
         const id = substepId(group, i);
         // 하이라이트는 1단계에서만. 2단계는 목록만 보여 준다 (docs/06 표).
@@ -345,16 +365,41 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
               placeholder="${escapeHtml(notePlaceholder(level, step))}">${escapeHtml(st.session.notes[id] ?? '')}</textarea>
           </li>`;
       }).join('');
-      return `
-        <section class="note-step" data-step-group="${group.id}" data-done="${groupDone(st, group.id)}">
-          <h3>STEP ${group.id} · ${group.title}
-            ${groupDone(st, group.id) ? '<span class="step-done-mark">✓</span>' : ''}</h3>
-          <ul class="substep-list">${items}</ul>
-          ${group.id === '4' ? questionA(st) : ''}
-        </section>`;
+      return stepShell(group, gi, groupsDone,
+        `<ul class="substep-list">${items}</ul>${group.id === '4' ? questionA(st) : ''}`);
     }).join('');
+    const tally = nowIdx === -1
+      ? `<p class="step-tally step-tally--done">${N.stepAllDone}</p>`
+      : `<p class="step-tally">${N.stepProgress(doneCount, UI.protocol.length)}</p>`;
     return `<p class="stage-text step-lead">${emph(N.stepLeadIn)}</p>
+      ${tally}
       <div id="note-step-4">${stepsHtml}</div>`;
+  }
+
+  /**
+   * STEP 하나를 감싸는 껍데기. 세 단계가 같은 모양이라 한 곳에서 만든다.
+   *
+   * **학생이 손으로 여닫은 것이 이긴다.** 없으면 지금 할 STEP 만 펼친다.
+   */
+  function stepShell(group, gi, groupsDone, body) {
+    const isDone = groupsDone[gi];
+    const isNow = gi === groupsDone.findIndex((d) => !d);
+    const state = isDone ? 'done' : (isNow ? 'now' : 'later');
+    const open = manualOpen.has(group.id) ? manualOpen.get(group.id) : isNow;
+    // 접힌 STEP 에도 「눌러서 열린다」 를 적는다. 말하지 않으면 잠긴 것으로 읽힌다.
+    const hint = isNow ? ''
+      : `<span class="step-open-hint">${isDone ? N.stepReopenHint : N.stepPeekHint}</span>`;
+    return `
+      <details class="note-step" data-step-group="${group.id}"
+        data-state="${state}" data-done="${isDone}"${open ? ' open' : ''}>
+        <summary class="step-summary">
+          <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
+          ${isDone ? '<span class="step-done-mark">✓</span>' : ''}
+          ${isNow ? `<span class="step-now-badge">${N.stepNowBadge}</span>` : ''}
+          ${hint}
+        </summary>
+        <div class="step-body">${body}</div>
+      </details>`;
   }
 
   /**
@@ -618,6 +663,23 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   /* ---------------------------------------------------------------- */
 
   function bindPanel() {
+    // **`toggle` 이 아니라 summary 의 `click` 을 듣는다.**
+    // `<details open>` 을 innerHTML 로 꽂으면 브라우저가 **삽입만으로도 `toggle` 을 한 번 쏜다** —
+    // 그러면 「지금 할 차례라서 펼쳐진 것」이 「학생이 손으로 연 것」으로 기록되고,
+    // 그 STEP 은 끝난 뒤에도 **영영 접히지 않는다.** micrometer 에서 직접 재현했다:
+    //     toggle        STEP1 완료 → 1:done**펼침**  2:now펼침
+    //     summary click STEP1 완료 → 1:done접힘     2:now펼침
+    // click 은 사람이 눌렀을 때만 온다(summary 는 포커스를 받으므로 Enter·Space 도 click 이다 —
+    // 키보드도 같이 산다).
+    //
+    // **「접어지는가」로 시험하면 두 방식이 다 통과한다** — 사람이 접으면 어느 쪽이든
+    // `open=false` 가 기록되기 때문이다. **「끝내면 저절로 접히는가」로 재야** 갈린다.
+    panelEl.querySelectorAll('details[data-step-group] > summary').forEach((el) => {
+      el.addEventListener('click', () => {
+        // 기본 동작이 아직 안 일어났으므로 `open` 은 누르기 **전**의 값이다.
+        manualOpen.set(el.parentElement.dataset.stepGroup, !el.parentElement.open);
+      });
+    });
     panelEl.querySelectorAll('[data-note]').forEach((el) => {
       el.addEventListener('change', () => {
         store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });

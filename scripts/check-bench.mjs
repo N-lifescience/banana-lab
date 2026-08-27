@@ -1367,6 +1367,52 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await sp.close();
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * 탐구 과정 — **한 번에 한 STEP.**
+ *
+ * **「접어지는가」로 시험하면 `toggle` 을 들어도 통과한다** — 사람이 접으면 어느 쪽이든
+ * `open=false` 가 기록되기 때문이다. **「끝내면 저절로 접히는가」로 재야** 갈린다.
+ * micrometer 에서 직접 재현한 갈림이다:
+ *     toggle        STEP1 완료 → 1:done**펼침**  2:now펼침   ← 영영 안 접힘
+ *     summary click STEP1 완료 → 1:done접힘     2:now펼침
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const ac = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await ac.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(ac);
+  await ac.evaluate(() => [...document.querySelectorAll('button')]
+    .filter((b) => /^4\.\s/.test(b.innerText.trim()))[0]?.click());
+  await ac.waitForTimeout(350);
+
+  const shape = () => ac.evaluate(() => [...document.querySelectorAll('details[data-step-group]')]
+    .map((d) => `${d.dataset.stepGroup}:${d.dataset.state}${d.open ? '펼침' : '접힘'}`).join(' '));
+  const openCount = () => ac.evaluate(() =>
+    document.querySelectorAll('details[data-step-group][open]').length);
+
+  ok(await openCount() === 1, '4절 — 지금 할 차례인 STEP 하나만 펼쳐져 있다', await shape());
+
+  // **끝내면 저절로 접히는가.** 이것이 toggle 함정의 눈에 보이는 얼굴이다.
+  await ac.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
+  await ac.waitForTimeout(400);
+  const after = await shape();
+  ok(/1:done접힘/.test(after) && /2:now펼침/.test(after),
+     '4절 — STEP 을 마치면 저절로 접히고 다음이 펼쳐진다', after);
+
+  // **접힘은 잠금이 아니다** — 앞으로 올 STEP 도 눌러서 열려야 한다.
+  await ac.locator('details[data-step-group="5"] > summary').click({ timeout: 3000 });
+  await ac.waitForTimeout(250);
+  ok(/5:later펼침/.test(await shape()), '4절 — 앞으로 올 STEP 도 눌러서 열린다', await shape());
+
+  // 손으로 연 것은 다시 그려도 그대로다.
+  await ac.evaluate(() => window.__store.dispatch('SMEAR', { slide: 'A', thickness: 0.3 }));
+  await ac.waitForTimeout(400);
+  ok(/5:later펼침/.test(await shape()), '4절 — 손으로 연 STEP 은 다시 그려도 열려 있다', await shape());
+
+  ok(await ac.evaluate(() => document.querySelectorAll('#note-step-4 [disabled]').length) === 0,
+     '4절 — 접힘을 잠금으로 쓰지 않는다 (disabled 0개)');
+  await ac.close();
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
