@@ -17,12 +17,30 @@ import { UI } from '../src/ui/strings.js';
 
 const UI_DIR = new URL('../src/ui/', import.meta.url);
 
-/** src/ui/ 안의 .js 파일을 전부 읽어 [이름, 내용] 으로 돌려준다 */
+/**
+ * **금지어를 훑을 때 주석을 걷어낸다.**
+ *
+ * 금지어 검사는 그 낱말을 **설명에도 쓰게 되므로** 구조적으로 자기 주석을 문다.
+ * 「이 저장소는 `disabled` 를 쓰지 않는다」 라고 적어 두면 그 줄이 「쓴다」로 읽힌다 —
+ * **규칙을 적어 두는 것이 규칙 위반이 되는 셈이다.**
+ *
+ * 그러면 사람은 규칙을 지우거나 검사를 지운다. 둘 다 나쁘다.
+ * (chromatography 세션이 자기 저장소에서 **네 번째로** 겪고 알려 주었다)
+ *
+ * 주석만 걷어내고 문자열은 남긴다 — 문자열에 든 `disabled` 는 진짜로 화면에 나간다.
+ */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+}
+
+/** src/ui/ 안의 .js 파일을 전부 읽어 [이름, 내용] 으로 돌려준다. **주석은 걷어낸다.** */
 function uiSources() {
   const dir = new URL('.', UI_DIR);
   return readdirSync(dir)
     .filter((f) => f.endsWith('.js'))
-    .map((f) => [f, readFileSync(new URL(f, UI_DIR), 'utf8')]);
+    .map((f) => [f, stripComments(readFileSync(new URL(f, UI_DIR), 'utf8'))]);
 }
 
 /* ---------------- 문자열 표가 상태를 전부 덮는가 ---------------- */
@@ -94,7 +112,9 @@ test('UI 는 버튼을 disabled 로 막지 않는다', () => {
       `src/ui/${name} 에 disabled 가 있습니다 — 막지 말고 결과로 답하세요 (AGENTS.md 2.1)`);
   }
   if (existsSync(new URL('../index.html', import.meta.url))) {
-    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    // HTML 주석도 같은 이유로 걷어낸다.
+    const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+      .replace(/<!--[\s\S]*?-->/g, '');
     assert.equal(/\bdisabled\b/.test(html), false, 'index.html 에 disabled 가 있습니다');
   }
 });
