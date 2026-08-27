@@ -46,12 +46,26 @@ test('보고서에 학생이 적은 것과 넣은 이름이 실린다', () => {
 });
 
 test('적지 않은 칸도 종이에 남는다 — 어디를 건너뛰었는지 보여야 한다', () => {
+  // **종이 전체에서 세면 못 잡는다.**
+  // 앞서는 `shown >= steps` 를 종이 전체에서 셌다. 그런데 예상·정리 절에도 빈칸이 있어서,
+  // 이 저장소에서는 빈칸이 전체 35개 · 탐구 과정 절 20개였다 —
+  // **탐구 과정 절에서 열다섯 칸이 사라져도 초록불**이었다. 다른 절이 수를 채워 준 것이다.
+  // (fermentation 세션이 자기 저장소에서 실제로 다섯 개를 놓친 뒤 알려 주었다)
+  //
+  // 절을 잘라서, **같은지**를 본다. 「몇 개 이상」이 아니라 「몇 개」다.
   const html = buildSheet(initialState(1), {});
   assert.ok(html.includes(UI.report.notWritten), '빈칸 표시가 없습니다');
-  // 세부 단계는 하나도 안 적었어도 전부 실린다
+
+  const from = html.indexOf(UI.report.sections.process);
+  assert.ok(from >= 0, '종이에서 탐구 과정 절을 못 찾았습니다');
+  const section = html.slice(from, html.indexOf('</section>', from));
+
   const steps = UI.protocol.reduce((n, g) => n + g.steps.length, 0);
-  const shown = (html.match(new RegExp(UI.report.notWritten, 'g')) ?? []).length;
-  assert.ok(shown >= steps, `세부 단계 ${steps}칸 중 ${shown}칸만 실렸습니다`);
+  const shown = (section.match(new RegExp(UI.report.notWritten, 'g')) ?? []).length;
+  assert.equal(shown, steps,
+    `탐구 과정 절의 빈칸 ${shown}개가 세부 단계 ${steps}칸과 다릅니다.\n`
+    + '  적을 칸을 준 적도 없는 자리에 「적지 않았습니다」가 붙으면\n'
+    + '  선생님 눈에는 학생이 건너뛴 것으로 읽힙니다. 반대로 모자라면 건너뛴 것이 안 보입니다.');
 });
 
 test('넣지 않은 개인정보 칸은 종이에 아예 나오지 않는다', () => {
