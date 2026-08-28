@@ -72,8 +72,16 @@ export function render(_state = {}) {
       앞에서 본 네모만 쌓으면 아무리 칠해도 평평하다. 물건이 **딛고 선 면**을 뒤로
       물러나게 그린다. 누운 면은 서 있는 면보다 **빛을 더 받으므로** 각 짝의 밝은 쪽을 쓴다.
     -->
-    <!-- 선반 유리판 (앞 모서리 y=65 → 뒤 y=53) -->
-    <polygon points="10,65 390,65 372,53 28,53" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <!--
+      선반 유리판 (앞 모서리 y=65 → 뒤 y=53).
+
+      **실험대 폭 전체(0~1500 mm)를 덮는다.** 처음에는 10~390(=37.5~1462.5 mm)으로
+      좁게 그렸는데, 물건 배치는 0~1500 기준이라 **양 끝 물건이 유리판 밖으로 삐져나갔다.**
+      난간과 브래킷이 생기기 전에는 눈에 안 띄던 것이 그때 드러났다 — 여덟 중 둘에서
+      양 끝이 17.5 mm 씩 나갔고, 하나는 왼쪽으로 9.4 mm 나갔다.
+      물건을 옮기는 대신 **유리판을 실험대에 맞췄다.** 배치는 실험마다 다르고, 선반은 하나다.
+    -->
+    <polygon points="0,65 400,65 380,53 20,53" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <!-- 작업면 상판 (앞 모서리 y=155 → 뒤 y=134) -->
     <polygon points="0,155 400,155 380,134 20,134" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
@@ -88,8 +96,8 @@ export function render(_state = {}) {
       선반의 **서 있는 면** — 유리판의 두께이자 앞 난간이다. 참고 이미지의 그 난간이
       물건이 굴러 떨어지지 않게 한다. 누운 면보다 한 단 어둡다.
     -->
-    <polygon points="10,65 390,65 390,77 10,77" fill="${PALETTE.glass[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
-    <line x1="10" y1="72" x2="390" y2="72" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <polygon points="0,65 400,65 400,77 0,77" fill="${PALETTE.glass[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <line x1="0" y1="72" x2="400" y2="72" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
     <!--
       **벽 브래킷 셋.** 참고 이미지에서 선반을 받치는 것이 이것이다.
@@ -100,7 +108,7 @@ export function render(_state = {}) {
       **그늘을 먼저, 브래킷을 나중에.** 뒤에 그린 것이 위에 온다 — 순서를 바꾸면
       그늘 띠가 브래킷을 덮어 버리고, 받치는 것이 안 보인 채 선반만 떠 있다.
     -->
-    <rect x="30" y="77" width="340" height="6" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
+    <rect x="20" y="77" width="360" height="6" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
     <polygon points="58,77 78,77 58,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
     <polygon points="190,77 210,77 190,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
     <polygon points="322,77 342,77 322,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>

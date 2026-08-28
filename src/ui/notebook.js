@@ -748,7 +748,19 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     panelEl.querySelectorAll('details[data-step-group] > summary').forEach((el) => {
       el.addEventListener('click', () => {
         // 기본 동작이 아직 안 일어났으므로 `open` 은 누르기 **전**의 값이다.
-        manualOpen.set(el.parentElement.dataset.stepGroup, !el.parentElement.open);
+        const id = el.parentElement.dataset.stepGroup;
+        const willOpen = !el.parentElement.open;
+        manualOpen.set(id, willOpen);
+
+        /*
+         * **여기서 담아야 한다.** 누를 때는 다시 그리지 않는다(`<details>` 가 알아서 열린다).
+         * 그리는 쪽에만 두면 이렇게 새어 나간다 —
+         *   손으로 STEP 4 를 펼침 → 아직 안 담김 → 학생이 기록을 지움 → 다시 그림 →
+         *   잠금을 **먼저** 판정하고 잠겼으면 일찍 돌아가므로 **영영 못 담는다** →
+         *   **눈앞에서 펼쳐져 있던 STEP 이 사라진다.**
+         * 이 규칙이 막으려던 바로 그 모양이다. (웨이브 2 의 catalase 세션이 잡았다)
+         */
+        if (willOpen) everOpened.add(id);
       });
     });
     panelEl.querySelectorAll('[data-note]').forEach((el) => {

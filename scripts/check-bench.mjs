@@ -1579,29 +1579,68 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   }
   ok(await lockedCount() === 0, '   (앞 조건) 지금 STEP 을 다 적으면 잠금이 풀린다', `${await lockedCount()}개`);
 
+  /*
+   * ①-b **잠기기 전에 맨 뒤 STEP 을 손으로 펼쳐 둔다.**
+   *
+   * ★ 여기서 「지금 안 열린 것 아무거나」 를 집으면 **아무것도 증명하지 못한다.** 그 시점에
+   * 접혀 있는 것은 이미 끝난 STEP 1 뿐이고, 그건 애초에 잠길 수 없는 자리다(지금보다 앞).
+   * 「STEP 1 → done」 을 받고 초록불이 나는데 실제로는 맨 뒤가 도로 잠겨 있었다.
+   * (웨이브 1 의 micrometer 세션이 이 헛초록불을 잡았다)
+   *
+   * **확실히 「앞으로 올 STEP」 인 맨 뒤**를 연다. 지금은 아무것도 안 잠겨 있어 열린다.
+   */
+  const back = await lk.evaluate(() => {
+    const all = [...document.querySelectorAll('details[data-step-group]')];
+    return all[all.length - 1]?.dataset.stepGroup ?? null;
+  });
+  ok(back !== null, '   (앞 조건) 맨 뒤 STEP 을 손으로 펼칠 수 있다', `STEP ${back}`);
+  if (back) {
+    await lk.locator(`details[data-step-group="${back}"] > summary`).click({ timeout: 3000 });
+    await lk.waitForTimeout(250);
+  }
+
   // ② 이제 조작을 마치면 다음 STEP 이 「지금」 이 되고, 그 기록은 비어 있다.
   //    **아직 펼쳐 본 적 없는 뒤엣것은 다시 잠겨야 한다.**
   await lk.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
   await lk.waitForTimeout(400);
+
+  /*
+   * ★ **「지금 STEP 이 실제로 넘어갔는가」 를 먼저 본다.**
+   *
+   * 안 넘어갔으면 잠글 근거 자체가 없어서, **자물쇠가 죽었는지 멀쩡한지 구별이 안 된다** —
+   * 그 상태의 빨간불을 보고 앱을 의심하게 된다. 조작 하나를 빠뜨려 STEP 이 안 끝나는 일은
+   * 실험마다 다른 자리에서 난다. (웨이브 2 의 osmosis 세션이 그 자리에서 한 번 헛짚었다)
+   */
+  const moved = await lk.evaluate(() => {
+    const el = document.querySelector('[data-step-group="1"]');
+    return { state: el?.dataset.state, done: el?.dataset.done };
+  });
+  ok(moved.done === 'true' && moved.state !== 'now',
+     '   (앞 조건) 조작으로 STEP 1 이 실제로 끝났다', JSON.stringify(moved));
+
   ok(await lockedCount() > 0,
      '자물쇠 — 기록만 먼저 채워도 자물쇠가 죽지 않는다',
      `조작 뒤 잠긴 STEP ${await lockedCount()}개 (0이면 통째로 죽은 것)`);
 
-  // ③ **반대 방향.** 손으로 펼쳐 본 STEP 은 그 뒤에도 안 잠겨야 한다 —
-  //    그러지 않으면 열려 있던 것이 사라져 학생 눈에 고장이다.
-  const target = await lk.evaluate(() =>
-    document.querySelector('details[data-step-group]:not([open])')?.dataset.stepGroup ?? null);
-  if (target) {
-    await lk.locator(`details[data-step-group="${target}"] > summary`).click({ timeout: 3000 });
-    await lk.waitForTimeout(250);
-    await lk.evaluate(() => window.__store.dispatch('SMEAR', { slide: 'A', thickness: 0.3 }));
-    await lk.waitForTimeout(400);
-    const still = await lk.evaluate((g) =>
-      document.querySelector(`[data-step-group="${g}"]`)?.dataset.state, target);
-    ok(still !== 'locked', '자물쇠 — 손으로 열어 본 STEP 은 다시 잠기지 않는다',
-       `STEP ${target} → ${still}`);
-  } else {
-    ok(false, '자물쇠 — 손으로 열어 볼 STEP 을 못 찾았습니다');
+  /*
+   * ③ **반대 방향 — 그리고 이쪽이 더 잘 샌다.**
+   *
+   * 누를 때는 다시 그리지 않으므로(`<details>` 가 알아서 열린다), 그리는 쪽에서만
+   * 「열어 봤다」 를 담으면 그 STEP 은 담기지 못한 채 다음 렌더에서 잠긴다 —
+   * **눈앞에서 펼쳐져 있던 것이 사라진다.** 잠긴 갈래가 먼저 `return` 하니 영영 못 담는다.
+   * 그래서 **누르는 자리에서도** 담아야 한다.
+   * (catalase 와 micrometer 두 세션이 각각 잡았다)
+   */
+  if (back) {
+    const after = await lk.evaluate((g) => ({
+      mine: document.querySelector(`[data-step-group="${g}"]`)?.dataset.state,
+      locked: document.querySelectorAll('[data-step-group][data-state="locked"]').length,
+    }), back);
+    ok(after.mine !== 'locked',
+       '자물쇠 — 손으로 펼쳐 둔 맨 뒤 STEP 은 그 뒤에도 안 잠긴다',
+       `STEP ${back} → ${after.mine}`);
+    ok(after.locked > 0,
+       '   (앞 조건) 그때 펴 본 적 없는 STEP 은 실제로 다시 잠긴다', `${after.locked}개`);
   }
   await lk.close();
 }
