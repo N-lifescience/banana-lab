@@ -21,7 +21,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { initialState } from '../src/sim/state.js';
 import { payloadOf } from '../src/ui/report.js';
 
@@ -72,6 +72,35 @@ test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', (
     && !['student_no', 'student_name', 'submitted_at'].includes(k));
   assert.deepEqual(notSent, [],
     `보내지도 않는 것을 방침이 받는다고 적고 있습니다: ${notSent.join(', ')}`);
+});
+
+test('환경변수를 통째로 읽지 않는다 — 실명과 커밋 메시지가 번들에 실린다', () => {
+  /*
+   * `const env = import.meta.env` 처럼 **통째로** 읽으면 Vite 가 `VITE_` 로 시작하는 것을
+   * **전부** 번들에 박아 넣는다. Vercel 은 시스템 값 스물몇 개를 `VITE_VERCEL_*` 로 자동
+   * 노출하므로, 그 순간 **커밋한 사람의 실명과 커밋 메시지가 학생 브라우저로 나간다.**
+   * 배포본에서 실제로 확인했다 (약 3 KB):
+   *
+   *     VITE_VERCEL_GIT_COMMIT_AUTHOR_NAME · GIT_COMMIT_MESSAGE · PROJECT_ID · …
+   *
+   * 비밀값은 아니지만 **아무도 그러라고 하지 않은 것**이고, 이 저장소는 사람 이름을 안 싣는다.
+   * 이름을 하나씩 적어 읽으면 Vite 는 그 키만 바꿔 넣는다.
+   *
+   * `import.meta.env.DEV` 처럼 **점을 찍어 한 개씩** 읽는 것은 괜찮다 — 그 하나만 박힌다.
+   * (웨이브 1 의 micrometer 세션이 배포 번들을 열어 보고 찾았다)
+   */
+  const files = readdirSync(new URL('../src', import.meta.url), { recursive: true })
+    .filter((f) => String(f).endsWith('.js'));
+  for (const f of files) {
+    const src = readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    // 뒤에 `.이름` 이 안 붙은 `import.meta.env` — 통째로 집어 가는 모양이다.
+    const bare = src.match(/import\.meta\.env(?!\s*\.\s*[A-Za-z_$])/g) ?? [];
+    assert.deepEqual(bare, [],
+      `src/${f} 가 import.meta.env 를 통째로 읽습니다 — VITE_VERCEL_* 스물몇 개가 번들에 박히고`
+      + ' 커밋한 사람의 실명과 커밋 메시지가 학생 브라우저로 나갑니다.'
+      + ' 쓰는 키를 하나씩 이름으로 적어 읽으세요.');
+  }
 });
 
 test('되돌리기 기록은 보내지 않는다', () => {

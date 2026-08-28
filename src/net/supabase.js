@@ -17,11 +17,35 @@
  * 서비스 롤 키는 절대 여기 넣지 않는다 — 그 키는 RLS 를 통째로 건너뛴다.
  */
 
-// 순수 node(테스트)에서는 import.meta.env 가 없다. 모듈을 불러 보는 것만으로 터지면 안 된다.
-const env = (typeof import.meta === 'undefined' ? null : import.meta.env) ?? {};
+/*
+ * ── 두 값만 **이름을 적어** 읽는다. `import.meta.env` 를 통째로 읽지 않는다 ──────
+ *
+ * `const env = import.meta.env` 처럼 통째로 읽으면 Vite 가 **VITE_ 로 시작하는 환경변수를
+ * 전부** 번들에 박아 넣는다. Vercel 은 시스템 값 스물몇 개를 `VITE_VERCEL_*` 로 자동
+ * 노출하므로, 그 순간 **커밋한 사람의 실명과 커밋 메시지가 학생 브라우저로 그대로 나간다.**
+ * 실제로 그랬다 — 배포본에서 확인했다:
+ *
+ *     VITE_VERCEL_GIT_COMMIT_AUTHOR_NAME: `조성주`
+ *     VITE_VERCEL_GIT_COMMIT_MESSAGE:     `안내서의 낡은 줄 — …`
+ *     VITE_VERCEL_PROJECT_ID · DEPLOYMENT_ID · 팀 슬러그 …        (약 3 KB)
+ *
+ * 비밀값은 아니지만 **아무도 그러라고 하지 않은 것**이고, 이 저장소는 사람 이름을 안 싣는다
+ * (`Projects/CLAUDE.md`). 이름을 하나씩 적어 읽으면 Vite 는 **그 두 개만** 바꿔 넣는다.
+ *
+ * 순수 node(테스트)에서는 `import.meta.env` 자체가 없어서 읽는 순간 터진다.
+ * 그래서 감싼다 — 모듈을 불러 보는 것만으로 죽으면 안 된다.
+ * (웨이브 1 의 micrometer 세션이 배포 번들을 열어 보고 찾았다)
+ */
+const { url: RAW_URL, key: RAW_KEY } = (() => {
+  try {
+    return { url: import.meta.env.VITE_SUPABASE_URL, key: import.meta.env.VITE_SUPABASE_ANON_KEY };
+  } catch {
+    return { url: undefined, key: undefined };
+  }
+})();
 
-export const SUPABASE_URL = String(env.VITE_SUPABASE_URL ?? '').replace(/\/+$/, '');
-export const SUPABASE_ANON_KEY = String(env.VITE_SUPABASE_ANON_KEY ?? '');
+export const SUPABASE_URL = String(RAW_URL ?? '').replace(/\/+$/, '');
+export const SUPABASE_ANON_KEY = String(RAW_KEY ?? '');
 
 /** 제출 기능을 켤 수 있는 상태인가. */
 export const enabled = () => Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
