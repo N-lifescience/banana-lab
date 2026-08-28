@@ -360,10 +360,23 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
  */
 {
   const doc = readFileSync('PLAYTEST.md', 'utf8');
+  /*
+   * ★ **「N줄 이상 읽었다」는 앞 조건이 아니다. 「표에 있는 만큼 읽었다」가 앞 조건이다.**
+   *
+   * 0줄만 막으면 그 사이가 열려 있다 — **한 줄만 모양이 바뀌면 남은 줄만 맞대 보고
+   * 초록불**이 난다. 사라진 그 한 줄이 하필 낡은 줄일 수 있다.
+   * 그래서 표의 몸통 줄을 **세어서** 읽은 수와 같은지 본다.
+   * (웨이브 3 의 germination 세션이 자기 검사에서 `>= 4` 를 이렇게 바꾸고 알려 주었다)
+   */
+  const body = doc.split('\n');
+  const head = body.findIndex((l) => /^\|\s*화면\s*\|/.test(l));
+  let inTable = 0;
+  for (let i = head + 2; i >= 2 && i < body.length && body[i].startsWith('|'); i += 1) inTable += 1;
   const rows = [...doc.matchAll(/^\|\s*(\d+)\s*×\s*(\d+)\s*\|.*?\*\*(\d+)\s*%\*\*.*?노트\s*(\d+)\s*%/gm)]
     .map((m) => ({ key: `${m[1]}×${m[2]}`, bar: Number(m[3]), note: Number(m[4]) }));
-  record(rows.length > 0, '   (앞 조건) PLAYTEST 의 덮임 표를 읽었다',
-    `${rows.length}줄 — 0줄이면 표 모양이 바뀐 것입니다`);
+  record(head >= 0 && inTable > 0 && rows.length === inTable,
+    '   (앞 조건) PLAYTEST 의 덮임 표를 **빠짐없이** 읽었다',
+    `표에 ${inTable}줄 / 읽은 것 ${rows.length}줄 — 다르면 그 줄의 모양이 바뀐 것입니다`);
   const checked = rows.filter((r) => measured.has(r.key));
   record(checked.length > 0, '   (앞 조건) 그 줄들을 실제로 잰 화면이 있다',
     `맞댄 ${checked.length}줄 / 잰 화면 ${[...measured.keys()].join(' ')}`);
