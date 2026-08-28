@@ -1023,7 +1023,9 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await nm.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
   await unlock(nm);
   const names = await nm.evaluate(() => [...document.querySelectorAll('.token-name')]
-    .map((n) => ({ text: n.textContent.trim(), r: n.getBoundingClientRect().toJSON() })));
+    .map((n) => ({ text: n.textContent.trim(), r: n.getBoundingClientRect().toJSON() }))
+    .filter((n) => n.r.width > 0 && n.r.height > 0));
+  // 여기도 **보이는 것만** 센다 — display:none 은 개수를 안 줄인다(위 overlap 머리말 참조).
   ok(names.length === ITEM_COUNT, `실험대 물건 ${ITEM_COUNT}개에 모두 이름표가 붙는다`, `${names.length}개`);
   ok(names.every((n) => n.text.length > 0), '빈 이름표가 없다');
   // 3단계에서도 이름은 보인다 — 난이도가 줄이는 것은 설명이지 물건이 무엇인지가 아니다.
@@ -1848,7 +1850,16 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
    * (웨이브 3 의 centrifuge 세션이 자기 저장소에서 같은 구멍을 찾았다)
    */
   const overlap = () => rz.evaluate(() => {
-    const ns = [...document.querySelectorAll('.token-name')].map((e) => e.getBoundingClientRect());
+    /*
+     * ★ **보이는 것만 센다.** `querySelectorAll` 은 `display:none` 인 것도 찾아 준다 —
+     * 그래서 좁을 때 이름표를 숨겨도 **개수가 안 줄고**, 0×0 짜리는 **절대 안 겹치므로**
+     * 두 줄이 나란히 통과한다. 그러면 이 검사가 보장하는 것은
+     * 「학생 눈에 보인다」가 아니라 **「선택자가 안 어긋났다」**뿐이다.
+     * (웨이브 3 의 centrifuge 세션이 좁을 때만 숨기는 CSS 를 넣어 보고 잡았다)
+     */
+    const ns = [...document.querySelectorAll('.token-name')]
+      .map((e) => e.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0);
     let n = 0;
     for (let i = 0; i < ns.length; i += 1) for (let j = i + 1; j < ns.length; j += 1) {
       const a = ns[i]; const z = ns[j];
