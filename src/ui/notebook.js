@@ -368,6 +368,34 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   }
 
   /**
+   * 잠긴 STEP 의 **말**을 지금 적은 것에 맞춘다.
+   *
+   * 다 적어 놓았는데 「앞 STEP 을 먼저 적으세요」 라고 하면 **거짓말**이다. 학생은 방금
+   * 적은 것이 안 세어진 줄 안다. 글은 손이 칸을 떠나야 저장되므로, 떠나기 전까지
+   * 그 거짓말이 화면에 남는다.
+   *
+   * 잠긴 STEP 은 `<div>` 라 열어 줄 수는 없다 — 여는 것은 **누르는 순간** 일어난다
+   * (`pointerdown` 에서 저장하고, 그 덕에 풀렸으면 펼친다). 여기서는 **말만** 바꾼다.
+   * 열 수 있다는 것을 알려 주는 것으로 충분하고, 판을 갈지 않으니 치던 칸이 안 사라진다.
+   * (웨이브 2 의 chromatography 세션이 잠금 안내도 같이 갈아야 한다고 짚었다)
+   */
+  function patchStepHints() {
+    const st = store.getState();
+    const typed = {};
+    panelEl.querySelectorAll('[data-note]').forEach((el) => { typed[el.dataset.note] = el.value; });
+    const merged = { ...st, session: { ...st.session, notes: { ...st.session.notes, ...typed } } };
+    const nowGroup = panelEl.querySelector('details[data-step-group][data-state="now"]');
+    const next = nowGroup?.nextElementSibling;
+    if (!next?.classList.contains('note-step--locked')) return;
+    const idx = UI.protocol.findIndex((g) => g.id === nowGroup.dataset.stepGroup);
+    const ready = idx >= 0 && stepNotesWritten(merged, UI.protocol[idx]);
+    const hint = next.querySelector('.step-open-hint');
+    const why = next.querySelector('.step-locked-why');
+    if (hint) hint.textContent = ready ? N.stepReadyHint : N.stepLockedHint;
+    if (why) why.textContent = ready ? N.stepReadyWhy : N.stepLockedWhy(nowGroup.dataset.stepGroup);
+  }
+
+  /**
    * 탐구 과정 — **한 번에 한 STEP.**
    *
    * 여섯 STEP 을 한꺼번에 펼쳐 놓으면 학생이 그것을 「읽을 글」로 받는다. 주욱 읽고 내려간
@@ -805,7 +833,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         setTimeout(() => { if (pendingRender && !pressing) { pendingRender = false; render(); } }, 0);
       });
       // 치는 동안에는 판을 갈지 않는다(치던 칸이 사라진다). 관문만 제자리에서 고친다.
-      el.addEventListener('input', patchGate);
+      el.addEventListener('input', () => { patchGate(); patchStepHints(); });
     });
     // 선택형 예상 — 고른 보기를 **글로** 저장한다. 6단계에서 실제 결과와 나란히 읽히려면
     // 코드가 아니라 문장이어야 한다.

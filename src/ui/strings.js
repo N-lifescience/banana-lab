@@ -573,6 +573,12 @@ export const UI = {
      */
     stepLockedWhy: (id) => `STEP ${id} 의 관찰 기록을 적어야 여기가 열립니다.`,
     stepLockedHint: '앞 STEP 을 먼저 적으세요',
+    /*
+     * 다 적었는데 아직 안 눌러 본 자리. 글은 손이 칸을 떠나야 저장되므로 그때까지
+     * 잠금 표시가 그대로 남는다 — 그 사이에 「먼저 적으세요」 라고 하면 **거짓말**이다.
+     */
+    stepReadyHint: '눌러서 여세요',
+    stepReadyWhy: '관찰 기록을 다 적었습니다. 눌러서 여세요.',
     stepProgress: (done, all) => `STEP ${all} 개 중 ${done} 개를 마쳤습니다.`,
     stepAllDone: 'STEP 을 모두 마쳤습니다.',
     stepDoneMark: '했습니다',

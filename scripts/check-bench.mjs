@@ -2038,11 +2038,42 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       await three.keyboard.type('색이 변한다');
     }
     const after = await gateOf();   // 마지막 칸에 **손을 둔 채로** 본다
+    /*
+     * ★ **전제부터 확인한다** — 손이 정말 칸에 있는가.
+     *
+     * 손이 이미 칸을 떠났다면 저장이 먼저 일어난 것이고, 그러면 관문이 풀려 있는 것이
+     * 당연하다. 그 통과는 아무 뜻이 없다. 「눌러 보니 넘어가더라」로는 원리상 못 잡는
+     * 것과 같은 이유다. (웨이브 2 의 chromatography 세션이 짚었다)
+     */
+    ok(await three.evaluate(() => document.activeElement?.matches?.('[data-note]')) === true,
+       '   (앞 조건) 손이 아직 글칸에 있다 — 떠났으면 아래 통과는 뜻이 없다',
+       String(await three.evaluate(() => document.activeElement?.dataset?.note ?? document.activeElement?.tagName)));
     ok(after.off === false,
        '노트 — 다 적자마자 관문이 풀린다 (칸을 떠날 때까지 기다리게 하지 않는다)',
        JSON.stringify(after));
     ok(!/고르고|먼저/.test(after.why),
        '노트 — 다 적은 뒤에는 「먼저 고르라」 는 말이 사라진다', `"${after.why}"`);
+    /*
+     * ★ **반대 방향** — 한 칸을 도로 비우면 다시 잠겨야 한다.
+     *
+     * 「풀린다」 만 재면 **늘 풀려 있는 코드**도 통과한다. 관문을 없애 놓고 초록불을
+     * 받는 것이 오늘만 세 번째다. (웨이브 1 의 micrometer 세션이 짚었다)
+     */
+    const firstCell = three.locator('#note-panel textarea[data-note]').first();
+    await firstCell.click();
+    // 맥에서 `Control+a` 는 **전체 선택이 아니라 「줄 앞으로」** 다 — 칸이 안 지워지고,
+    // 그러면 「비웠는데 안 잠긴다」 는 빨간불이 뜬다. 앱이 아니라 검사가 틀린 것이다.
+    await three.keyboard.press('ControlOrMeta+a');
+    await three.keyboard.press('Backspace');
+    await three.waitForTimeout(250);
+    const emptied = await gateOf();
+    ok(await firstCell.inputValue() === '', '   (앞 조건) 그 칸이 실제로 비었다',
+       JSON.stringify(await firstCell.inputValue()));
+    ok(await three.evaluate(() => document.activeElement?.matches?.('[data-note]')) === true,
+       '   (앞 조건) 비운 뒤에도 손이 글칸에 있다');
+    ok(emptied.off === true,
+       '노트 — **한 칸을 도로 비우면 다시 잠긴다** (관문이 늘 열려 있는 것이 아니다)',
+       JSON.stringify(emptied));
     await three.close();
   }
 
@@ -2089,9 +2120,52 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
        `${opened.tag} · 열림 ${opened.open}`);
     const notes = await two.evaluate(() => window.__store.getState().session.notes);
     const wrote = Object.entries(notes).filter(([k, v]) => /^1[a-z]$/.test(k) && String(v).trim()).length;
+
     ok(wrote === cells, 'STEP — 그 누름에 **그때 적은 관찰 기록도 함께 저장된다**',
        `${wrote}/${cells}칸`);
     await two.close();
+  }
+
+  {
+    /*
+     * ★ **잠긴 STEP 의 말이 지금 적은 것과 맞는가.**
+     *
+     * 다 적어 놓았는데 「앞 STEP 을 먼저 적으세요」 라고 하면 **거짓말**이다 — 학생은
+     * 방금 적은 것이 안 세어진 줄 안다. 글은 손이 칸을 떠나야 저장되므로, 떠나기 전까지
+     * 그 거짓말이 화면에 남는다. 여기서도 **손을 칸에 둔 채로** 본다.
+     * (웨이브 2 의 chromatography 세션이 잠금 안내도 같이 갈아야 한다고 짚었다)
+     */
+    const hint = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await hint.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await hint.evaluate(() => { for (const st of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: st }); });
+    await hint.locator('.note-tab[data-stage="4"]').click();
+    await hint.waitForTimeout(350);
+    const nowSel2 = 'details[data-step-group][data-state="now"]';
+    const cells2 = await hint.locator(`${nowSel2} textarea[data-note]`).count();
+    const peek = () => hint.evaluate(() => {
+      const nx = document.querySelector('details[data-step-group][data-state="now"]')?.nextElementSibling;
+      return {
+        onField: Boolean(document.activeElement?.matches?.('[data-note]')),
+        hint: nx?.querySelector('.step-open-hint')?.textContent?.trim() ?? '',
+        why: nx?.querySelector('.step-locked-why')?.textContent?.trim() ?? '',
+      };
+    });
+    await hint.locator(`${nowSel2} textarea[data-note]`).first().click();
+    await hint.keyboard.type('색이 변했다');
+    const partial = await peek();
+    ok(partial.onField, '   (앞 조건) 손이 아직 글칸에 있다', JSON.stringify(partial));
+    ok(cells2 < 2 || /먼저 적/.test(partial.hint),
+       'STEP — 아직 덜 적었을 때는 「먼저 적으세요」 라고 한다', `"${partial.hint}"`);
+    for (let i = 1; i < cells2; i += 1) {
+      await hint.locator(`${nowSel2} textarea[data-note]`).nth(i).click();
+      await hint.keyboard.type('색이 변했다');
+    }
+    const full = await peek();
+    ok(full.onField, '   (앞 조건) 다 적은 뒤에도 손이 글칸에 있다', JSON.stringify(full));
+    ok(!/먼저 적/.test(full.hint) && !/먼저 적/.test(full.why),
+       'STEP — **다 적은 뒤에는 「먼저 적으세요」 라고 하지 않는다** (거짓말을 안 한다)',
+       `"${full.hint}" · "${full.why}"`);
+    await hint.close();
   }
 
   {
