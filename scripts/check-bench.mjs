@@ -1520,6 +1520,89 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 }
 
 /* ────────────────────────────────────────────────────────────────
+ * 탐구 노트가 **학생을 다음 쪽으로 데려가는가.**
+ *
+ * 「이 쪽을 읽었습니다」 를 누르면 그 자리에 ✓ 만 남고 아무 일도 안 일어났다. 학생은 자기가
+ * 무엇을 더 해야 하는지 모른 채 그 쪽에 서 있었다 — 탭을 직접 찾아 눌러야 다음이었다.
+ *
+ * 그리고 예상 쪽에서는 **예상을 세우기 전에 넘어가지 못한다.** 막는 것 자체보다
+ * **말 없이 막는 것**이 나쁘므로, 왜 못 누르는지가 화면에 있는지도 함께 잰다.
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const nb = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await nb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  const activeTab = () => nb.evaluate(() =>
+    document.querySelector('.note-tab[aria-selected="true"]')?.dataset.stage ?? '(없음)');
+
+  ok(await activeTab() === '1', '   (앞 조건) 탐구 노트는 1 쪽에서 시작한다', await activeTab());
+  await nb.locator('#mark-read').click();
+  await nb.waitForTimeout(250);
+  ok(await activeTab() === '2', '노트 — 「읽었습니다」 를 누르면 다음 쪽으로 데려간다', await activeTab());
+
+  // 1 쪽에 ✓ 가 제대로 붙었는가. **넘길 쪽과 표시할 쪽을 헷갈리면 2 쪽에 ✓ 가 붙는다** —
+  // 화면은 멀쩡해 보이고, 학생은 안 읽은 쪽이 읽은 것으로 되어 있는 것을 모른다.
+  const marks = await nb.evaluate(() => [...document.querySelectorAll('.note-tab')]
+    .map((t) => `${t.dataset.stage}:${t.dataset.read}`).join(' '));
+  ok(/1:true/.test(marks) && /2:false/.test(marks),
+     '노트 — ✓ 는 넘어간 쪽이 아니라 **읽은 쪽**에 붙는다', marks);
+
+  await nb.locator('.note-tab[data-stage="3"]').click();
+  await nb.waitForTimeout(250);
+  const gate = () => nb.evaluate(() => {
+    const b = document.querySelector('#mark-read');
+    return { off: b?.disabled ?? null,
+             why: b?.closest('.read-mark')?.querySelector('p')?.innerText.trim() ?? '' };
+  });
+  {
+    const g = await gate();
+    ok(g.off === true, '노트 — 예상을 안 세우면 「읽었습니다」 가 안 눌린다', JSON.stringify(g));
+    ok(/예상/.test(g.why), '노트 — 왜 안 눌리는지 화면에 말한다', g.why || '(아무 말도 없음)');
+  }
+
+  // **반대 방향도 잰다.** 「늘 안 눌리는 단추」 도 위 검사만으로는 통과한다.
+  for (const id of ['A', 'B', 'C']) {
+    await nb.evaluate((k) => window.__store.dispatch('SAVE_NOTE', { step: `predict.${k}`, text: '색이 변한다' }), id);
+    await nb.waitForTimeout(120);
+  }
+  ok((await gate()).off === false, '노트 — 예상을 세우면 눌린다', JSON.stringify(await gate()));
+  await nb.locator('#mark-read').click();
+  await nb.waitForTimeout(250);
+  ok(await activeTab() === '4', '노트 — 예상 쪽에서도 다음 쪽으로 데려간다', await activeTab());
+  await nb.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * 자기 평가의 **안전 규칙 준수가 거짓말을 하지 않는가.**
+ *
+ * 이 칸은 `session.violations` 만 보고 그렸다. 그런데 그 목록은 **보고서를 열 때**에만
+ * 채워진다 — 자기 평가 쪽은 보고서를 열기 **전에** 보는 곳이다. 그래서 손 한 번 안 씻고
+ * 들어가도 세 줄 모두 「지켰습니다 ✓」 가 떴다. 사장님이 그대로 보셨다:
+ * **"나 안 지켰는데도 그냥 체크가 되어 있네."**
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const sv = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await sv.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(sv);
+  await sv.locator('.note-tab[data-stage="7"]').click();
+  await sv.waitForTimeout(250);
+  const hands = () => sv.evaluate(() => {
+    const li = document.querySelector('#violations .value-item');
+    return { state: li?.dataset.state ?? '(없음)', text: li?.innerText.replace(/\s+/g, ' ').trim() ?? '' };
+  });
+  {
+    const h = await hands();
+    ok(h.state !== 'kept', '자기 평가 — 안 씻은 손을 씻었다고 하지 않는다', JSON.stringify(h));
+    ok(!/지켰습니다/.test(h.text), '자기 평가 — 「지켰습니다」 가 뜨지 않는다', h.text);
+  }
+
+  // **반대 방향.** 실제로 씻으면 지켰다고 해야 한다 — 안 그러면 늘 「아직」 인 칸일 뿐이다.
+  await sv.evaluate(() => window.__store.dispatch('WASH_HANDS', {}));
+  await sv.waitForTimeout(250);
+  ok((await hands()).state === 'kept', '자기 평가 — 씻고 나면 지켰다고 한다', JSON.stringify(await hands()));
+  await sv.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
  * **키보드 말풍선이 밑의 물건을 죽이지 않는가.**
  *
  * 포커스로 뜬 말풍선에는 「여기에 놓기」 단추가 붙는다. 그래서 이때만 포인터를 받아야 하는데,
