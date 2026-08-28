@@ -132,7 +132,18 @@ function bindEditShortcut() {
     e.preventDefault();
     const url = new URL(location.href);
     if (url.searchParams.get('edit') === '1') url.searchParams.delete('edit');
-    else url.searchParams.set('edit', '1');
+    else {
+      url.searchParams.set('edit', '1');
+      /*
+       * **단계를 아직 안 고른 첫 화면에서도 열린다.**
+       *
+       * 실험대는 단계가 정해져야 만들어진다. 그래서 시작 화면에서 Ctrl+P 를 누르면
+       * 주소에 `edit=1` 만 붙고 **아무 일도 안 일어났다** — 배치를 옮기려던 사람 눈에는
+       * 단축키가 죽은 것이다. 단계가 없으면 1단계로 열어 준다.
+       * (배치는 단계와 무관하다 — 어느 단계로 열어도 같은 자리를 적는다)
+       */
+      if (!url.searchParams.get('level')) url.searchParams.set('level', '1');
+    }
     location.href = url.toString();
   });
 }
@@ -165,7 +176,6 @@ function boot(level, mode = MODES.GROUP) {
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
   const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
-  bindEditShortcut();
   createNotebook($('#notebook'), store, {
     onOpenZoom: openZoom,
     // 보고서를 여는 것이 곧 "실험을 마친다" 는 뜻이다. 그때 정리를 했는지 한 번 본다
@@ -196,6 +206,14 @@ function startClock() {
     if (reacting) store.dispatch('TICK', {});
   }, 1000);
 }
+
+/*
+ * 단축키는 **실험을 시작하기 전부터** 듣는다.
+ *
+ * 앞서는 `boot()` 안에서 달았다. 그러면 단계를 고르기 전 첫 화면에서는 아예 안 달려 있어서
+ * Ctrl+P 가 **아무 일도 안 했다** — 배치를 옮기려던 사람 눈에는 단축키가 죽은 것이다.
+ */
+bindEditShortcut();
 
 const fromUrl = levelFromUrl();
 const modeUrl = modeFromUrl();

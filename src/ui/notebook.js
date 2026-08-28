@@ -798,7 +798,11 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     });
     panelEl.querySelectorAll('[data-note]').forEach((el) => {
       el.addEventListener('change', () => {
+        savingNote = true;
         store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });
+        savingNote = false;
+        // 포커스가 다음 칸에 자리잡은 **뒤에** 그린다. 지금 그리면 그 칸이 사라진다.
+        setTimeout(() => { if (pendingRender && !pressing) { pendingRender = false; render(); } }, 0);
       });
       // 치는 동안에는 판을 갈지 않는다(치던 칸이 사라진다). 관문만 제자리에서 고친다.
       el.addEventListener('input', patchGate);
@@ -913,6 +917,20 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
    */
   let pressing = false;
   let pendingRender = false;
+  /**
+   * **저장이 부른 다시 그리기인가.**
+   *
+   * 칸에서 칸으로 **키보드(Tab)로** 옮기면 손가락이 화면을 누르지 않는다 — `pressing` 은
+   * 거짓이다. 그리고 `change` 는 **포커스가 아직 `body` 인 동안** 온다. 그래서
+   * 「지금 글칸에 손이 있는가(`typing`)」 도 거짓이다. 두 관문이 다 열린 채 판이 갈리고,
+   * **막 포커스를 받으려던 다음 칸이 통째로 사라진다.** 그 뒤의 글자는 새로 그려진 판의
+   * 첫 칸으로 떨어진다 — 화면 `["예상2예상0","",""]`. 실제로 그랬다.
+   *
+   * 관문을 「누가 눌렀나」 가 아니라 **「내가 방금 저장시켰나」** 로 옮긴다. 칸이 스스로
+   * 말하므로 마우스든 Tab 이든 같은 길을 탄다.
+   * (웨이브 3 의 centrifuge 세션이 `change → activeElement=BODY` 로 짚었다)
+   */
+  let savingNote = false;
   root.addEventListener('pointerdown', (e) => {
     pressing = true;
     /*
@@ -942,7 +960,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   // 글칸에서 손이 떠나면 미뤄 둔 것을 따라잡는다. 다음 칸으로 옮기는 중이면
   // 그 칸이 포커스를 받은 뒤라 `typing` 이 다시 참이 되어 또 미뤄진다 — 그게 맞다.
   root.addEventListener('focusout', () => {
-    setTimeout(() => { if (pendingRender && !pressing) { pendingRender = false; render(); } }, 0);
+    setTimeout(() => { if (pendingRender && !pressing && !savingNote) { pendingRender = false; render(); } }, 0);
   });
   window.addEventListener('pointerup', () => {
     setTimeout(() => {
@@ -967,7 +985,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
      */
     const typing = panelEl.contains(document.activeElement)
       && document.activeElement.matches?.('[data-note]');
-    if (pressing || typing) { pendingRender = true; return; }
+    if (pressing || typing || savingNote) { pendingRender = true; return; }
     const st = store.getState();
     tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
       tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));

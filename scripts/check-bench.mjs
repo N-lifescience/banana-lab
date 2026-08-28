@@ -834,6 +834,28 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const ed = await browser.newPage({ viewport: { width: 1200, height: 1000 } });
   await ed.goto(`${BASE}/?level=1&edit=1`, { waitUntil: 'networkidle' });
   ok(await ed.locator('#edit-panel').count() === 1, '?edit=1 로 배치 편집 모드가 열린다');
+  {
+    /*
+     * ★ **단계를 안 고른 첫 화면에서도 Ctrl+P 가 열어야 한다.**
+     *
+     * 실험대는 단계가 정해져야 만들어진다. 그래서 시작 화면에서 누르면 주소에 `edit=1`
+     * 만 붙고 **아무 일도 안 일어났다** — 배치를 옮기려던 사람 눈에는 단축키가 죽은 것이다.
+     */
+    const first = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await first.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await first.waitForTimeout(300);
+    ok(await first.locator('#edit-panel').count() === 0, '   (앞 조건) 시작 화면에는 편집 판이 없다');
+    await first.keyboard.press('Control+p');
+    await first.waitForTimeout(900);
+    ok(await first.locator('#edit-panel').count() === 1,
+       '편집 — **단계를 고르기 전 첫 화면에서도** Ctrl+P 로 열린다',
+       first.url().replace(BASE, ''));
+    await first.keyboard.press('Control+p');
+    await first.waitForTimeout(900);
+    ok(await first.locator('#edit-panel').count() === 0,
+       '편집 — 한 번 더 누르면 닫힌다', first.url().replace(BASE, ''));
+    await first.close();
+  }
 
   const eBox = async (sel) => ed.locator(sel).boundingBox();
   const eCenter = (b) => [b.x + b.width / 2, b.y + b.height / 2];
@@ -2070,6 +2092,73 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     ok(wrote === cells, 'STEP — 그 누름에 **그때 적은 관찰 기록도 함께 저장된다**',
        `${wrote}/${cells}칸`);
     await two.close();
+  }
+
+  {
+    /*
+     * ★ **반대 방향** — 아무것도 안 적고 잠긴 STEP 을 눌러도 안 열려야 한다.
+     *
+     * 위 고침은 「누르는 순간 저장하고, 그 덕에 풀렸으면 펼친다」 이다. 「풀렸으면」 을 빠뜨리고
+     * 무조건 펼치게 두면 **자물쇠가 통째로 무력해진다** — 그런데 「한 번에 열린다」 만 재면
+     * **자물쇠를 없애 놓고도 초록불**이다.
+     * (웨이브 3 의 fermentation 세션이 자기 저장소에서 이 뒷문을 잡았다)
+     */
+    const back = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await back.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await back.evaluate(() => { for (const st of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: st }); });
+    await back.locator('.note-tab[data-stage="4"]').click();
+    await back.waitForTimeout(350);
+    const states = () => back.evaluate(() =>
+      [...document.querySelectorAll('[data-step-group]')].map((e) => `${e.dataset.stepGroup}:${e.dataset.state}`).join(' '));
+    const beforeAll = await states();
+    ok(/locked/.test(beforeAll), '   (앞 조건) 아무것도 안 적었을 때 잠긴 STEP 이 있다', beforeAll);
+    for (const id of ['2', '3', '4', '5', '6']) {
+      const sel = `[data-step-group="${id}"]`;
+      if (await back.locator(sel).count()) await back.locator(sel).click({ force: true });
+    }
+    await back.waitForTimeout(600);
+    const afterAll = await states();
+    ok(afterAll === beforeAll,
+       'STEP — **안 적고 누르면 안 열린다** (자물쇠가 뒷문으로 무력해지지 않았다)', afterAll);
+    ok(await back.locator('details[data-step-group][open]').count() === 1,
+       'STEP — 그렇게 눌러도 열린 것은 지금 STEP 하나뿐이다',
+       `${await back.locator('details[data-step-group][open]').count()}개`);
+    await back.close();
+  }
+
+  {
+    /*
+     * ★ **키보드(Tab)로만 칸을 옮겨도 글이 제 칸에 남는가.**
+     *
+     * 마우스로 옮길 때는 `pointerdown` 이 먼저 와서 다시 그리기를 막아 준다. Tab 에는
+     * 그 누름이 없다. 게다가 `change` 는 **포커스가 아직 `body` 인 동안** 오므로
+     * 「지금 글칸에 손이 있는가」 도 거짓이다 — 두 관문이 다 열린 채 판이 갈리고,
+     * **막 포커스를 받으려던 다음 칸이 통째로 사라진다.** 그 뒤의 글자는 새로 그려진 판의
+     * 첫 칸으로 떨어진다. 실제로 그랬다: 화면 ["예상2예상0","",""].
+     * (웨이브 3 의 centrifuge 세션이 change → activeElement=BODY 로 짚었다)
+     */
+    const kb = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await kb.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+    await kb.locator('.note-tab[data-stage="3"]').click();
+    await kb.waitForTimeout(300);
+    const kbKeys = await kb.evaluate(() =>
+      [...document.querySelectorAll('#note-panel textarea[data-note]')].map((t) => t.dataset.note));
+    ok(kbKeys.length >= 2, '   (앞 조건) Tab 으로 옮겨 볼 칸이 둘 이상이다', `${kbKeys.length}칸`);
+    await kb.locator('#note-panel textarea[data-note]').first().focus();
+    for (let i = 0; i < kbKeys.length; i += 1) {
+      await kb.keyboard.type(`예상${i}`);
+      if (i < kbKeys.length - 1) { await kb.keyboard.press('Tab'); await kb.waitForTimeout(120); }
+    }
+    await kb.waitForTimeout(250);
+    const kbShown = await kb.evaluate(() =>
+      [...document.querySelectorAll('#note-panel textarea[data-note]')].map((t) => t.value));
+    ok(kbShown.every((v, i) => v === `예상${i}`),
+       '노트 — **Tab 으로만 옮겨도** 글자가 제 칸에 들어간다',
+       kbShown.map((v) => `"${v}"`).join(' '));
+    ok(await kb.evaluate(() => document.activeElement?.dataset?.note) === kbKeys[kbKeys.length - 1],
+       '노트 — Tab 으로 옮긴 뒤에도 손이 그 칸에 남아 있다',
+       String(await kb.evaluate(() => document.activeElement?.dataset?.note ?? document.activeElement?.tagName)));
+    await kb.close();
   }
 
   await nb.locator('.note-tab[data-stage="3"]').click();
