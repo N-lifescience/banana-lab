@@ -132,17 +132,24 @@ if (!slot) {
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 /*
- * ★ **`.catch(() => true)` 로 삼키면 「없다」와 「닫혔다」가 같아진다.**
+ * ★ **`.catch` 의 기본값이 통과 쪽이면 「없다」와 「닫혔다」가 같아진다.**
  *
- * `#zoom` 이 아예 없어도(화면이 안 그려졌어도) `true` 가 되어 「닫힌다」가 통과한다.
- * 그 자리가 살아 있는지를 먼저 찍는다.
- * (웨이브 3 의 fermentation 세션이 자기 저장소에서 `goto` 를 삼킨 자리를 찾았다)
+ * `catch(() => true)` 였다. `#zoom` 이 아예 없어도(화면이 안 그려졌어도) `true` 가 되어
+ * 「닫힌다」가 통과한다. **앞 조건으로 받치는 것보다 기본값을 바꾸는 쪽이 낫다** —
+ * 위험을 지키는 것이 아니라 없앤다.
+ *
+ *     .catch(() => '')  뒤에 `.includes(…)`   → 안전 (빈 값은 못 통과)
+ *     .catch(() => null) 뒤에 `!== null`       → 안전
+ *     .catch(() => true) 뒤에 그 값을 그대로   → **위험**
+ *
+ * **「기본값이 통과 쪽이냐」 하나로 갈린다.** `grep "\.catch(() =>"` 로 훑어
+ * **truthy 인 것만** 손보면 된다.
+ * (웨이브 3 의 fermentation 이 잡고, 웨이브 2 의 osmosis 가 이 한 줄로 갈랐다)
  */
-const zoomExists = await page.locator('#zoom').count();
-record(zoomExists === 1, '   (앞 조건) 확대 뷰 자리가 화면에 있다', `${zoomExists}개`);
-const closed = await page.$eval('#zoom', (el) => el.hidden).catch(() => true);
+const closed = await page.$eval('#zoom', (el) => el.hidden).catch(() => null);
 const focusBack = await page.evaluate(() => document.activeElement?.dataset?.id ?? null);
-record(closed, 'Esc 로 확대 뷰가 닫힌다');
+record(closed === true, 'Esc 로 확대 뷰가 닫힌다',
+  closed === null ? '★ #zoom 이 화면에 없다' : `hidden=${closed}`);
 record(focusBack === 'microscope', '닫으면 포커스가 열었던 곳으로 돌아온다',
   `activeElement data-id = ${focusBack}`);
 
