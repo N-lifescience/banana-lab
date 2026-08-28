@@ -22,3 +22,7 @@ shot-tmp.mjs
 # 보안 점검 결과물. 설정(dorms-check.config.json)은 커밋하고 리포트는 남기지 않는다 —
 # 매번 다시 재는 값이라 커밋해 두면 언제 잰 것인지 헷갈린다.
 .dorms-check/
+
+# 사장님이 제미나이로 만든 실험대 참고 이미지 (5 MB).
+# 기계가 만든 것이고 코드가 안 읽는다 — SSD 에만 둔다 (Projects/CLAUDE.md).
+"Lab ref.png"

@@ -78,19 +78,43 @@ test('실험대 배경의 랜드마크가 제자리에 있다', () => {
     `작업면 앞 모서리가 y=${surfaceFrontY} 에 있어야 합니다 — 작업면 위 물건이 뜹니다`);
 });
 
-test('실험대 배경에 금속 부속이 남아 있지 않다', () => {
+test('걷어낸 부속이 되살아나지 않았다 — 콘센트 · 기둥 · 밸브 · 서랍', () => {
   /*
-   * 콘센트 두 개 · 선반 지지 기둥 · 「연필처럼 생긴」 가스 밸브 노즐 · 서랍 손잡이 —
-   * 전부 지웠다. 넷 다 **금속 색**을 쓰던 것들이라, 하나라도 되살아나면 여기서 걸린다.
+   * ── 이 검사가 한 번 헛발질했다 ────────────────────────────────
+   * 처음에는 「금속색을 안 쓴다」 로 적었다. 넷이 다 금속색이었으니 그때는 맞았다.
+   * 그런데 참고 이미지대로 **상판을 밝은 회색(metal)** 으로, **선반 브래킷을 금속**으로
+   * 다시 그리자 이 검사가 물었다 — **지킬 것은 색이 아니라 그 물건들이었는데** 색을 재고
+   * 있었다. 검사가 맞는 일을 막아서면 사람이 검사를 끄고, 그러면 진짜도 같이 못 잡는다.
    *
-   * 이 검사가 없으면 「지웠습니다」 는 스크린샷 한 장으로만 남는다. 다음 사람이 배경을
-   * 손보다 하나를 도로 그려 넣어도 초록불이다.
+   * 그래서 **그 넷이 있던 자리와 모양**을 잰다.
    */
   const svg = ASSETS.bench.render({});
-  for (const hex of PALETTE.metal) {
-    assert.equal(svg.includes(hex), false,
-      `실험대 배경에 금속 부속(${hex})이 있습니다 — 콘센트·기둥·밸브·서랍 손잡이는 지웠습니다`);
-  }
+
+  // ① 콘센트 구멍은 이 배경에서 원을 쓰던 **유일한** 것이었다.
+  assert.equal(/<circle/.test(svg), false,
+    '실험대 배경에 원이 있습니다 — 콘센트 구멍이 되살아났습니다');
+
+  // ② 콘센트·가스 밸브·서비스 채널이 있던 벽 띠. 지금은 **비어 있어야** 한다.
+  //    선반 브래킷은 y=90 에서 끝나고, 작업면 상판은 y=134 에서 시작한다.
+  const shapes = [
+    ...[...svg.matchAll(/<(?:rect|polygon|line)\b[^>]*>/g)].map((m) => m[0]),
+  ].filter((tag) => {
+    const ys = [...tag.matchAll(/(?:\by|\by1|\by2)="(-?[\d.]+)"/g)].map((m) => Number(m[1]));
+    for (const [, list] of tag.matchAll(/points="([^"]+)"/g)) {
+      const n = list.trim().split(/[\s,]+/).map(Number);
+      for (let k = 1; k < n.length; k += 2) ys.push(n[k]);
+    }
+    const h = Number(tag.match(/(?<![-\w])height="([\d.]+)"/)?.[1] ?? 0);
+    if (ys.length === 0) return false;
+    return Math.min(...ys) >= 92 && Math.max(...ys) + h <= 132;
+  });
+  assert.deepEqual(shapes, [],
+    '뒷벽 한가운데에 도형이 있습니다 — 콘센트·가스 밸브·서비스 채널을 걷어낸 자리입니다');
+
+  // ③ 서랍 손잡이는 둥근 모서리의 납작한 막대였다. 캐비닛 안에 그런 것이 없어야 한다.
+  const surface = svg.slice(svg.indexOf('<g id="surface"'), svg.indexOf('</g>', svg.indexOf('<g id="surface"')));
+  assert.equal(/rx="1\.5"/.test(surface), false,
+    '캐비닛에 서랍 손잡이가 되살아났습니다');
 });
 
 /** 색의 밝기. 「누운 면이 더 밝은가」 를 재려면 이름이 아니라 값으로 봐야 한다. */
