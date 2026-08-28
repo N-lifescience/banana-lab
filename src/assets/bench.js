@@ -82,12 +82,14 @@ export function render(_state = {}) {
       물건을 옮기는 대신 **유리판을 실험대에 맞췄다.** 배치는 실험마다 다르고, 선반은 하나다.
     -->
     <polygon points="0,65 400,65 380,53 20,53" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
-    <!-- 작업면 상판 (앞 모서리 y=155 → 뒤 y=134) -->
-    <polygon points="0,155 400,155 380,134 20,134" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <!-- 아래 선반 유리판 (앞 모서리 y=116 → 뒤 y=105) -->
+    <polygon points="0,116 400,116 380,105 20,105" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <!-- 작업면 상판 (앞 모서리 y=172 → 뒤 y=151) -->
+    <polygon points="0,172 400,172 380,151 20,151" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!-- 6. 바닥 — 벽과 만나는 모서리. 실험대 옆으로 이 선이 보여야 「방」 이 된다 -->
-    <rect x="0" y="246" width="400" height="54" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
-    <line x1="0" y1="246" x2="400" y2="246" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="252" width="400" height="48" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
+    <line x1="0" y1="252" x2="400" y2="252" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
   </g>
 
   <!-- 시약 선반 (물건이 서는 선 y=65 고정) -->
@@ -112,34 +114,48 @@ export function render(_state = {}) {
     <polygon points="58,77 78,77 58,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
     <polygon points="190,77 210,77 190,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
     <polygon points="322,77 342,77 322,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+
+    <!--
+      **아래 선반** — 위 선반과 같은 모양이다(누운 유리판은 #room 에, 여기는 난간·그늘·브래킷).
+
+      선반이 하나뿐일 때는 병이 한 줄에 몰려, 폰 폭에서 물건이 10 px 로 줄자 **잡는 자리가
+      서로 포개져 옆 것이 집혔다** — 학생의 실험 조건이 바뀐 채로 시행이 기록된다.
+      줄을 갈라 놓으면 그 겹침이 크게 준다. (catalase 가 어느 폭에서나 14쌍이라고 재 왔다)
+    -->
+    <polygon points="0,116 400,116 400,128 0,128" fill="${PALETTE.glass[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <line x1="0" y1="123" x2="400" y2="123" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <rect x="20" y="128" width="360" height="6" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
+    <polygon points="58,128 78,128 58,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="190,128 210,128 190,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="322,128 342,128 322,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
   </g>
 
-  <!-- 실험대 몸체 (물건이 서는 선 y=155 고정) -->
+  <!-- 실험대 몸체 (물건이 서는 선 y=172 고정) -->
   <g id="surface">
     <!--
       1. 상판의 **서 있는 면** — 두께다. 누운 면(#room)보다 한 단 어둡다.
       이 한 단 차이가 「상판이 앞으로 떨어진다」 를 만든다.
     -->
-    <rect x="0" y="155" width="400" height="17" fill="${PALETTE.metal[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="172" width="400" height="17" fill="${PALETTE.metal[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!--
       2. 캐비닛 문. **상판보다 좁다** — 상판이 좌우로 걸쳐 나오고 그 옆으로 벽이 보인다.
       앞에서 본 네모를 아무리 칠해도 안 나오는 것이 이것이다.
       세로 이음선은 문과 문 사이다. 손잡이는 없다 — 서랍은 걷어냈다.
     -->
-    <rect x="32" y="172" width="336" height="78" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
-    <line x1="116" y1="183" x2="116" y2="250" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <line x1="200" y1="183" x2="200" y2="250" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <line x1="284" y1="183" x2="284" y2="250" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <rect x="32" y="189" width="336" height="66" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <line x1="116" y1="200" x2="116" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <line x1="200" y1="200" x2="200" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <line x1="284" y1="200" x2="284" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
     <!--
       3. 걸레받이 — 참고 이미지에서 가장 진한 덩어리다. 캐비닛보다 **더 안으로** 들어가 있고
       바닥에 닿는다. 바닥에 닿는 자리가 어두워야 실험대가 놓인 것으로 보인다. 떠 보이지 않는다.
     -->
-    <rect x="48" y="250" width="304" height="22" fill="${PALETTE.bodyDark[1]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <rect x="48" y="255" width="304" height="20" fill="${PALETTE.bodyDark[1]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
 
     <!-- 바닥에 지는 그림자 — 이것이 없으면 실험대가 바닥에 놓인 게 아니라 떠 있다 -->
-    <rect x="38" y="272" width="324" height="7" fill="${PALETTE.bodyDark[0]}" ${PATH_ATTRS}/>
+    <rect x="38" y="275" width="324" height="7" fill="${PALETTE.bodyDark[0]}" ${PATH_ATTRS}/>
   </g>
 
   <!--
@@ -148,7 +164,7 @@ export function render(_state = {}) {
     상판이 앞으로 튀어나와 있으니 그 밑은 그늘진다. 캐비닛 폭에 맞춰 얹는다 —
     상판 두께면과 이어져 하나의 어두운 덩어리로 읽히고, 그 아래가 물러난다.
   -->
-  <rect id="surface-shade" x="32" y="172" width="336" height="10" fill="${PALETTE.metal[1]}"/>
+  <rect id="surface-shade" x="32" y="189" width="336" height="10" fill="${PALETTE.metal[1]}"/>
 </svg>`;
 }
 

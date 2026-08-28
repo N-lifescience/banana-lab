@@ -156,7 +156,8 @@ export const UI = {
     copy: '코드 복사',
     copied: '복사했습니다',
     reset: '원래대로',
-    shelf: '선반',
+    shelf: '위 선반',
+    shelf2: '아래 선반',
     surface: '작업면',
     overlap: '겹침',
     overlapWarn: (n) => `${n}개가 서로 겹칩니다. 겹치면 뒤엣것이 앞엣것의 클릭을 가로챕니다. `

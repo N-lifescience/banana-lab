@@ -1538,15 +1538,33 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   ok(near !== 'locked', '4절 — 지금 STEP 을 다 적으면 **그 다음 하나**가 열린다', `STEP 3 → ${near}`);
   ok(far === 'locked', '4절 — 그 너머는 잠긴 채다 (통째로 열리지 않는다)', `STEP 5 → ${far}`);
 
-  // **접힘은 잠금이 아니다** — 자물쇠가 풀린 다음에는 앞으로 올 STEP 도 눌러서 열려야 한다.
-  await ac.locator('details[data-step-group="5"] > summary').click({ timeout: 3000 });
-  await ac.waitForTimeout(250);
-  ok(/5:later펼침/.test(await shape()), '4절 — 앞으로 올 STEP 도 눌러서 열린다', await shape());
+  /*
+   * **접힘은 잠금이 아니다** — 잠기지 않은 「앞으로 올 STEP」 은 눌러서 열려야 한다.
+   *
+   * ★ 여기서 STEP 5 를 **번호로 박아** 두었다가 자물쇠가 한 칸씩으로 바뀌면서
+   * **정당하게 잠긴 것을 누르려다 3초를 기다리고 죽었다.** 그리고 죽은 자리가 스크립트 끝이라
+   * 「기계가 눌려서 그렇다」로 읽었다 — **환경 탓이 가장 편한 결론이라 가장 의심해야 한다.**
+   * (centrifuge 세션이 같은 날 같은 착각을 하고 스스로 정정했다)
+   *
+   * 번호를 박지 않고 **지금 잠기지 않은 것 중 접힌 것**을 고른다.
+   */
+  const foldable = await ac.evaluate(() => {
+    const d = [...document.querySelectorAll('details[data-step-group]:not([open])')];
+    return d[d.length - 1]?.dataset.stepGroup ?? null;
+  });
+  ok(foldable !== null, '   (앞 조건) 잠기지 않은 접힌 STEP 이 있다', `STEP ${foldable}`);
+  if (foldable) {
+    await ac.locator(`details[data-step-group="${foldable}"] > summary`).click({ timeout: 3000 });
+    await ac.waitForTimeout(250);
+    const open1 = new RegExp(`${foldable}:\\w+펼침`).test(await shape());
+    ok(open1, '4절 — 잠기지 않은 STEP 은 눌러서 열린다', await shape());
 
-  // 손으로 연 것은 다시 그려도 그대로다.
-  await ac.evaluate(() => window.__store.dispatch('SMEAR', { slide: 'A', thickness: 0.3 }));
-  await ac.waitForTimeout(400);
-  ok(/5:later펼침/.test(await shape()), '4절 — 손으로 연 STEP 은 다시 그려도 열려 있다', await shape());
+    // 손으로 연 것은 다시 그려도 그대로다.
+    await ac.evaluate(() => window.__store.dispatch('SMEAR', { slide: 'A', thickness: 0.3 }));
+    await ac.waitForTimeout(400);
+    ok(new RegExp(`${foldable}:\\w+펼침`).test(await shape()),
+       '4절 — 손으로 연 STEP 은 다시 그려도 열려 있다', await shape());
+  }
 
   ok(await ac.evaluate(() => document.querySelectorAll('#note-step-4 [disabled]').length) === 0,
      '4절 — 잠글 때도 disabled 를 쓰지 않는다 (열리는 척하다 안 열리는 것이 가장 나쁘다)');

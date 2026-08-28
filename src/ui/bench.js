@@ -56,6 +56,7 @@ const heightMm = (assetName) => CONTRACT[assetName].realSizeMm * aspect(assetNam
  */
 const LANDMARKS = CONTRACT.bench.landmarks;
 const SHELF_MM = (LANDMARKS.shelfTopY / 300) * STAGE_H_MM;      // 선반 상판 윗면
+const SHELF2_MM = (LANDMARKS.shelf2TopY / 300) * STAGE_H_MM;     // 아래 선반 상판 윗면
 const SURFACE_MM = (LANDMARKS.surfaceFrontY / 300) * STAGE_H_MM; // 작업면 앞 모서리
 
 const DRAG_THRESHOLD_PX = 6;
@@ -89,10 +90,23 @@ function clamp(v, a, b) {
  */
 function defaultItems() {
   const shelf = (x, rest) => ({ x, bottom: SHELF_MM, ...rest });
+  const shelf2 = (x, rest) => ({ x, bottom: SHELF2_MM, ...rest });
   const surface = (x, rest) => ({ x, bottom: SURFACE_MM, ...rest });
   const I = UI.bench.items;
   return [
-    // 상단 선반
+    /*
+     * **선반이 둘이다.** 하나에 몰아 두면 폰 폭에서 잡는 자리(44 px)가 서로 포개져
+     * **겨눈 것 옆이 집힌다** — 학생의 실험 조건이 바뀐 채로 기록된다.
+     * 위 선반에는 **시료·받침 유리·통**, 아래 선반에는 **시약병 셋**을 둔다.
+     *
+     * ★ **겹침 0 을 좇지 않는다.** 320 px 에서 잡는 자리(44 px)는 실험대의 223 mm 에 해당해서,
+     * 물건 예닐곱이면 1500 mm 가 찬다 — 열여섯을 두면 겹칠 수밖에 없다. 그래서 **겹쳐도
+     * 겨눈 것이 집히게** 하는 `aimedAt()` 이 있다(그림까지의 거리로 고른다). 선반을 가르는 것은
+     * 눈으로 덜 붐비게 하려는 것이지 그 숫자를 0 으로 만들려는 것이 아니다.
+     *
+     * 자리는 `?edit=1`(또는 Ctrl+P)로 사장님이 언제든 바꾸신다. 여기 값은 **첫 자리**일 뿐이다.
+     */
+    // 위 선반 — 시료와 받침 유리
     // 받침 유리 사이를 120 mm 씩 벌려 둔다. 바나나가 180 mm 라 90 mm 간격에서는
     // 끄는 동안 바나나 그림이 이웃한 유리 두 장을 함께 덮어, 어디에 발리는지 보이지 않았다.
     // 왼쪽에서 오른쪽으로 (가)·(나)·(다) 순이다. 앞서는 (다)·(나)·(가) 순이었는데,
@@ -113,9 +127,9 @@ function defaultItems() {
     surface(1380, { id: 'forceps', asset: 'forceps', kind: 'forceps', labelKey: 'forceps' }),
     // 물도 시약병에 담겨 있다. 교과서 절차에서 시료 위에 먼저 떨어뜨리는 봉입액이고,
     // 이것이 없으면 (가) 대조군에 아무것도 할 일이 없어 대조군인 이유가 흐려진다.
-    shelf(1221, { id: 'bottleWATER', asset: 'bottle', kind: 'bottle', reagent: 'WATER', labelKey: 'bottleWATER' }),
-    shelf(1298, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
-    shelf(1375, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
+    shelf2(1221, { id: 'bottleWATER', asset: 'bottle', kind: 'bottle', reagent: 'WATER', labelKey: 'bottleWATER' }),
+    shelf2(1298, { id: 'bottleIKI', asset: 'bottle', kind: 'bottle', reagent: 'IKI', labelKey: 'bottleIKI' }),
+    shelf2(1375, { id: 'bottleSUDAN', asset: 'bottle', kind: 'bottle', reagent: 'SUDAN3', labelKey: 'bottleSUDAN' }),
     // 작업면. 씻는 곳(개수대)과 버리는 곳(쓰레기통·폐액통)을 나눠 둔다 —
     // 실험 접시 하나가 둘을 겸하고 있었는데, 그림도 이름도 그 일과 맞지 않았다.
     // 접시는 실험대에서 뺐다. 두 물건이 그 일을 나눠 가진 뒤로는 놓아 둘 자리라는 뜻밖에
@@ -251,7 +265,8 @@ export const BENCH_KINDS = [
  */
 function layoutCode(items) {
   const lines = items.map((it) => {
-    const fn = Math.abs(it.bottom - SHELF_MM) < 1 ? 'shelf' : 'surface';
+    const fn = Math.abs(it.bottom - SHELF_MM) < 1 ? 'shelf'
+      : (Math.abs(it.bottom - SHELF2_MM) < 1 ? 'shelf2' : 'surface');
     const props = [
       `id: '${it.id}'`,
       `asset: '${it.asset}'`,
@@ -334,6 +349,15 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
    * 지금은 **놓은 자리에 그대로 둔다.** 실험대 밖으로만 안 나가게 잡아 준다.
    * (사장님 지시 — 「가능한 포지션을 정해 두지 마라. 내 마음대로 할 거다」)
    */
+  /**
+   * 편집 패널에 보일 이름. **자유 배치라 「붙인 선」 이 아니라 「가장 가까운 선」** 이다.
+   * 셋 중 하나로만 말한다 — 사람이 표를 읽고 코드로 옮길 때 그 이름이 있어야 한다.
+   */
+  function whichLine(it) {
+    const d = [[SHELF_MM, UI.edit.shelf], [SHELF2_MM, UI.edit.shelf2], [SURFACE_MM, UI.edit.surface]];
+    return d.reduce((a, b) => (Math.abs(it.bottom - b[0]) < Math.abs(it.bottom - a[0]) ? b : a))[1];
+  }
+
   function placeFreely(item) {
     const h = heightMm(item.asset);
     item.x = clamp(item.x, 0, STAGE_W_MM - CONTRACT[item.asset].realSizeMm);
@@ -373,7 +397,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       return `
       <tr${bad.has(it.id) ? ' class="edit-bad"' : ''}>
         <td>${it.id}</td>
-        <td>${Math.abs(it.bottom - SHELF_MM) < 1 ? UI.edit.shelf : UI.edit.surface}</td>
+        <td>${whichLine(it)}</td>
         <td class="edit-x">${Math.round(it.x)}</td>
         <td class="edit-span">~${Math.round(it.x + d.dx + d.w)}</td>
         <td>${bad.has(it.id) ? UI.edit.overlap : ''}</td>

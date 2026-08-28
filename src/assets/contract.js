@@ -209,7 +209,15 @@ export const CONTRACT = {
              * 그림을 다시 그리면서 이 선을 옮기면 실험대 위 물건이 전부 허공에 뜬다.
              * 그러고도 화면은 멀쩡해 보인다 — 그래서 tests/assets.contract.test.js 가 지킨다.
              */
-            landmarks: { shelfTopY: 65, surfaceFrontY: 155 } },
+            /*
+             * **선반이 둘이다.** 하나뿐일 때는 병이 한 줄에 몰려, 폰 폭에서 물건이 10 px 로
+             * 줄자 잡는 자리(44 px)가 서로 포개져 **옆 것이 집혔다** — 학생의 실험 조건이
+             * 바뀐 채로 시행이 기록된다. 줄을 갈라 놓으면 그 겹침이 크게 준다.
+             * (catalase 가 어느 폭에서나 14쌍이 겹친다고 재 왔다)
+             *
+             * 작업면은 살짝 내렸다(155 → 172) — 둘째 선반이 들어갈 자리를 벌기 위해서다.
+             */
+            landmarks: { shelfTopY: 65, shelf2TopY: 116, surfaceFrontY: 172 } },
 };
 
 /**
