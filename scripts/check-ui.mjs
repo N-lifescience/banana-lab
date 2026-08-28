@@ -20,7 +20,7 @@
  */
 import { devUrl } from '../dev-port.js';
 
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 let chromium;
 try {
@@ -251,6 +251,7 @@ for (const w of [320, 375, 390]) {
  * 폭과 높이를 **짝으로** 준다. (웨이브 3 의 centrifuge 세션이 짚었다:
  * 같은 폭에서도 568 은 노트 100 % · 720 은 0 % 로 갈렸다)
  */
+const measured = new Map();   // 아래 5.7 에서 PLAYTEST 의 표와 맞댄다
 for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700], [768, 700], [1280, 800]]) {
   const t = await browser.newPage({ viewport: { width: w, height: h } });
   await t.goto(devUrl(`/?level=1`), { waitUntil: 'networkidle' });
@@ -327,7 +328,40 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
   record((cover.note?.pct ?? 0) <= 20,
     `토스트 ${w}×${h} — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
     `${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
+  measured.set(`${w}×${h}`, { bar: cover.bar?.pct ?? 0, note: cover.note?.pct ?? 0 });
   await t.close();
+}
+
+/* ---------------- 5.7 PLAYTEST 의 덮임 표가 아직 맞는가 ---------------- */
+/*
+ * ★ **문서에 적어 둔 숫자는 문구보다 더 나쁘게 낡는다.**
+ *
+ * 낡은 문구는 안 보이면 못 찾고 끝이지만, **낡은 숫자는 틀린 신고를 만들어 낸다** —
+ * 선생님이 맞는 값을 보고도 「표와 다르다, 고장이다」로 적어 보내신다. 실제로 어젯밤
+ * 인용문이 낡아 없는 버그를 하나 만들어 냈고, 숫자는 그 자리에서 한 발 더 간다.
+ * (웨이브 3 의 germination 세션이 자기 수치표에서 짚었다)
+ *
+ * 그래서 **표를 읽어서 잰 값과 맞대 본다.** 오차는 ±6 %p 로 둔다 — 글꼴 렌더링이
+ * 한두 점 흔들리는 것까지 빨간불로 만들면 이 명령을 아무도 안 믿게 된다.
+ *
+ * ★ **표를 못 읽었으면 초록불이 아니라 빨간불이다.** 「0줄 중 0줄이 맞다」는
+ *   여기서도 그대로 나온다 — 표 모양이 바뀌면 이 검사가 조용히 아무것도 안 하게 된다.
+ */
+{
+  const doc = readFileSync('PLAYTEST.md', 'utf8');
+  const rows = [...doc.matchAll(/^\|\s*(\d+)\s*×\s*(\d+)\s*\|.*?\*\*(\d+)\s*%\*\*.*?노트\s*(\d+)\s*%/gm)]
+    .map((m) => ({ key: `${m[1]}×${m[2]}`, bar: Number(m[3]), note: Number(m[4]) }));
+  record(rows.length > 0, '   (앞 조건) PLAYTEST 의 덮임 표를 읽었다',
+    `${rows.length}줄 — 0줄이면 표 모양이 바뀐 것입니다`);
+  const checked = rows.filter((r) => measured.has(r.key));
+  record(checked.length > 0, '   (앞 조건) 그 줄들을 실제로 잰 화면이 있다',
+    `맞댄 ${checked.length}줄 / 잰 화면 ${[...measured.keys()].join(' ')}`);
+  for (const r of checked) {
+    const got = measured.get(r.key);
+    record(Math.abs(got.bar - r.bar) <= 6 && Math.abs(got.note - r.note) <= 6,
+      `PLAYTEST 의 ${r.key} 줄이 아직 맞다 (낡은 숫자는 없는 버그 신고를 만든다)`,
+      `문서 조작 ${r.bar}% · 노트 ${r.note}%  /  잰 값 조작 ${got.bar}% · 노트 ${got.note}%`);
+  }
 }
 
 /* ---------------- 6. 라이트/다크 스크린샷 ---------------- */
