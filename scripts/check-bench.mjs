@@ -778,8 +778,11 @@ async function checkButtonContrast(page, where) {
     };
     const out = [];
     let seen = 0;
-    for (const el of document.querySelectorAll('button')) {
-      if (!el.offsetParent) continue;
+    let hidden = 0;
+    let noText = 0;
+    const all = document.querySelectorAll('button');
+    for (const el of all) {
+      if (!el.offsetParent) { hidden += 1; continue; }
       // SVG 안의 글자는 CSS color 가 아니라 애셋이 정한 fill 로 칠해진다.
       // 그걸 CSS 색으로 재면 실제로 잘 보이는 글자를 못 읽는다고 말하게 된다 —
       // 검사가 한 번 헛발질하면 그 뒤로 아무도 안 믿는다. HTML 글자만 잰다.
@@ -792,7 +795,7 @@ async function checkButtonContrast(page, where) {
           || (n.nodeType === 1 && n.tagName.toLowerCase() !== 'svg'
               && !n.classList.contains('token-name') && !n.classList.contains('edit-x-tag')))
         .map((n) => n.textContent).join('').trim();
-      if (!htmlText) continue;
+      if (!htmlText) { noText += 1; continue; }
       const fg = parse(getComputedStyle(el).color);
       const bg = solidBg(el);
       const [a, b] = [lum(fg) + 0.05, lum(bg) + 0.05].sort((x, y) => y - x);
@@ -800,14 +803,26 @@ async function checkButtonContrast(page, where) {
       if (ratio < 3) out.push(`${el.id || el.className || htmlText}=${ratio.toFixed(2)}`);
       seen += 1;
     }
-    return { out, seen };
+    return { out, seen, hidden, noText, all: all.length };
   });
   /*
    * ★ **0을 세었을 때 무슨 색이 나오는지 먼저 본다.**
    * 단추를 하나도 못 찾으면 「묻힌 것 0건」이 그냥 나온다 — 아무것도 안 재고 초록불이다.
    * (웨이브 1 의 micrometer 세션이 한 저장소에서만 이 얼굴을 다섯 번 만나고 규칙으로 세웠다)
+   *
+   * ★ 그런데 **`> 0` 은 열둘이 셋으로 줄어드는 것을 못 잡는다.** 이름표 검사는
+   *   `ITEM_COUNT` 와 맞대어 그 구멍이 없는데, 여기는 **맞댈 상수가 없다** —
+   *   단추 수는 화면 상태에 따라 정말로 달라진다.
+   *
+   *   그래서 **문턱을 지어내지 않는다.** 대신 **몇 개를 건너뛰었고 왜인지**를 상세란에
+   *   찍어, 열둘이 셋으로 줄면 그 줄에서 눈에 띄게 한다. 지어낸 문턱은 맞는지 아무도
+   *   모르는 채 굳고, 언젠가 맞는 코드에 빨간불을 내서 앞 조건째로 헐거워진다.
+   *   (chromatography 가 「전부가 화면 안에」를 `out.length === 0` 으로만 재던 자리를
+   *    `ITEM_COUNT` 와 맞대게 고치고, 상수가 있는 자리와 없는 자리를 갈라 주었다)
    */
-  ok(bad.seen > 0, `   (앞 조건) ${where} — 글자 있는 단추를 실제로 쟀다`, `${bad.seen}개`);
+  ok(bad.seen > 0,
+     `   (앞 조건) ${where} — 글자 있는 단추를 실제로 쟀다 (맞댈 상수가 없어 수를 남긴다)`,
+     `단추 ${bad.all}개 중 잰 것 ${bad.seen}개 · 안 보임 ${bad.hidden} · 글자 없음 ${bad.noText}`);
   ok(bad.out.length === 0, `버튼 글자가 배경에 묻히지 않는다 (${where})`,
      `${bad.seen}개 중 ${bad.out.length}개 묻힘 ${bad.out.join(' / ')}`);
 }
