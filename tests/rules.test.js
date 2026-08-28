@@ -474,7 +474,15 @@ test('재물대에 잘못 올린 슬라이드는 되돌리기를 쓰지 않고 �
     '내리는 데 되돌리기 횟수를 쓰면 2·3단계에서 실수 한 번이 조작 예산을 깎는다'
   );
 
-  assert.equal(run(off.state, 'UNMOUNT').outcome, 'ok', '올린 것이 없으면 조용히 넘어간다');
+  /*
+   * 앞서는 「올린 것이 없으면 **조용히** 넘어간다」로 못 박고 있었다. 그런데 조용한 것이
+   * 바로 결함이었다 — 스무 번을 눌러도 값도 화면도 그대로면 학생은 단추가 고장 난 줄 안다.
+   * 이 검사의 본뜻은 **「내리는 데 되돌리기 횟수를 쓰지 않는다」** 이고 그건 그대로다.
+   */
+  const empty = run(off.state, 'UNMOUNT');
+  assert.equal(empty.outcome, 'happened', '올린 것이 없으면 왜 아무 일도 없는지 말해야 합니다');
+  assert.equal(empty.state.microscope.stage, null, '없던 일이 생기면 안 됩니다');
+  assert.equal(empty.state.session.undosLeft, before, '말만 하고 되돌리기 예산을 깎으면 안 됩니다');
 });
 
 /* ---------------- 안전 수칙 · 기록 ---------------- */
@@ -728,4 +736,68 @@ test('미동나사가 끝에 닿았는데도 안 맞으면 — 말한다. 막지
   // 그리고 맞는 동안에는 **그 말을 하지 않아야** 한다 — 늘 하면 아무도 안 읽는다.
   const quiet = reduce(s, { type: 'FINE_FOCUS', payload: { delta: 0.01 } });
   assert.equal(quiet.message ?? null, null, '초점이 맞은 뒤에는 그 말을 하지 않아야 합니다');
+});
+
+test('되풀이해도 아무 일도 없고 아무 말도 없는 조작은 없다', () => {
+  /*
+   * **결함의 모양으로 훑는다.**
+   *
+   * 미동나사 건은 「범위 끝에 닿았는데 아무 말이 없다」였다. 그 모양을 일반화하면
+   * **「스무 번을 눌러도 상태도 안 바뀌고 한 마디도 없는 조작」** 이다. 학생 눈에는
+   * 단추가 고장 난 것이고, 콘솔에는 아무것도 안 남는다.
+   *
+   * 값이 안 움직이는 것 자체는 문제가 아니다 — **말없이** 안 움직이는 것이 문제다.
+   * (웨이브 3 의 centrifuge 세션이 열한 자리를 20번씩 두들겨 훑는 방식을 냈다)
+   */
+  const PAYLOAD = {
+    SMEAR: { slide: 'A', thickness: 0.3 },
+    DROP: { slide: 'A', count: 1 },
+    FILL_DROPPER: { reagent: REAGENTS.IKI },
+    PLACE_COVERSLIP: { slide: 'A', angleDeg: 45 },
+    LIFT_COVERSLIP: { slide: 'A' },
+    RINSE_SLIDE: { slide: 'A' },
+    NEW_SLIDE: { slide: 'A' },
+    MOUNT: { slide: 'A' },
+    SET_OBJECTIVE: { objective: 40 },
+    COARSE_FOCUS: { delta: 0.05 },
+    FINE_FOCUS: { delta: 0.05 },
+    SET_DIAPHRAGM: { value: 0.5 },
+    MOVE_STAGE: { dx: 10, dy: 10 },
+    SAVE_NOTE: { step: 'q.a', text: '적었다' },
+    MARK_READ: { stage: '1' },
+    DELETE_CAPTURE: { index: 0 },
+  };
+  /** 학생이 누르는 조작이 아닌 것. 시계는 화면이 스스로 돌린다. */
+  const NOT_A_BUTTON = new Set(['TICK']);
+
+  /*
+   * ★ **`session.log` 는 빼고 견준다.**
+   *
+   * `reduce` 는 조작마다 `log` 를 한 줄씩 쌓는다 — 아무 일도 안 한 조작까지. 그래서
+   * 상태를 통째로 견주면 **늘 「바뀌었다」** 가 나오고, 이 검사는 아무것도 안 재게 된다.
+   * 실제로 그렇게 짰다가 통과를 받았다. 학생 눈에 보이는 것만 견딘다.
+   */
+  const visible = (st) => JSON.stringify({
+    ...st,
+    session: { ...st.session, log: null, history: st.session.history.length },
+  });
+
+  const mute = [];
+  for (const type of Object.keys(ACTIONS)) {
+    if (NOT_A_BUTTON.has(type)) continue;
+    let s = S0();
+    let changed = 0;
+    let said = 0;
+    for (let i = 0; i < 20; i += 1) {
+      const before = visible(s);
+      const r = reduce(s, { type, payload: PAYLOAD[type] ?? {} });
+      if (visible(r.state) !== before) changed += 1;
+      if (r.message) said += 1;
+      s = r.state;
+    }
+    if (changed === 0 && said === 0) mute.push(type);
+  }
+  assert.deepEqual(mute, [],
+    `스무 번을 눌러도 아무 일도 없고 아무 말도 없는 조작: ${mute.join(', ')}\n`
+    + '값이 안 움직이는 것은 괜찮습니다 — 말없이 안 움직이는 것이 문제입니다.');
 });
