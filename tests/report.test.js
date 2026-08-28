@@ -181,7 +181,10 @@ test('제출한 값만으로 선생님 화면이 같은 종이를 만든다', ()
   }
   st = { ...st, session: { ...st.session,
     captures: [{ at: 1, reagent: 'IKI', objective: 40, ripe: 0.5, thickness: 0.3, drops: 2, seed: 7 }],
-    violations: ['pipette-mouth'],
+    // **없는 칸을 지어내 넣는다.** 상태에 칸이 새로 생겨도 저절로 안 나가는지를 재는 자리다.
+    // 앞서는 `violations` 를 썼는데 그건 **걷어낸 기능의 이름**이라, 읽는 사람이
+    // 「아직 안전 수칙을 기록하는구나」로 오해한다. 이름 자체가 무엇을 재는지 말하게 둔다.
+    neverSent: ['이 칸은 종이에도 서버에도 안 나가야 한다'],
     log: [{ t: '이건 종이에 안 실린다' }],
   } };
 
@@ -222,7 +225,8 @@ test('제출 목록에 군더더기가 없다 — 하나만 빼도 종이가 달
   }
   st = { ...st, session: { ...st.session,
     captures: [{ at: 1, reagent: 'IKI', objective: 40, ripe: 0.5, thickness: 0.3, drops: 2, seed: 7 }],
-    violations: ['pipette-mouth'],
+    // 위와 같은 뜻의 「없는 칸」이다 — 걷어낸 기능의 이름을 빌려 쓰지 않는다.
+    neverSent: ['이 칸은 종이에도 서버에도 안 나가야 한다'],
   } };
 
   /** 키 하나를 뺀 꾸러미로 종이를 만든다. 터지는 것도 「달라진다」로 친다. */
