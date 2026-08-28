@@ -92,6 +92,11 @@ function defaultItems() {
   const shelf = (x, rest) => ({ x, bottom: SHELF_MM, ...rest });
   const shelf2 = (x, rest) => ({ x, bottom: SHELF2_MM, ...rest });
   const surface = (x, rest) => ({ x, bottom: SURFACE_MM, ...rest });
+  /**
+   * 선에 안 붙은 자리. 편집 모드에서 어중간한 높이로 맞춘 것을 **그대로** 적어 둔다.
+   * `bottom` 은 그림 아래끝이라 `y` 에서 키를 더해 낸다 — 선 이름과 같은 뜻이 된다.
+   */
+  const at = (x, y, rest) => ({ x, y, bottom: y + heightMm(rest.asset), ...rest });
   const I = UI.bench.items;
   return [
     /*
@@ -265,8 +270,16 @@ export const BENCH_KINDS = [
  */
 function layoutCode(items) {
   const lines = items.map((it) => {
-    const fn = Math.abs(it.bottom - SHELF_MM) < 1 ? 'shelf'
-      : (Math.abs(it.bottom - SHELF2_MM) < 1 ? 'shelf2' : 'surface');
+    /*
+     * **선에 딱 맞을 때만 선 이름을 쓴다.**
+     *
+     * 앞서는 늘 「가장 가까운 선」 으로 적었다. 그런데 편집 모드는 이제 놓은 자리에 그대로
+     * 두므로(`placeFreely`), 어중간한 높이로 맞춰 놓아도 **붙여 넣는 순간 선으로 되돌아갔다** —
+     * 자유롭게 놓게 해 놓고 그 자리를 적을 방법을 안 준 셈이다.
+     * 선에서 벗어난 것은 **`at(x, y)`** 로 적는다. (웨이브 2 의 osmosis 세션이 짚었다)
+     */
+    const near = [[SHELF_MM, 'shelf'], [SHELF2_MM, 'shelf2'], [SURFACE_MM, 'surface']]
+      .find(([mm]) => Math.abs(it.bottom - mm) < 1);
     const props = [
       `id: '${it.id}'`,
       `asset: '${it.asset}'`,
@@ -275,7 +288,9 @@ function layoutCode(items) {
       it.reagent ? `reagent: '${it.reagent}'` : null,
       `labelKey: '${it.labelKey}'`,
     ].filter(Boolean).join(', ');
-    return `    ${fn}(${Math.round(it.x)}, { ${props} }),`;
+    return near
+      ? `    ${near[1]}(${Math.round(it.x)}, { ${props} }),`
+      : `    at(${Math.round(it.x)}, ${Math.round(it.y)}, { ${props} }),`;
   });
   return `// src/ui/bench.js 의 defaultItems() 안, 배열 자리에 그대로 붙여 넣습니다.\n${lines.join('\n')}`;
 }
