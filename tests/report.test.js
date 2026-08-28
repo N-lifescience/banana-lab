@@ -34,6 +34,33 @@ function filled() {
   return st;
 }
 
+test('종이는 제출물이 나르는 것만 읽는다 — 안전 기록 절', () => {
+  /*
+   * 자기 평가 **화면**은 이제 살아 있는 판정(`tidyStatus`)을 본다. 그런데 **종이는 그러면 안 된다.**
+   *
+   * 선생님 화면은 제출된 `{ level, notes, captures, violations }` **넷만으로** 같은 종이를 다시
+   * 만든다. 종이가 `tidy` 나 `slides` 를 읽는 순간 그 계약이 깨지고, 선생님 화면에서만
+   * **안전 기록 절이 조용히 달라진다** — 학생 화면에서는 멀쩡해서 아무도 모른다.
+   * 계약을 지키려고 제출물에 `tidy` 를 더하면 이번에는 **종이가 읽지도 않는 것까지 수집**하게 된다.
+   *
+   * 그래서 답은 하나다 — 종이는 `CHECK_TIDY` 가 **얼려 둔** `violations` 를 읽는다.
+   * 같은 함수의 출력이라 화면과 어긋나지 않는다.
+   *
+   * (7번을 고치다 종이까지 함께 바꾸고 싶어지는 자리다. 웨이브 3 의 centrifuge 세션이 짚었다.)
+   */
+  let st = filled();
+  st = reduce(st, { type: 'CHECK_TIDY', payload: {} }).state;
+  assert.ok(st.session.violations.length > 0,
+    '(앞 조건) 정리를 안 한 상태여야 이 검사가 무언가를 잽니다');
+
+  // 제출물이 나르는 것만 남긴 상태 — 선생님 화면이 손에 쥐는 것이 딱 이만큼이다.
+  const carried = payloadOf(st, { school: '', team: '' }, 'team').state;
+
+  const cut = (html) => html.slice(html.indexOf(UI.notebook.valuesLabel));
+  assert.equal(cut(buildSheet(carried, {})), cut(buildSheet(st, {})),
+    '종이가 제출물에 없는 것을 읽고 있습니다 — 선생님 화면에서 안전 기록 절이 달라집니다');
+});
+
 test('보고서에 학생이 적은 것과 넣은 이름이 실린다', () => {
   const html = buildSheet(filled(), { name: '홍길동', grade: '2', classNo: '4', number: '17' });
   assert.ok(html.includes('홍길동'), '이름이 종이에 없습니다');
