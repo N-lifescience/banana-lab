@@ -144,6 +144,17 @@ ok(await page.locator('#bench-lock').isHidden(), '1~4 쪽을 읽으면 실험대
 
 // 되돌리기 버튼이 실험대에 있는가
 ok(await page.locator('#bench #undo').count() === 1, '되돌리기 버튼이 실험대에 있다');
+/*
+ * ★ **0이 정답인 검사는 앞 조건을 「옆의 것」에서 찾는다.**
+ *
+ * 「탐구 노트에 되돌리기가 없다」는 **0개가 정답**이라 「몇 개를 쟀는가」를 붙일 데가 없다 —
+ * 세는 대상 자체가 없어야 하는 것이니까. 그러면 **노트가 아예 안 그려져도 통과한다.**
+ * 그래서 「그 자리가 살아 있는가」를 옆의 것으로 건다.
+ * (웨이브 2 의 osmosis 세션이 이 부류를 갈라 냈다)
+ */
+ok(await page.locator('#notebook .note-tab').count() > 0,
+   '   (앞 조건) 탐구 노트가 그려져 있다',
+   `${await page.locator('#notebook .note-tab').count()}쪽`);
 ok(await page.locator('#notebook #undo').count() === 0, '탐구 노트에는 되돌리기가 없다');
 
 // 마우스를 올리면 이름 + 안내가 뜨는가
