@@ -1508,11 +1508,20 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
    * 잠긴 STEP 은 몸통을 안 그리므로 그 칸들은 아직 DOM 에 없다. 앞을 적으면 다음이 드러난다 —
    * 그래서 한 칸씩, 드러나는 대로 채워 나간다.
    */
+  /*
+   * ★ **한 칸씩만 열린다.** 「다 적으면 뒤가 다 열린다」 로 재던 자리다 — 그것이 사장님이
+   * 「코드가 개판이더라」 고 하신 동작이었다. 지금 규칙은 **지금 STEP 을 다 적으면 그 다음
+   * 하나**가 열리는 것이고, 그래서 **가까운 것은 열리고 먼 것은 잠긴 채**를 함께 재야 한다.
+   * 한쪽만 재면 「통째로 열림」과 「영영 안 열림」 중 하나가 통과한다.
+   */
+  const stateOf = (g) => ac.evaluate((id) =>
+    document.querySelector(`[data-step-group="${id}"]`)?.dataset.state, g);
+
   let filled = 0;
-  for (let n = 0; n < 40 && (await locked()).state === 'locked'; n += 1) {
+  for (let n = 0; n < 12; n += 1) {
     const wrote = await ac.evaluate(() => {
-      const t = [...document.querySelectorAll('#note-step-4 textarea[data-note]')]
-        .find((x) => !x.value.trim());
+      const now = document.querySelector('details[data-step-group][data-state="now"]');
+      const t = [...(now?.querySelectorAll('textarea[data-note]') ?? [])].find((x) => !x.value.trim());
       if (!t) return false;
       t.value = '적었습니다';
       t.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1522,9 +1531,12 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     filled += 1;
     await ac.waitForTimeout(180);
   }
-  ok(filled > 0, '   (앞 조건) 앞 STEP 의 관찰 기록 칸을 실제로 채웠다', `${filled}칸`);
-  ok((await locked()).state !== 'locked',
-     '4절 — 앞을 다 적고 나면 뒤 STEP 이 열린다', JSON.stringify(await locked()));
+  ok(filled > 0, '   (앞 조건) 지금 STEP 의 관찰 기록 칸을 실제로 채웠다', `${filled}칸`);
+
+  const near = await stateOf('3');   // 지금(2) 바로 다음
+  const far = await stateOf('5');    // 한참 뒤
+  ok(near !== 'locked', '4절 — 지금 STEP 을 다 적으면 **그 다음 하나**가 열린다', `STEP 3 → ${near}`);
+  ok(far === 'locked', '4절 — 그 너머는 잠긴 채다 (통째로 열리지 않는다)', `STEP 5 → ${far}`);
 
   // **접힘은 잠금이 아니다** — 자물쇠가 풀린 다음에는 앞으로 올 STEP 도 눌러서 열려야 한다.
   await ac.locator('details[data-step-group="5"] > summary').click({ timeout: 3000 });
@@ -1683,6 +1695,51 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   }
 
   await lk.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * **Ctrl+P 로 배치 편집 모드가 켜지는가.**
+ *
+ * 이 기능은 **죽어도 아무 데서도 안 보인다.** 처음 넣었을 때 가드를 `#report` 의 자식 수로
+ * 썼는데, 대화상자 마크업이 **열기 전부터** 들어 있어 그 값이 늘 2 였다 —
+ * **가드가 항상 걸려 단축키가 한 번도 안 먹었다.** 단위 검사도 소스도 멀쩡해 보인다.
+ * **눌러 봐야 안다.** (웨이브 3 의 centrifuge 세션이 자기 저장소에서 잡았다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const kp = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await kp.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(kp);
+  const where = () => kp.evaluate(() => ({
+    edit: new URLSearchParams(location.search).get('edit'),
+    panel: document.querySelectorAll('#edit-panel').length,
+  }));
+  ok((await where()).panel === 0, '   (앞 조건) 평소에는 편집 모드가 아니다', JSON.stringify(await where()));
+
+  await kp.keyboard.press('Control+p');
+  await kp.waitForTimeout(900);
+  ok((await where()).panel === 1, 'Ctrl+P — 배치 편집 모드가 켜진다', JSON.stringify(await where()));
+
+  await kp.keyboard.press('Control+p');
+  await kp.waitForTimeout(900);
+  ok((await where()).panel === 0, 'Ctrl+P — 한 번 더 누르면 꺼진다', JSON.stringify(await where()));
+
+  /*
+   * **인쇄를 뺏지 않는가.** 보고서 창은 브라우저 인쇄로 활동지 PDF 를 만든다 —
+   * 그때 Ctrl+P 를 가로채면 **활동지를 못 뽑는다.**
+   */
+  const opened = await kp.evaluate(() => {
+    const d = document.querySelector('#report-dialog');
+    if (!d) return false;
+    d.showModal();
+    return true;
+  });
+  ok(opened, '   (앞 조건) 보고서 창을 열었다');
+  const before = (await where()).edit;
+  await kp.keyboard.press('Control+p');
+  await kp.waitForTimeout(700);
+  ok((await where()).edit === before,
+     'Ctrl+P — 보고서가 열려 있으면 인쇄에 양보한다', `${before} → ${(await where()).edit}`);
+  await kp.close();
 }
 
 /* ────────────────────────────────────────────────────────────────

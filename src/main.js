@@ -118,8 +118,17 @@ function bindEditShortcut() {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'p' && e.key !== 'P') return;
     if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
-    // 보고서(활동지)가 열려 있으면 인쇄가 우선이다.
-    if (document.querySelector('#report')?.childElementCount) return;
+    /*
+     * 보고서(활동지)가 **열려 있을 때만** 인쇄가 우선이다.
+     *
+     * 앞서는 `#report` 의 자식 수를 봤는데, `createReport()` 가 **열기 전부터** 대화상자
+     * 마크업을 넣어 두므로 그 값은 **늘 2** 다 — 가드가 **항상** 걸려서 이 단축키가
+     * **한 번도 안 먹었다.** 검사로는 안 보인다. 눌러 봐야 안다.
+     * (웨이브 3 의 centrifuge 세션이 자기 저장소에서 잡았고, 여기도 똑같았다)
+     *
+     * 물어야 할 것은 「마크업이 있는가」가 아니라 **「지금 보고서 흐름에 있는가」**다.
+     */
+    if (document.querySelector('#report dialog[open]')) return;
     e.preventDefault();
     const url = new URL(location.href);
     if (url.searchParams.get('edit') === '1') url.searchParams.delete('edit');
