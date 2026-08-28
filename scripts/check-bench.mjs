@@ -838,20 +838,37 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const eBox = async (sel) => ed.locator(sel).boundingBox();
   const eCenter = (b) => [b.x + b.width / 2, b.y + b.height / 2];
 
-  // 먼저 아래로 내린다. 선반 물건을 아래로 끌면 작업면에 붙어야 한다.
-  // (순서가 중요하다 — 먼저 다른 물건 위로 옮겨 놓으면 그 물건이 위에 겹쳐 그려져서
-  //  다음 번에 집는 것이 바나나가 아니라 겹친 물건이 된다.)
+  /*
+   * **놓은 자리에 그대로 남고, 그 자리가 코드로 나온다.**
+   *
+   * ★ 앞서는 「아래로 끌면 **작업면 선에 붙는다**」 를 재고 있었다 — 사장님이 없애라 하신
+   * 바로 그 동작이다(「가능한 포지션을 너가 정해두지마. 내가 미세하게 조정할거야」).
+   * 규칙이 바뀌었는데 검사가 옛 동작을 지키고 있어서, 고친 코드에 빨간불을 냈다.
+   * **자리를 옮기는 지시가 오면 그 자리를 재던 검사도 같이 봐야 한다.** (micrometer 가 짚었다)
+   *
+   * 그리고 **선에 안 붙은 자리는 `at(x, y)` 로 나와야** 한다 — 안 그러면 어중간한 높이로
+   * 맞춰 놓아도 **붙여 넣는 순간 선으로 되돌아간다.** (osmosis 가 짚었다)
+   */
   const ban = await eBox('[data-id="banana"]');
+  const dropY = eCenter(ban)[1] + 140;   // 두 선 사이 어중간한 높이
   await ed.mouse.move(...eCenter(ban));
   await ed.mouse.down();
-  await ed.mouse.move(eCenter(ban)[0], eCenter(ban)[1] + 300, { steps: 12 });
+  await ed.mouse.move(eCenter(ban)[0], dropY, { steps: 12 });
   await ed.mouse.up();
-  await ed.waitForTimeout(200);
+  await ed.waitForTimeout(250);
+
+  const landed = await ed.evaluate(() => {
+    const r = document.querySelector('[data-id="banana"]')?.getBoundingClientRect();
+    return r ? Math.round(r.top + r.height / 2) : null;
+  });
+  ok(landed !== null && Math.abs(landed - dropY) <= 6,
+     '편집 — 놓은 자리에 그대로 남는다 (선으로 튕겨 돌아가지 않는다)',
+     `놓은 곳 ${Math.round(dropY)} → 앉은 곳 ${landed}`);
 
   const code = await ed.evaluate(() => window.__layoutCode());
   const bananaLine = code.split('\n').find((l) => l.includes("id: 'banana'"));
-  ok(/^\s*surface\(\d+,/.test(bananaLine ?? ''),
-     '아래로 끌면 작업면에 붙고, 그 자리가 코드로 나온다', JSON.stringify(bananaLine));
+  ok(/^\s*at\(\d+, \d+,/.test(bananaLine ?? ''),
+     '편집 — 선에 안 붙은 자리는 at(x, y) 로 나온다', JSON.stringify(bananaLine));
   ok(code.split('\n').filter((l) => l.includes('labelKey')).length === ITEM_COUNT,
      `코드에 실험대 물건 ${ITEM_COUNT}개가 모두 나온다`);
 
