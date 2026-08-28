@@ -174,6 +174,44 @@ if (historyMix === null) {
     `2.6초 동안 ${historyMix.before} → ${historyMix.after} (TICK 이 쌓으면 안 된다)`);
 }
 
+/* ---------------- 5.5 폰에서 시작 단추에 닿는가 ---------------- */
+
+/*
+ * 시작 화면은 폰에서 **한 화면에 안 들어간다** — 375px 에서 카드가 877px 다.
+ * 「1단계로 시작하기」는 y 822 에 있고 화면은 700 이다. 첫 화면에는 안 보인다.
+ *
+ * 안 보이는 것 자체는 참을 수 있다(내리면 된다). **닿을 수 없게 되는 것**이 사고다 —
+ * `align-items:center` 인 세로 상자에서 내용이 화면보다 커지면 브라우저에 따라
+ * **윗머리가 스크롤로도 안 돌아온다.** 그러면 학생은 앱을 열고 시작할 방법이 없다.
+ * 여기서는 「내리면 화면 안에 들어오는가」와 「가로로 삐져나가지 않는가」를 잰다.
+ * (웨이브 3 의 centrifuge 세션이 자기 저장소에서 「375 에서 시작 단추가 화면 밖」 을 알렸다)
+ */
+for (const w of [320, 375, 390]) {
+  const phone = await browser.newPage({ viewport: { width: w, height: 700 } });
+  // ★ `URL_BASE` 는 `?level=1` 이라 **시작 화면을 건너뛴다.** 그러면 `.start-go` 가
+  //   없어서 「못 찾음」 이 나오고, 그것은 「단추가 화면 밖」 과 구별이 안 된다.
+  //   재려는 화면으로 곧장 간다.
+  await phone.goto(devUrl('/'), { waitUntil: 'networkidle' });
+  await phone.waitForTimeout(350);
+  const flat = await phone.evaluate(() => {
+    const d = document.documentElement;
+    return { over: d.scrollWidth - d.clientWidth };
+  });
+  record(flat.over <= 0, `시작 화면 ${w}px — 가로로 삐져나가지 않는다`, `넘침 ${flat.over}px`);
+  await phone.evaluate(() => window.scrollTo(0, 99999));
+  await phone.waitForTimeout(250);
+  const go = await phone.evaluate(() => {
+    const el = document.querySelector('.start-go');
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { top: Math.round(b.top), bottom: Math.round(b.bottom), h: window.innerHeight };
+  });
+  record(Boolean(go) && go.top >= 0 && go.bottom <= go.h,
+    `시작 화면 ${w}px — 끝까지 내리면 시작 단추가 화면 안에 들어온다`,
+    go ? `단추 ${go.top}~${go.bottom} · 화면 ${go.h}` : '.start-go 를 못 찾음');
+  await phone.close();
+}
+
 /* ---------------- 6. 라이트/다크 스크린샷 ---------------- */
 
 await page.screenshot({ path: 'shots/ui-light.png', fullPage: true });
