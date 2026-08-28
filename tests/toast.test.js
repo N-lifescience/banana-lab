@@ -118,3 +118,27 @@ test('잘된 조작도 말한다 — 마지막 것만 남는다', () => {
   assert.ok(!s2.includes('지금까지 2숟갈입니다.'),
     `지난 수가 줄을 서 있습니다: ${JSON.stringify(s2)}`);
 });
+
+test('같은 태그라도 **다른 말**은 삼키지 않는다', (t) => {
+  /*
+   * 앞서는 같은 태그면 삼켰다. 그런데 한 태그가 **다른 말 둘**을 내는 자리가 있다 —
+   * `cross-contamination` 은 「스포이트에 다른 용액이 남아 있는 채로 채웠습니다」와
+   * 「씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다」 둘을 내고, `cracked` 도 둘이다.
+   * 그러면 **둘째가 통째로 삼켜져** 학생은 왜 그렇게 됐는지를 못 듣는다.
+   *
+   * 막으려던 것은 「**같은 문장**이 수십 번」이므로 문장으로 걸러도 그대로 막힌다 —
+   * 위 검사가 그것을 지킨다. 둘을 함께 두어야 한쪽으로 기울지 않는다.
+   * (웨이브 3 의 fermentation 세션이 자기 저장소에서 희석 안내가 삼켜지는 것으로 잡았다)
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+
+  toast.push('스포이트에 다른 용액이 남아 있는 채로 채웠습니다.', 'happened', 'cross-contamination');
+  toast.push('씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다.', 'happened', 'cross-contamination');
+  t.mock.timers.tick(5 * 60 * 1000);
+
+  assert.ok(shown.some((s) => s.includes('남아 있는 채로')), '첫째가 떠야 합니다');
+  assert.ok(shown.some((s) => s.includes('두 용액이 섞였습니다')),
+    `같은 태그라도 다른 말은 삼키면 안 됩니다 — 뜬 것: ${JSON.stringify(shown)}`);
+});

@@ -52,8 +52,10 @@ export function createToastQueue(root, getLevel) {
 
   const queue = [];
   let showing = false;
-  /** 지금 화면에 떠 있는 것의 태그. 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
+  /** 지금 화면에 떠 있는 것의 태그. 잘된 조작을 갈아 끼울 때 쓴다. */
   let showingTag = null;
+  /** 지금 화면에 떠 있는 **문장**. 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
+  let showingMessage = null;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
 
@@ -64,8 +66,9 @@ export function createToastQueue(root, getLevel) {
   function showNext() {
     if (showing || queue.length === 0) return;
     showing = true;
-    const { message, good, tag } = queue.shift();
+    const { message, raw, good, tag } = queue.shift();
     showingTag = tag ?? null;
+    showingMessage = raw;
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -81,6 +84,7 @@ export function createToastQueue(root, getLevel) {
       dismiss = null;
       showing = false;
       showingTag = null;
+      showingMessage = null;
       showNext();
     };
   }
@@ -103,9 +107,20 @@ export function createToastQueue(root, getLevel) {
       if (good && tag) {
         const at = queue.findIndex((q) => q.tag === tag);
         if (at >= 0) queue.splice(at, 1);
-      } else if (tag && (showingTag === tag || queue.some((q) => q.tag === tag))) {
-        // 뜻대로 안 된 것은 그대로 줄을 지킨다. 슬라이더를 끄는 동안 같은 경고가
-        // 수십 번 쌓이면 손을 뗀 뒤에도 몇 분 동안 계속 뜬다.
+      } else if (showingMessage === message || queue.some((q) => q.raw === message)) {
+        /*
+         * 뜻대로 안 된 것은 그대로 줄을 지킨다. 슬라이더를 끄는 동안 같은 경고가
+         * 수십 번 쌓이면 손을 뗀 뒤에도 몇 분 동안 계속 뜬다.
+         *
+         * ★ **태그가 아니라 문장으로 거른다.**
+         *
+         * 앞서는 같은 태그면 삼켰다. 그런데 한 태그가 **다른 말 둘**을 내는 자리가 있다 —
+         * `cross-contamination` 은 「스포이트에 다른 용액이 남아 있는 채로 채웠습니다」와
+         * 「씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다」 둘을 내고,
+         * `cracked` 도 둘이다. 그러면 **둘째가 통째로 삼켜져** 학생은 왜 그렇게 됐는지를
+         * 못 듣는다. 막으려던 것은 「같은 문장이 수십 번」이므로 문장으로 걸러도 그대로 막힌다.
+         * (웨이브 3 의 fermentation 세션이 자기 저장소에서 희석 안내가 삼켜지는 것으로 잡았다)
+         */
         return;
       }
       const level = getLevel ? getLevel() : 1;
@@ -123,7 +138,9 @@ export function createToastQueue(root, getLevel) {
         return;
       }
 
-      queue.push({ message: detail(message, tag, level, good), good, tag });
+      // `raw` 는 꾸미기 전 문장이다. 큐에 든 것은 꾸며진 것이라 들어오는 날것과
+      // 그대로 견주면 **영영 같지 않아** 겹침 방지가 통째로 죽는다.
+      queue.push({ message: detail(message, tag, level, good), raw: message, good, tag });
       showNext();
     },
   };
