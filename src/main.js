@@ -103,6 +103,31 @@ function editMode() {
   return new URLSearchParams(location.search).get('edit') === '1';
 }
 
+/**
+ * **Ctrl+P (⌘P) 로 배치 편집 모드를 켜고 끈다.**
+ *
+ * 주소에 `?edit=1` 을 손으로 치는 것도 그대로 되지만, 폰에서는 주소창을 열어 글자를 치는
+ * 것이 번거롭다. 누르면 주소에 붙였다 떼고 다시 그린다 — **주소가 남으므로 새로고침해도,
+ * 남에게 보내도 같은 화면**이다.
+ *
+ * ── 인쇄를 뺏지 않는다 ────────────────────────────────────────────
+ * Ctrl+P 는 원래 브라우저 인쇄다. 보고서 창은 그 인쇄로 PDF 를 만든다 —
+ * **보고서가 열려 있을 때는 손대지 않는다.** 안 그러면 활동지를 못 뽑는다.
+ */
+function bindEditShortcut() {
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'p' && e.key !== 'P') return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+    // 보고서(활동지)가 열려 있으면 인쇄가 우선이다.
+    if (document.querySelector('#report')?.childElementCount) return;
+    e.preventDefault();
+    const url = new URL(location.href);
+    if (url.searchParams.get('edit') === '1') url.searchParams.delete('edit');
+    else url.searchParams.set('edit', '1');
+    location.href = url.toString();
+  });
+}
+
 let store = null;
 
 /**
@@ -131,6 +156,7 @@ function boot(level, mode = MODES.GROUP) {
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
   const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
+  bindEditShortcut();
   createNotebook($('#notebook'), store, {
     onOpenZoom: openZoom,
     // 보고서를 여는 것이 곧 "실험을 마친다" 는 뜻이다. 그때 정리를 했는지 한 번 본다

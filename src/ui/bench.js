@@ -324,15 +324,22 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   /* ---------------- 편집 모드 ---------------- */
 
   /**
-   * 물건은 두 선 중 **가까운 쪽**에 바닥을 댄다 — 선반 위 아니면 작업면 위다.
-   * 중간 높이에 띄워 둘 수는 없다. 그림에 그런 자리가 없기 때문이다.
+   * 편집 모드에서 물건을 놓은 자리.
+   *
+   * ── 두 선에 **붙이지 않는다** ────────────────────────────────────
+   * 앞서는 선반 선과 작업면 선 중 가까운 쪽에 바닥을 딱 붙였다. 그러면 **놓을 수 있는
+   * 자리를 앱이 정해 버린다** — 배치를 정하는 사람은 교실에서 쓰는 선생님이고,
+   * 미세하게 옮기고 싶어도 손이 놓은 자리에서 튕겨 나갔다.
+   *
+   * 지금은 **놓은 자리에 그대로 둔다.** 실험대 밖으로만 안 나가게 잡아 준다.
+   * (사장님 지시 — 「가능한 포지션을 정해 두지 마라. 내 마음대로 할 거다」)
    */
-  function snapToLine(item) {
+  function placeFreely(item) {
     const h = heightMm(item.asset);
-    const bottom = item.y + h;
-    item.bottom = Math.abs(bottom - SHELF_MM) <= Math.abs(bottom - SURFACE_MM) ? SHELF_MM : SURFACE_MM;
     item.x = clamp(item.x, 0, STAGE_W_MM - CONTRACT[item.asset].realSizeMm);
-    item.y = item.bottom - h;
+    item.y = clamp(item.y, 0, STAGE_H_MM - h);
+    // `bottom` 은 배치 코드가 읽는 값이라 계속 낸다 — 이제 「붙인 선」 이 아니라 **바닥 높이**다.
+    item.bottom = item.y + h;
   }
 
   /**
@@ -929,7 +936,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
     // 편집 모드 — 조작은 일어나지 않고, 놓은 자리에 그대로 남는다.
     if (edit) {
-      snapToLine(item);
+      placeFreely(item);
       item.homeX = item.x;
       item.homeY = item.y;
       drag = null;

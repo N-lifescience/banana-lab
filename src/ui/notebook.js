@@ -256,8 +256,11 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         <thead><tr><th>${N.matHeadFigure}</th><th>${N.matHeadName}</th><th>${N.matHeadRole}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <h3>${N.safetyHeading}</h3>
-      <ul class="safety-list">${N.safetyNotes.map((n) => `<li>${n}</li>`).join('')}</ul>`;
+      <section class="safety-note">
+        <h3>${N.valuesLabel}</h3>
+        <p class="stage-text values-lead">${emph(N.valuesLead)}</p>
+        <ul class="values-list">${N.valuesList.map((line) => `<li>${emph(line)}</li>`).join('')}</ul>
+      </section>`;
   }
 
   /* ---------------------------------------------------------------- */
@@ -368,13 +371,22 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
 
     const stepsHtml = UI.protocol.map((group, gi) => {
       /*
-       * **잠그는 자리는 셋을 다 지나야 한다:**
-       *   ① 지금 STEP 보다 **뒤**여야 한다 — 지나온 것과 지금 것은 안 잠근다.
-       *   ② 지금 STEP 의 관찰 기록이 **비어** 있어야 한다.
-       *   ③ 그 STEP 을 **한 번도 열어 본 적이 없어야** 한다 — 열려 있던 것이 사라지면 고장이다.
+       * **한 칸씩만 열린다.**
+       *
+       * 앞서는 「지금 STEP 의 기록이 비었는가」 하나로 뒤를 통째로 잠갔다. 그래서 STEP 1 을
+       * 적는 순간 **여섯이 한꺼번에 다 열렸다.** 학생이 STEP 1 을 적으면 열려야 하는 것은
+       * **STEP 2 하나**다 — 한 번에 한 STEP 이 이 쪽의 규칙이다.
+       *
+       * 그래서 「어디까지 열 수 있는가」를 정한다:
+       *   지금 STEP 을 아직 안 적었으면  → 지금 STEP 까지
+       *   다 적었으면                   → **그 다음 하나까지**
+       *
+       * 그 너머는 잠근다. 다만 **한 번이라도 열어 본 것은 안 잠근다** — 열려 있던 것이
+       * 눈앞에서 사라지면 고장으로 읽힌다.
        */
-      const lockedBy = gi > nowIdx && nowIdx >= 0 && unwritten[nowIdx] && !everOpened.has(group.id)
-        ? UI.protocol[nowIdx].id : null;
+      const openableUpTo = nowIdx < 0 ? UI.protocol.length : (unwritten[nowIdx] ? nowIdx : nowIdx + 1);
+      const lockedBy = gi > openableUpTo && !everOpened.has(group.id)
+        ? UI.protocol[Math.min(openableUpTo, UI.protocol.length - 1)].id : null;
       if (lockedBy) return stepShell(group, gi, groupsDone, '', lockedBy, nowIdx);
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
@@ -703,26 +715,16 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`feedback.${key}`] ?? '')}</textarea>
       </div>`).join('');
 
-    /*
-     * 가치·태도 — **적어만 둔다. 아무것도 판정하지 않는다.**
-     *
-     * 예전에는 손 씻기·마개 닫기·폐액 버리기를 지켜보고 ✓/✗ 를 붙였다. 그 조작을 통째로
-     * 걷어냈다 — 가상 실험에서 그것을 따지면 **화면 속 단추를 눌렀다는 사실**을 평가하게
-     * 되고, 그건 안전 습관이 아니라 조작 순서 외우기다.
-     */
-    const values = N.valuesList.map((line) => `<li>${emph(line)}</li>`).join('');
-
     return `
       <div id="self-eval">
         <h3>${N.likertHeading}</h3>
         ${rows}
         <h3>${N.reflectionHeading}</h3>
         ${reflections}
-        <div class="self-eval-item">
-          <h3>${N.valuesLabel}</h3>
-          <p class="stage-text values-lead">${emph(N.valuesLead)}</p>
-          <ul id="values-list" class="values-list">${values}</ul>
-        </div>
+        <!--
+          가치·태도 안내는 **2 쪽(준비물)** 에 있다. 실험을 시작하기 **전에** 읽어야 하는 것을
+          다 끝낸 뒤에 보여 주는 것은 늦다. 두 곳에 두면 어디가 정본인지도 모르게 된다.
+        -->
       </div>`;
   }
 
