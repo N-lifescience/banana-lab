@@ -1542,6 +1542,71 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 }
 
 /* ────────────────────────────────────────────────────────────────
+ * STEP 자물쇠가 **조용히 죽지 않는가.**
+ *
+ * 「한 번 열어 본 STEP 은 다시 안 잠근다」 는 옳다 — 열려 있던 것이 사라지면 고장으로 읽힌다.
+ * 그런데 **「열어 본 적 있다」 를 「그때 안 잠겨 있었다」 로 쌓으면 자물쇠가 통째로 죽는다.**
+ *
+ * 학생이 조작은 안 하고 STEP 1 의 관찰 기록만 먼저 채우면, 그 순간 잠글 조건이 사라져
+ * **여섯이 통째로 「열어 본 것」 이 된다.** 그 뒤로는 무엇을 해도 영영 안 잠긴다.
+ * 화면은 멀쩡하고 단위 검사도 초록불이다 — 이건 브라우저에서만 보인다.
+ * (웨이브 2 의 osmosis 세션이 자기 저장소에서 잡았다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const lk = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await lk.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(lk);
+  await lk.evaluate(() => [...document.querySelectorAll('button')]
+    .filter((b) => /^4\.\s/.test(b.innerText.trim()))[0]?.click());
+  await lk.waitForTimeout(350);
+
+  const lockedCount = () => lk.evaluate(() =>
+    document.querySelectorAll('[data-step-group][data-state="locked"]').length);
+  ok(await lockedCount() > 0, '   (앞 조건) 처음에는 뒤 STEP 이 잠겨 있다', `${await lockedCount()}개`);
+
+  // ① **조작은 안 하고 기록만** 채운다. 이때 STEP 1 의 조건이 풀려 아무것도 안 잠긴다.
+  for (let i = 0; i < 6; i += 1) {
+    const wrote = await lk.evaluate(() => {
+      const t = [...document.querySelectorAll('#note-step-4 textarea[data-note]')]
+        .find((x) => /^1[a-z]$/.test(x.dataset.note) && !x.value.trim());
+      if (!t) return false;
+      t.value = '적었습니다';
+      t.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    });
+    if (!wrote) break;
+    await lk.waitForTimeout(180);
+  }
+  ok(await lockedCount() === 0, '   (앞 조건) 지금 STEP 을 다 적으면 잠금이 풀린다', `${await lockedCount()}개`);
+
+  // ② 이제 조작을 마치면 다음 STEP 이 「지금」 이 되고, 그 기록은 비어 있다.
+  //    **아직 펼쳐 본 적 없는 뒤엣것은 다시 잠겨야 한다.**
+  await lk.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
+  await lk.waitForTimeout(400);
+  ok(await lockedCount() > 0,
+     '자물쇠 — 기록만 먼저 채워도 자물쇠가 죽지 않는다',
+     `조작 뒤 잠긴 STEP ${await lockedCount()}개 (0이면 통째로 죽은 것)`);
+
+  // ③ **반대 방향.** 손으로 펼쳐 본 STEP 은 그 뒤에도 안 잠겨야 한다 —
+  //    그러지 않으면 열려 있던 것이 사라져 학생 눈에 고장이다.
+  const target = await lk.evaluate(() =>
+    document.querySelector('details[data-step-group]:not([open])')?.dataset.stepGroup ?? null);
+  if (target) {
+    await lk.locator(`details[data-step-group="${target}"] > summary`).click({ timeout: 3000 });
+    await lk.waitForTimeout(250);
+    await lk.evaluate(() => window.__store.dispatch('SMEAR', { slide: 'A', thickness: 0.3 }));
+    await lk.waitForTimeout(400);
+    const still = await lk.evaluate((g) =>
+      document.querySelector(`[data-step-group="${g}"]`)?.dataset.state, target);
+    ok(still !== 'locked', '자물쇠 — 손으로 열어 본 STEP 은 다시 잠기지 않는다',
+       `STEP ${target} → ${still}`);
+  } else {
+    ok(false, '자물쇠 — 손으로 열어 볼 STEP 을 못 찾았습니다');
+  }
+  await lk.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
  * 탐구 노트가 **학생을 다음 쪽으로 데려가는가.**
  *
  * 「이 쪽을 읽었습니다」 를 누르면 그 자리에 ✓ 만 남고 아무 일도 안 일어났다. 학생은 자기가

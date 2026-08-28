@@ -375,7 +375,6 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
        */
       const lockedBy = gi > nowIdx && nowIdx >= 0 && unwritten[nowIdx] && !everOpened.has(group.id)
         ? UI.protocol[nowIdx].id : null;
-      if (!lockedBy) everOpened.add(group.id);
       if (lockedBy) return stepShell(group, gi, groupsDone, '', lockedBy, nowIdx);
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
@@ -451,6 +450,17 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
 
     const state = isDone ? 'done' : (isNow ? 'now' : 'later');
     const open = manualOpen.has(group.id) ? manualOpen.get(group.id) : isNow;
+
+    /*
+     * **「열어 본 적 있다」 는 실제로 펼쳐졌을 때만 쌓는다.**
+     *
+     * 잠기지 않은 것을 전부 쌓으면 자물쇠가 조용히 죽는다 — 학생이 STEP 1 의 관찰 기록만
+     * 먼저 채우면 그 순간 **아무것도 안 잠기고**, 여섯이 통째로 「열어 본 것」 이 되어
+     * 그 뒤로는 영영 안 잠긴다. 화면은 멀쩡하고 검사도 초록불이다.
+     * (웨이브 2 의 osmosis 세션이 자기 저장소에서 잡았다. 이쪽은 STEP 1 에 칸이 있어
+     *  첫 그림에서 우연히 맞아떨어졌을 뿐, 규칙 자체가 틀렸다.)
+     */
+    if (open) everOpened.add(group.id);
     // 접힌 STEP 에도 「눌러서 열린다」 를 적는다. 말하지 않으면 잠긴 것으로 읽힌다.
     const hint = isNow ? ''
       : `<span class="step-open-hint">${isDone ? N.stepReopenHint : N.stepPeekHint}</span>`;
