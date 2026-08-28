@@ -112,6 +112,16 @@ export function createToastQueue(root, getLevel) {
        */
       if (outcome === 'blocked') {
         const shown = detail(message, tag, level, false, true);
+        /*
+         * ★ **같은 막힘이 이미 떠 있으면 그대로 둔다.**
+         *
+         * 막힘을 거르기보다 앞으로 옮기고 나면, 학생이 같은 곳을 계속 만질 때마다
+         * 갈아 끼워서 **깜빡이기만 한다** — 열 번 만지면 말풍선이 열 번 새로 붙고
+         * 아홉 번 떨어진다. 읽고 있는 문장이 눈앞에서 사라졌다 나타난다.
+         * **다른** 막힘은 그대로 새치기한다 — 그건 다른 사실이다.
+         * (웨이브 3 의 centrifuge 세션이 짚었다)
+         */
+        if (showingShown === shown) return;
         queue.unshift({ message: shown, shown, good: false, tag });
         if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
         else showNext();

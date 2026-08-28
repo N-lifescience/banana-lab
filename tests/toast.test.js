@@ -153,12 +153,23 @@ test('막힘은 겹침 방지에 걸리지 않는다 — 이유를 못 들으면
   const { root, shown } = fakeDom();
   const toast = createToastQueue(root, () => 1);
 
-  toast.push('그 자리에는 놓을 수 없습니다.', 'happened', 'nope');
-  toast.push('그 자리에는 놓을 수 없습니다.', 'blocked', 'nope');   // 글자가 같다
+  /*
+   * ★ **재려는 것은 「같은 글자가 두 번 뜨는가」가 아니다.**
+   *
+   * 처음엔 같은 글자로 두 번 밀어 넣고 「둘 다 떠야 한다」로 적었다. 그런데 같은 글자를
+   * 두 번 띄우는 것은 **학생에게 아무것도 더 주지 않는다** — 깜빡이기만 한다(아래 검사).
+   * 진짜 보증은 **다른 막힘이 줄에 밀려 삼켜지지 않는 것**이다.
+   */
+  toast.push('덮개 유리를 덮었습니다.', 'happened', 'covered');
+  toast.push('고배율에서는 조동나사를 돌리지 않습니다.', 'blocked', 'coarse-high');
   t.mock.timers.tick(5 * 60 * 1000);
 
-  assert.equal(shown.filter((s) => s.includes('놓을 수 없습니다')).length, 2,
+  assert.ok(shown.some((s) => s.includes('조동나사')),
     `막힘이 삼켜졌습니다 — 뜬 차례: ${JSON.stringify(shown)}`);
+  // 앞엣것은 밀어 넣는 순간 이미 떠 버린다. 막힘은 **그 바로 다음**으로 와야 한다 —
+  // 줄 뒤에 서면 앞선 말풍선 두어 개가 지나갈 동안 학생은 아무 답도 못 받는다.
+  assert.equal(shown[1], '고배율에서는 조동나사를 돌리지 않습니다.',
+    `막힘이 줄 뒤로 밀렸습니다 — 뜬 차례: ${JSON.stringify(shown)}`);
 });
 
 test('3단계에서 감춘 말끼리는 겹쳐 쌓지 않는다', (t) => {
@@ -177,4 +188,24 @@ test('3단계에서 감춘 말끼리는 겹쳐 쌓지 않는다', (t) => {
 
   assert.equal(shown.length, 1,
     `3단계에서는 둘 다 같은 글자로 보이므로 한 번만 떠야 합니다 — 뜬 것: ${JSON.stringify(shown)}`);
+});
+
+test('같은 막힘이 이미 떠 있으면 갈아 끼우지 않는다 — 깜빡이기만 한다', (t) => {
+  /*
+   * 막힘을 거르기보다 앞으로 옮기고 나면, 학생이 같은 곳을 계속 만질 때마다 갈아 끼워서
+   * **깜빡이기만 한다** — 열 번 만지면 말풍선이 열 번 새로 붙고 아홉 번 떨어진다.
+   * 읽고 있는 문장이 눈앞에서 사라졌다 나타난다. **다른** 막힘은 그대로 새치기해야 한다.
+   * (웨이브 3 의 centrifuge 세션이 짚었다)
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+
+  for (let i = 0; i < 10; i += 1) toast.push('그 자리에는 놓을 수 없습니다.', 'blocked', 'nope');
+  assert.equal(shown.length, 1, `같은 막힘이 ${shown.length}번 새로 떴습니다 — 깜빡입니다`);
+
+  // 다른 막힘은 그대로 새치기한다 — 그건 다른 사실이다.
+  toast.push('유리에 금이 갔습니다.', 'blocked', 'cracked');
+  assert.equal(shown.length, 2,
+    `다른 막힘은 곧장 떠야 합니다 — 뜬 차례: ${JSON.stringify(shown)}`);
 });
