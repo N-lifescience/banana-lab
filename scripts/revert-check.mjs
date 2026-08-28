@@ -44,10 +44,21 @@ if (cmd.length === 0) {
   process.exit(2);
 }
 
-/** 명령을 돌리고 초록불이었는지만 돌려준다. 화면에는 안 쏟는다 — 네 줄만 남긴다. */
+/**
+ * 명령을 돌리고 초록불이었는지만 돌려준다. 화면에는 안 쏟는다 — 네 줄만 남긴다.
+ *
+ * ★ **「돌려서 빨간불」과 「돌리지도 못함」을 가른다.**
+ *
+ * `spawnSync` 는 못 띄운 명령(이름 오타·실행 권한 없음)의 `status` 를 **`null`** 로 준다.
+ * 그것을 `!== 0` 으로 뭉뚱그리면 **「이 저장소는 원래 빨갛다」**가 되고,
+ * 사람은 **있지도 않은 실패를 찾으러** 간다. 되돌림 도구가 그러면 그 도구로 잰 판단이
+ * 전부 흔들린다. (웨이브 3 의 fermentation 세션이 자기 도구에서 잡았다)
+ */
 function run() {
   const r = spawnSync(cmd[0], cmd.slice(1), { encoding: 'utf8', shell: false });
-  return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  const ran = r.status !== null && !r.error;
+  return { ran, ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`,
+           why: r.error?.message ?? '끝값이 없습니다' };
 }
 
 /** 실패한 검사 이름을 몇 개만 뽑아 보여 준다 — 무엇이 물었는지가 이 도구의 답이다. */
@@ -85,6 +96,12 @@ let code = 0;
 try {
   // ① 주입 전 — 잴 바탕이 있는가
   const clean = run();
+  if (!clean.ran) {
+    console.log(`① 주입 전 검사   ★ **돌리지도 못했습니다** — ${clean.why}`);
+    console.log('   검사가 빨간 것이 아닙니다. 「--」 뒤의 명령을 다시 보세요.');
+    code = 2;
+    throw new Error('stop');
+  }
   console.log(`① 주입 전 검사   ${clean.ok ? '초록불' : '★ 빨간불 — 잴 바탕이 없습니다'}`);
   if (!clean.ok) {
     console.log(`   먼저 무는 것: ${bites(clean.out).join(' / ') || '(이름을 못 읽음)'}`);
@@ -103,7 +120,10 @@ try {
 
   // ③ 주입 뒤 — 검사가 무는가
   const hurt = run();
-  if (hurt.ok) {
+  if (!hurt.ran) {
+    console.log(`③ 주입 뒤 검사   ★ **돌리지도 못했습니다** — ${hurt.why}`);
+    code = 2;
+  } else if (hurt.ok) {
     console.log('③ 주입 뒤 검사   ★ 초록불 — **이 검사는 그 버그를 못 잡습니다**');
     code = 1;
   } else {
