@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "바나나랩",
+    "name": "바나나에서 탄수화물과 지질 관찰하기",
     "url": "https://banana-inquiry-based-virtual-lab.vercel.app",
     "stack": "Vite"
   },

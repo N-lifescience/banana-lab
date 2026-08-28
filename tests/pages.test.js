@@ -19,7 +19,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { UI } from '../src/ui/strings.js';
 import { manifest } from '../src/manifest.js';
 
@@ -66,6 +66,36 @@ function visible(src) {
 const titleOf = (src) => (src.match(/<title>([\s\S]*?)<\/title>/i) ?? [])[1]?.trim();
 const metaOf = (src, key) =>
   (src.match(new RegExp(`<meta[^>]+(?:name|property)="${key}"[^>]+content="([^"]*)"`, 'i')) ?? [])[1];
+
+test('점검 설정이 자기 앱을 가리킨다 — 남의 배포본을 보고 판정하지 않는다', () => {
+  /*
+   * `dorms-check.config.json` 은 복제해 오면 **바나나랩을 가리킨 채로 남는다.**
+   * 그 상태로 `/dorms` 를 돌리면 **남의 배포본을 열어 보고 이 저장소에 대한 판정을 낸다** —
+   * 개인정보처리방침도 응답 헤더도 남의 것을 읽는다. 다섯 저장소가 받은 초록불이
+   * **한 사이트를 다섯 번 검사한 것**이었다.
+   *
+   * **검사가 없었던 것보다 있는 것처럼 보였던 것이 나쁘다.**
+   *
+   * ── 「남의 것 목록」을 두지 않는다 ─────────────────────────────────
+   * 무엇이 남의 주소인지 목록으로 들고 다니면 **그 목록이 또 복제된다.**
+   * 대신 **자기를 가리키는지**만 본다 — 이름은 앱 제목과 같아야 하고, 주소는
+   * 비었거나(`null`) 자기 id 를 담아야 한다. 목록이 필요 없고 저장소마다 저절로 맞는다.
+   * (웨이브 2 의 osmosis 세션이 이 모양을 냈다)
+   *
+   * **이름만 갈고 주소를 안 간 상태**도 잡아야 한다. 복제 도중 한쪽만 고치면 실제로 그 꼴이 된다.
+   */
+  const cfgPath = new URL('../dorms-check.config.json', import.meta.url);
+  if (!existsSync(cfgPath)) return;   // 이 저장소가 점검 대상이 아니면 잴 것이 없다
+  const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+
+  assert.equal(cfg.app?.name, UI.appTitle,
+    `점검 설정의 이름이 이 앱과 다릅니다 — "${cfg.app?.name}" 이 아니라 "${UI.appTitle}" 이어야 합니다`);
+
+  const url = cfg.app?.url;
+  assert.ok(url === null || url === undefined || url === '' || String(url).includes(manifest.id),
+    `점검 설정이 남의 주소를 가리킵니다: ${url}\n`
+    + '  → 배포 전에는 null 이 정직합니다. **비어 있으면 사람이 알고, 남의 주소면 아무도 모릅니다.**');
+});
 
 test('이 저장소가 자기 이름을 알고 있다', () => {
   // **아래 주소 검사가 눈이 멀지 않게 지키는 검사다.**
