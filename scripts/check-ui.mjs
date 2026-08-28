@@ -367,11 +367,33 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
   const checked = rows.filter((r) => measured.has(r.key));
   record(checked.length > 0, '   (앞 조건) 그 줄들을 실제로 잰 화면이 있다',
     `맞댄 ${checked.length}줄 / 잰 화면 ${[...measured.keys()].join(' ')}`);
+  /*
+   * ★ **울 때 「무엇을 고치라」와 「붙여 넣을 것」을 준다.**
+   *
+   * 안 주면 이 검사는 첫 빨간불에서 죽는다. 그날 사람은 바쁘고, 빨간불 하나가
+   * 무엇을 하라고 안 말하면 **가장 빠른 길이 검사를 지우는 것**이다.
+   * 고칠 것은 거의 언제나 **문서**다 — 잰 값이 지금의 진실이니까.
+   * (웨이브 3 의 fermentation 세션이 「붙여 넣을 것을 안 주면 지워진다」로 짚었다)
+   */
+  const stale = [];
   for (const r of checked) {
     const got = measured.get(r.key);
-    record(Math.abs(got.bar - r.bar) <= 6 && Math.abs(got.note - r.note) <= 6,
+    const same = Math.abs(got.bar - r.bar) <= 6 && Math.abs(got.note - r.note) <= 6;
+    if (!same) stale.push({ ...r, got });
+    record(same,
       `PLAYTEST 의 ${r.key} 줄이 아직 맞다 (낡은 숫자는 없는 버그 신고를 만든다)`,
       `문서 조작 ${r.bar}% · 노트 ${r.note}%  /  잰 값 조작 ${got.bar}% · 노트 ${got.note}%`);
+  }
+  if (stale.length) {
+    console.log('\n  ★ 먼저 **왜 바뀌었는지** 보세요. 말풍선 자리를 일부러 옮기신 것이면');
+    console.log('     **고칠 것은 이 검사가 아니라 `PLAYTEST.md`** 입니다 — 잰 값이 지금의 진실입니다.');
+    console.log('     (일부러 옮긴 것이 아니면 그것이 버그입니다. 노트를 가리는 쪽은 바로 위');
+    console.log('      「탐구 노트를 가리지 않는다」가 따로 막고 있으니, 표만 고쳐도 그쪽은 안 샙니다)');
+    console.log('     표를 고치실 때 아래 줄로 바꿔 넣으세요:\n');
+    for (const r of stale) {
+      console.log(`     | ${r.key.replace('×', ' × ')} | 「(다) 재물대에서 내리기」 **${r.got.bar} %** · 탐구 노트 ${r.got.note} % |`);
+    }
+    console.log('');
   }
 }
 
