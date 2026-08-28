@@ -235,21 +235,40 @@ for (const w of [320, 390, 768, 1280]) {
     const toast = [...document.querySelectorAll('#toast-region *')].find((e) => e.getBoundingClientRect().width > 20);
     if (!toast) return { none: true };
     const tb = toast.getBoundingClientRect();
-    const worst = [];
-    for (const el of document.querySelectorAll('.bench-bar button')) {
-      const r = el.getBoundingClientRect();
-      if (r.width < 4) continue;
-      const ov = Math.max(0, Math.min(tb.right, r.right) - Math.max(tb.left, r.left))
-               * Math.max(0, Math.min(tb.bottom, r.bottom) - Math.max(tb.top, r.top));
-      if (ov > 0) worst.push({ name: el.textContent.trim().slice(0, 16), pct: Math.round(ov / (r.width * r.height) * 100) });
-    }
-    return { worst, buttons: document.querySelectorAll('.bench-bar button').length };
+    const worstOf = (sel) => {
+      let pct = 0; let who = '';
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4) continue;
+        const ov = Math.max(0, Math.min(tb.right, r.right) - Math.max(tb.left, r.left))
+                 * Math.max(0, Math.min(tb.bottom, r.bottom) - Math.max(tb.top, r.top));
+        const p = ov / (r.width * r.height) * 100;
+        if (p > pct) { pct = p; who = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 16); }
+      }
+      return { pct: Math.round(pct), who };
+    };
+    return {
+      bar: worstOf('.bench-bar button'),
+      note: worstOf('#note-panel button, #note-panel textarea, .note-tab'),
+      buttons: document.querySelectorAll('.bench-bar button').length,
+    };
   });
   record(!cover.none && cover.buttons > 0, `   (앞 조건) ${w}px 에 토스트와 조작 단추가 둘 다 있다`,
     JSON.stringify(cover));
-  const bad = (cover.worst ?? []).filter((x) => x.pct > 20);
-  record(bad.length === 0, `토스트 ${w}px — 실험대 조작 단추를 가리지 않는다`,
-    bad.length ? bad.map((x) => `${x.name} ${x.pct}%`).join(' · ') : '가린 것 없음');
+  /*
+   * ★ **양쪽을 다 잰다 — 한쪽만 재면 고침이 문제를 옮기기만 한다.**
+   *
+   * 조작 줄만 재고 토스트를 아래로 내렸더니, 600px 에서 토스트가 **탐구 노트 위 91 %** 에
+   * 올라앉았다 — 이 저장소가 예전에 이미 되돌린 자리다. 실험대에서 한 조작의 결과 문구가
+   * 노트 위에 겹쳐 뜨면 어느 쪽 이야기인지 알 수 없다.
+   * 여기서는 **가려진 비율을 숫자로 남기고**, 어느 쪽이 나빠지든 빨간불이 나게 둔다.
+   * (웨이브 1 의 micrometer 세션이 「그 처방으로는 안 된다」고 되돌려 잰 것을 받았다)
+   */
+  record(true, `토스트 ${w}px — 무엇을 얼마나 가리는지 (숫자로 남긴다)`,
+    `조작 줄 ${cover.bar?.pct ?? 0}% ${cover.bar?.who ?? ''} · 노트 ${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
+  record((cover.note?.pct ?? 0) <= 20,
+    `토스트 ${w}px — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
+    `${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
   await t.close();
 }
 
