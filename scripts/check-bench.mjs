@@ -1642,6 +1642,46 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     ok(after.locked > 0,
        '   (앞 조건) 그때 펴 본 적 없는 STEP 은 실제로 다시 잠긴다', `${after.locked}개`);
   }
+  /*
+   * ④ **저절로 열렸던 STEP 도 면제여야 한다 — 이건 ③ 과 다른 경우다.**
+   *
+   * 「지금 할 차례」라서 저절로 펼쳐진 STEP 은 **학생이 누른 적이 없다.** 누르는 자리에서만
+   * 담으면 그런 STEP 은 안 담기고, 학생이 **앞 STEP 의 기록을 지우는 순간**
+   * 「지금 자리」가 뒤로 밀려 **봤던 것이 잠긴다.**
+   *
+   * 그래서 두 줄은 **서로 다른 경우**를 지킨다 — 누른 것과 저절로 열린 것.
+   * 「둘 다 넣었다」 로 끝내면 한 줄이 언제 사라져도 아무도 모른다.
+   * (웨이브 3 의 germination 세션이 되돌려 보고 잡았다)
+   */
+  {
+    const auto = await lk.evaluate(() =>
+      document.querySelector('details[data-step-group][data-state="now"]')?.dataset.stepGroup ?? null);
+    ok(auto !== null, '   (앞 조건) 저절로 펼쳐진 「지금」 STEP 이 있다', `STEP ${auto}`);
+    if (auto) {
+      // 앞 STEP 의 기록을 지운다 → 「지금 자리」가 뒤로 밀려 이 STEP 이 잠길 자리가 된다.
+      // **한 번의 렌더로 잠기게** 한다 — 사이에 「아직 아무것도 안 잠긴」 렌더가 끼면
+      // 그때 담겨 버려서 고장난 코드가 그대로 초록불을 받는다.
+      await lk.evaluate(() => {
+        const now = document.querySelector('details[data-step-group][data-state="now"]');
+        const prev = now?.previousElementSibling;
+        for (const t of prev?.querySelectorAll('textarea[data-note]') ?? []) {
+          if (!t.value.trim()) continue;
+          t.value = '';
+          t.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      await lk.waitForTimeout(400);
+      const st = await lk.evaluate((g) => ({
+        mine: document.querySelector(`[data-step-group="${g}"]`)?.dataset.state,
+        locked: document.querySelectorAll('[data-step-group][data-state="locked"]').length,
+      }), auto);
+      ok(st.mine !== 'locked',
+         '자물쇠 — 저절로 펼쳐졌던 STEP 도 누른 적 없어도 다시 안 잠긴다',
+         `STEP ${auto} → ${st.mine}`);
+      ok(st.locked > 0, '   (앞 조건) 그때 다른 STEP 은 실제로 잠겨 있다', `${st.locked}개`);
+    }
+  }
+
   await lk.close();
 }
 
