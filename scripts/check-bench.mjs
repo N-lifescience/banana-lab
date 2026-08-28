@@ -2128,6 +2128,38 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 
   {
     /*
+     * ★ **실험대가 잠겨 있는데 「실험대에서 먼저 해 보세요」 라고 하지 않는가.**
+     *
+     * 4쪽에 막 들어온 학생에게 실험대로 가라고 해 놓고 실험대는 잠가 두면, 눌러 보고
+     * 아무 일도 안 일어나는 것을 겪는다. 자물쇠를 여는 단추는 이 쪽 **맨 밑**(1264px
+     * 아래)이라 눈에 안 들어온다. 앱이 서로 다른 말을 하는 자리다.
+     * (운영 빌드를 학생처럼 밟다가 나왔다)
+     */
+    const two4 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await two4.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await two4.evaluate(() => { for (const st of ['1', '2', '3']) window.__store.dispatch('MARK_READ', { stage: st }); });
+    await two4.locator('.note-tab[data-stage="4"]').click();
+    await two4.waitForTimeout(400);
+    const peekHint = () => two4.evaluate(() => ({
+      locked: Boolean(document.querySelector('.bench')?.classList.contains('bench--locked')),
+      hint: document.querySelector('.substep-hint')?.textContent?.trim() ?? '',
+    }));
+    const shut = await peekHint();
+    ok(shut.locked, '   (앞 조건) 4쪽만 안 읽었을 때 실험대는 아직 잠겨 있다', JSON.stringify(shut));
+    ok(!/실험대에서 먼저/.test(shut.hint),
+       '노트 — **실험대가 잠겨 있으면 실험대로 보내지 않는다** (무엇을 누르면 되는지 말한다)',
+       `"${shut.hint}"`);
+    ok(/읽었습니다/.test(shut.hint), '노트 — 잠긴 동안에는 여는 단추를 짚어 준다', `"${shut.hint}"`);
+    await two4.evaluate(() => window.__store.dispatch('MARK_READ', { stage: '4' }));
+    await two4.waitForTimeout(400);
+    const open4 = await peekHint();
+    ok(open4.locked === false && /실험대에서 먼저/.test(open4.hint),
+       '노트 — 실험대가 열리면 다시 실험대로 보낸다', JSON.stringify(open4));
+    await two4.close();
+  }
+
+  {
+    /*
      * ★ **잠긴 STEP 의 말이 지금 적은 것과 맞는가.**
      *
      * 다 적어 놓았는데 「앞 STEP 을 먼저 적으세요」 라고 하면 **거짓말**이다 — 학생은

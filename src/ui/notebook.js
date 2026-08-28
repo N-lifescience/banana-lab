@@ -135,6 +135,10 @@ const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length >
  */
 const predictDone = (st) => SLIDE_IDS.every((id) => hasNote(st, `predict.${id}`));
 
+/** 실험대가 아직 잠겨 있는가 — `bench.js` 의 `lockState()` 와 같은 것을 본다. */
+const benchLocked = (st) =>
+  UI.bench.lock.required.some((id) => !(st.session.readStages ?? []).includes(id));
+
 /**
  * 이 STEP 의 관찰 기록을 **다 적었는가.**
  *
@@ -465,8 +469,17 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         const id = substepId(group, i);
         // 하이라이트는 1단계에서만. 2단계는 목록만 보여 준다 (docs/06 표).
         const hi = level === 1 && i === nextIdx ? ' substep--next' : '';
+        /*
+         * 실험대가 아직 잠겨 있으면 **거기로 보내지 않는다.**
+         *
+         * 4쪽에 막 들어온 학생에게 「실험대에서 먼저 해 보세요」 라고 해 놓고 실험대는
+         * 잠가 두면, 눌러 보고 아무 일도 안 일어나는 것을 겪는다. 자물쇠를 여는 단추는
+         * 이 쪽 **맨 밑**(1264px 아래)에 있어서 눈에 안 들어온다.
+         * 앱이 서로 다른 말을 하는 자리다 — 무엇을 누르면 되는지로 바꾼다.
+         */
+        const notYet = benchLocked(st) ? N.stepBenchLocked : N.stepNotYet;
         const hint = level === 1 && i === nextIdx
-          ? `<p class="substep-hint">${done[i] ? N.stepWriteNow : N.stepNotYet}</p>` : '';
+          ? `<p class="substep-hint">${done[i] ? N.stepWriteNow : notYet}</p>` : '';
         return `
           <li class="substep${hi}" data-done="${done[i]}">
             <div class="substep-title">
