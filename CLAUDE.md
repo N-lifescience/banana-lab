@@ -57,6 +57,11 @@ node scripts/check-ui.mjs        # 조작 UI — 화면을 띄워야 아는 것
 node scripts/check-bench.mjs     # 실험대 어포던스 — 말풍선·하이라이트·문지르기
 node scripts/check-grading.mjs   # 서술형 첨삭 — 바깥에서 던지는 문장
 node scripts/perf-fov.mjs --dom  # 시야 렌더러 성능
+
+# 검사가 그 버그를 **정말 무는지** — 손으로 하면 두 가지를 틀린다
+#   · 주입한 채로 멈춰 파일이 고쳐진 상태로 남는다
+#   · 주입이 안 먹었는데 「검사가 못 잡는다」로 읽는다 (「pass 8」이 그 둘을 안 가른다)
+node scripts/revert-check.mjs <파일> <찾을 것> <바꿀 것> -- npm run check
 ```
 
 `npm run check` 에는 **기계로 확실히 판정되는 것만** 넣습니다. 브라우저 검사와 성능 측정은
