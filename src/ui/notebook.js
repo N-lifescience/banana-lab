@@ -17,7 +17,7 @@ import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE } from '../sim/optics.js';
 import { UI } from './strings.js';
-import { stepDone, groupDone, resultsDone, tidyStatus } from '../sim/progress.js';
+import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
 
 
 const N = UI.notebook;
@@ -326,6 +326,14 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   const manualOpen = new Map();
 
   /**
+   * 한 번이라도 **열려 본** STEP. 잠금은 여기 없는 것에만 건다.
+   *
+   * 「앞 STEP 을 다 적어야 뒤가 열린다」 로만 두면, 미리 훑어본 STEP 이 뒤늦게 다시 잠긴다 —
+   * 학생 눈에는 **열려 있던 것이 사라진 것**이고, 그건 고장으로 읽힌다.
+   */
+  const everOpened = new Set();
+
+  /**
    * 탐구 과정 — **한 번에 한 STEP.**
    *
    * 여섯 STEP 을 한꺼번에 펼쳐 놓으면 학생이 그것을 「읽을 글」로 받는다. 주욱 읽고 내려간
@@ -345,7 +353,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const level = st.session.level;
     const groupsDone = UI.protocol.map((g) => groupDone(st, g.id));
     const doneCount = groupsDone.filter(Boolean).length;
-    // 앞 STEP 을 안 적었으면 뒤 STEP 은 열리지 않는다. **누가 막고 있는지**를 들고 다닌다 —
+    // 지금 STEP 의 관찰 기록이 비면 뒤 STEP 이 잠긴다. **누가 막고 있는지**를 들고 다닌다 —
     // 「열리지 않습니다」 만 띄우면 학생은 어디로 돌아가야 하는지 모른다.
     const unwritten = UI.protocol.map((g) => !stepNotesWritten(st, g));
 
@@ -359,8 +367,15 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const nowIdx = groupsDone.findIndex((d, i) => !(d && !unwritten[i]));
 
     const stepsHtml = UI.protocol.map((group, gi) => {
-      const blockerIdx = unwritten.slice(0, gi).findIndex(Boolean);
-      const lockedBy = blockerIdx === -1 ? null : UI.protocol[blockerIdx].id;
+      /*
+       * **잠그는 자리는 셋을 다 지나야 한다:**
+       *   ① 지금 STEP 보다 **뒤**여야 한다 — 지나온 것과 지금 것은 안 잠근다.
+       *   ② 지금 STEP 의 관찰 기록이 **비어** 있어야 한다.
+       *   ③ 그 STEP 을 **한 번도 열어 본 적이 없어야** 한다 — 열려 있던 것이 사라지면 고장이다.
+       */
+      const lockedBy = gi > nowIdx && nowIdx >= 0 && unwritten[nowIdx] && !everOpened.has(group.id)
+        ? UI.protocol[nowIdx].id : null;
+      if (!lockedBy) everOpened.add(group.id);
       if (lockedBy) return stepShell(group, gi, groupsDone, '', lockedBy, nowIdx);
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
@@ -641,7 +656,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   }
 
   /* ---------------------------------------------------------------- */
-  /* 7 자기 평가 — session.violations 를 그대로 보여 준다. 감점하지 않는다. */
+  /* 7 자기 평가 — 척도 · 느낀 점 · 실제 실험에서 지킬 것(적어만 둔다). */
   /* ---------------------------------------------------------------- */
 
   /**
@@ -679,26 +694,14 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       </div>`).join('');
 
     /*
-     * 이 칸은 학생이 채우는 곳이 아니다. 실험하는 동안 지켜본 것을 그대로 보여 준다.
+     * 가치·태도 — **적어만 둔다. 아무것도 판정하지 않는다.**
      *
-     * **`session.violations` 만 보면 안 된다.** 그 목록은 보고서를 열 때(`CHECK_TIDY`) 에만
-     * 채워지는데, 이 쪽은 보고서를 열기 **전에** 보는 곳이다. 그래서 손을 안 씻고 들어와도
-     * 세 줄 모두 「지켰습니다 ✓」 가 떴다 — 안 지켰는데 지켰다고 하는 화면이었다.
-     * 지금은 `tidyStatus` 한 곳을 본다. `CHECK_TIDY` 도 같은 함수를 본다.
+     * 예전에는 손 씻기·마개 닫기·폐액 버리기를 지켜보고 ✓/✗ 를 붙였다. 그 조작을 통째로
+     * 걷어냈다 — 가상 실험에서 그것을 따지면 **화면 속 단추를 눌렀다는 사실**을 평가하게
+     * 되고, 그건 안전 습관이 아니라 조작 순서 외우기다.
      */
-    const status = tidyStatus(st);
-    const stateWord = { kept: N.valuesKept, missed: N.valuesMissed, todo: N.valuesTodo, na: N.valuesNA };
-    const stateMark = { kept: '✓', missed: '✗', todo: '·', na: '–' };
-    const violationItems = N.valuesWatched.map(({ kind, label }) => {
-      const s = status[kind];
-      return `<li class="value-item" data-state="${s}" data-missed="${s === 'missed'}">
-        <span class="value-mark" aria-hidden="true">${stateMark[s]}</span>
-        <span class="value-label">${label}</span>
-        <span class="value-state">${stateWord[s]}</span>
-      </li>`;
-    }).join('');
-    const allKept = N.valuesWatched.every(({ kind }) => status[kind] === 'kept' || status[kind] === 'na');
-    const anyTodo = N.valuesWatched.some(({ kind }) => status[kind] === 'todo');
+    const values = N.valuesList.map((line) => `<li>${emph(line)}</li>`).join('');
+
     return `
       <div id="self-eval">
         <h3>${N.likertHeading}</h3>
@@ -707,10 +710,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         ${reflections}
         <div class="self-eval-item">
           <h3>${N.valuesLabel}</h3>
-          <p class="stage-text values-lead">${N.valuesLead}</p>
-          <ul id="violations" class="values-list">${violationItems}</ul>
-          ${allKept ? `<p class="no-violations">${N.noViolations}</p>` : ''}
-          ${anyTodo ? `<p class="stage-empty">${N.valuesTodoLead}</p>` : ''}
+          <p class="stage-text values-lead">${emph(N.valuesLead)}</p>
+          <ul id="values-list" class="values-list">${values}</ul>
         </div>
       </div>`;
   }
@@ -772,12 +773,20 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       /*
        * 누른 쪽은 끝났다. 학생이 탭을 도로 찾아 누르게 두지 않는다 — 다음 쪽으로 데려간다.
        *
+       * **넘길 곳은 「자리」로 고른다. 「아직 안 읽은 쪽」으로 고르면 안 된다.**
+       * 그렇게 하면 차례대로 읽는 동안에는 늘 맞고, 뒤쪽을 먼저 읽어 둔 학생이 앞쪽에서
+       * 누를 때만 거꾸로 끌려간다 — 차례대로만 재는 검사로는 영영 안 보인다.
+       *
+       * **마지막 읽기 쪽(4)에서는 그 자리에 머문다.** 그 쪽이 「탐구 과정」이고, 누르는
+       * 순간 실험대가 열린다. 다음 할 일은 다음 쪽을 읽는 것이 아니라 실험대로 가는 것이다.
+       *
        * **표시할 쪽과 옮겨 갈 쪽을 헷갈리면 엉뚱한 쪽에 ✓ 가 붙는다.** 지금 쪽을 먼저 붙잡고,
        * 그 다음에 옮긴다. dispatch 가 render 를 부르므로 옮기는 것이 먼저여야 한 번만 그린다.
        */
       const stage = activeStage;
-      const next = N.stages[N.stages.findIndex((s) => s.id === stage) + 1];
-      if (next) activeStage = next.id;
+      const required = UI.bench.lock.required;
+      const next = required[required.indexOf(stage) + 1];
+      if (next) activeStage = next;
       store.dispatch('MARK_READ', { stage });
     });
   }

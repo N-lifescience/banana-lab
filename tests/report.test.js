@@ -34,31 +34,26 @@ function filled() {
   return st;
 }
 
-test('종이는 제출물이 나르는 것만 읽는다 — 안전 기록 절', () => {
+test('가치·태도 절은 학생이 무엇을 했는지 읽지 않는다', () => {
   /*
-   * 자기 평가 **화면**은 이제 살아 있는 판정(`tidyStatus`)을 본다. 그런데 **종이는 그러면 안 된다.**
+   * 예전에는 이 절이 「손을 씻었는가」 를 적었다. 그 판정을 통째로 걷어냈다 —
+   * 가상 실험에서 그것을 따지면 **화면 속 단추를 눌렀다는 사실**을 평가하게 된다.
    *
-   * 선생님 화면은 제출된 `{ level, notes, captures, violations }` **넷만으로** 같은 종이를 다시
-   * 만든다. 종이가 `tidy` 나 `slides` 를 읽는 순간 그 계약이 깨지고, 선생님 화면에서만
-   * **안전 기록 절이 조용히 달라진다** — 학생 화면에서는 멀쩡해서 아무도 모른다.
-   * 계약을 지키려고 제출물에 `tidy` 를 더하면 이번에는 **종이가 읽지도 않는 것까지 수집**하게 된다.
-   *
-   * 그래서 답은 하나다 — 종이는 `CHECK_TIDY` 가 **얼려 둔** `violations` 를 읽는다.
-   * 같은 함수의 출력이라 화면과 어긋나지 않는다.
-   *
-   * (7번을 고치다 종이까지 함께 바꾸고 싶어지는 자리다. 웨이브 3 의 centrifuge 세션이 짚었다.)
+   * 그러니 이 절은 **상태와 무관하게 늘 같은 글**이어야 한다. 무엇을 했든 안 했든 똑같다.
+   * 여기가 상태를 다시 읽기 시작하면 제출 계약(`SUBMIT_SESSION_KEYS`)도 함께 깨지는데,
+   * 그때는 **선생님 화면에서만** 조용히 달라져서 학생 화면으로는 알 수가 없다.
    */
-  let st = filled();
-  st = reduce(st, { type: 'CHECK_TIDY', payload: {} }).state;
-  assert.ok(st.session.violations.length > 0,
-    '(앞 조건) 정리를 안 한 상태여야 이 검사가 무언가를 잽니다');
-
-  // 제출물이 나르는 것만 남긴 상태 — 선생님 화면이 손에 쥐는 것이 딱 이만큼이다.
-  const carried = payloadOf(st, { school: '', team: '' }, 'team').state;
-
   const cut = (html) => html.slice(html.indexOf(UI.notebook.valuesLabel));
-  assert.equal(cut(buildSheet(carried, {})), cut(buildSheet(st, {})),
-    '종이가 제출물에 없는 것을 읽고 있습니다 — 선생님 화면에서 안전 기록 절이 달라집니다');
+  const empty = cut(buildSheet(initialState(2), {}));
+  const busy = cut(buildSheet(filled(), {}));
+  assert.equal(empty, busy,
+    '가치·태도 절이 학생이 한 일에 따라 달라집니다 — 적어만 두기로 한 자리입니다');
+
+  // 그리고 실제로 안내가 실려 있어야 한다. 「늘 같다」 만 보면 **늘 비어 있어도** 통과한다.
+  for (const line of UI.notebook.valuesList) {
+    const bare = line.replace(/\*\*/g, '');
+    assert.ok(busy.includes(bare.slice(0, 12)), `안내 한 줄이 종이에 없습니다: ${bare}`);
+  }
 });
 
 test('보고서에 학생이 적은 것과 넣은 이름이 실린다', () => {

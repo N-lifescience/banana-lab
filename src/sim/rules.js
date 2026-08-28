@@ -18,7 +18,6 @@ import {
   isStaining, initialSlide, HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
 import { focusTolerance, EYEPIECE } from './optics.js';
-import { untidyNow } from './progress.js';
 
 export { PAN_LIMIT };
 
@@ -30,9 +29,8 @@ export { PAN_LIMIT };
  * 되돌리기 1회짜리 3단계에서는 그 한 번이 TICK 을 무르는 데 쓰여 사라진다.
  */
 export const TRANSIENT_ACTIONS = new Set([
-  'TICK', 'MOVE_STAGE', 'NOTE_VIOLATION',
+  'TICK', 'MOVE_STAGE',
   // 정리했는지 보는 것은 학생이 "한" 조작이 아니다. 되돌릴 것도 아니다.
-  'CHECK_TIDY',
   // 탐구 노트의 어느 쪽을 읽었는지는 학생이 "한" 조작이 아니다. 되돌릴 것도 아니다.
   'MARK_READ',
 ]);
@@ -108,28 +106,6 @@ function snapshot(state) {
  * 마개·손·폐액은 시야에 나타나지 않으므로 결과로 말할 수 없다.
  * 늦게라도 지키면 위반 기록에서 지운다. 감점은 애초에 없다. docs/04 「안전 규칙만은 예외」 참조.
  */
-/**
- * 정리 동작 하나 — 손 씻기 · 마개 닫기 · 폐액 버리기.
- *
- * 두 가지를 한다: **했다고 기록**하고, 이미 붙은 위반이 있으면 **지운다.**
- * 벌이 아니라 기록이므로 늦게 해도 지워진다.
- */
-function safetyAction(kind, message, doneMessage) {
-  return function (state) {
-    const { violations, tidy } = state.session;
-    const next = {
-      ...state,
-      session: {
-        ...state.session,
-        violations: violations.filter((v) => v !== kind),
-        tidy: tidy.includes(kind) ? tidy : [...tidy, kind],
-      },
-    };
-    if (violations.includes(kind)) return ok(next, message, 'safety-recovered');
-    return ok(next, doneMessage, 'tidy');
-  };
-}
-
 /**
  * 덮개 유리를 내려놓은 각도로 기포 수가 정해진다.
  * 35°~55° 사이면 0개, 수직(90°)이나 눕힘(0°)에 가까울수록 최대 6개.
@@ -533,51 +509,6 @@ export const ACTIONS = {
       return happened(next, '흐린 채로 기록됐습니다. 정리 단계에서 왜 흐렸는지 적게 됩니다.', 'blurry-capture');
     }
     return ok(next, `${SLIDE_NAME[m.stage]} 시야를 기록했습니다. 지금까지 ${next.session.captures.length}장입니다.`, 'captured');
-  },
-
-  /** 안전 규칙 위반 기록. 진행을 막지 않고 자기 평가에 보여 주기만 한다. */
-  NOTE_VIOLATION(state, { kind }) {
-    return ok({
-      ...state,
-      session: { ...state.session, violations: [...state.session.violations, kind] },
-    });
-  },
-
-  /** 손을 씻는다 */
-  WASH_HANDS: safetyAction('hands-unwashed',
-    '늦었지만 손을 씻었습니다. 위반 기록에서 지웠습니다.', '손을 씻었습니다.'),
-
-  /** 시약병 마개를 닫는다 */
-  CLOSE_CAP: safetyAction('cap-left-open',
-    '늦었지만 마개를 닫았습니다. 위반 기록에서 지웠습니다.', '시약병 마개를 닫았습니다.'),
-
-  /** 폐액을 처리한다 */
-  DISPOSE_WASTE: safetyAction('waste-left',
-    '늦었지만 폐액을 처리했습니다. 위반 기록에서 지웠습니다.', '폐액을 폐액통에 버렸습니다.'),
-
-  /**
-   * 실험을 마칠 때 정리를 했는지 본다. 보고서를 열 때 한 번 돈다.
-   *
-   * ── 왜 여기서 보나 ────────────────────────────────────────────────
-   * 「가치·태도 — 안전 규칙 준수」 칸은 만들어만 두고 **아무 데서도 기록되지 않고 있었다.**
-   * 그래서 무엇을 하든 늘 "위반 없음" 이었고, 학생 눈에는 아무 뜻 없는 칸이었다.
-   * 정리는 원래 **끝낼 때** 하는 일이라, 끝내는 시점에 본다.
-   *
-   * 막지 않는다. 정리를 안 했어도 보고서는 그대로 나온다 — 안 한 것이 적힐 뿐이다.
-   * 뒤늦게 실험대에서 휴지·시약병·폐액통을 누르면 기록이 지워진다.
-   */
-  CHECK_TIDY(state) {
-    const { violations } = state.session;
-    // 판정은 `progress.js` 의 `tidyStatus` 한 곳에만 있다. 화면(자기 평가 쪽)도 같은 것을 본다 —
-    // 따로 세면 노트와 보고서가 서로 다른 말을 하게 된다.
-    const missed = untidyNow(state);
-    if (missed.length === 0) return ok(state);
-    const next = {
-      ...state,
-      session: { ...state.session, violations: [...violations, ...missed] },
-    };
-    return happened(next,
-      `정리하지 않은 것이 ${missed.length}가지 있습니다. 자기 평가 쪽에 남습니다.`, 'tidy-missed');
   },
 
   /** 세부 단계별 관찰 기록 */

@@ -37,7 +37,7 @@ function fuzzPayloads(slide) {
     RINSE_SLIDE: { slide }, MOUNT: { slide }, CLEAN_LENS: {},
     SET_OBJECTIVE: { objective: 40 }, COARSE_FOCUS: { delta: 0.2 },
     FINE_FOCUS: { delta: 0.05 }, SET_DIAPHRAGM: { value: 0.5 },
-    NOTE_VIOLATION: { kind: 'cap-left-open' }, SAVE_NOTE: { step: '1a', text: 'x' },
+    SAVE_NOTE: { step: '1a', text: 'x' },
     MOVE_STAGE: { dx: 20, dy: 0 },
     NEW_SLIDE: { slide }, DELETE_CAPTURE: { at: 0 }, MARK_READ: { stage: '1' },
   };
@@ -479,21 +479,6 @@ test('재물대에 잘못 올린 슬라이드는 되돌리기를 쓰지 않고 �
 
 /* ---------------- 안전 수칙 · 기록 ---------------- */
 
-test('안전 수칙은 감점하지 않고, 늦게라도 지키면 기록에서 지운다', () => {
-  let s = run(S0(), 'NOTE_VIOLATION', { kind: 'cap-left-open' }).state;
-  s = run(s, 'NOTE_VIOLATION', { kind: 'hands-unwashed' }).state;
-  assert.deepEqual(s.session.violations, ['cap-left-open', 'hands-unwashed']);
-
-  const closed = run(s, 'CLOSE_CAP');
-  assert.equal(closed.tag, 'safety-recovered');
-  assert.deepEqual(closed.state.session.violations, ['hands-unwashed']);
-
-  const washed = run(closed.state, 'WASH_HANDS');
-  assert.deepEqual(washed.state.session.violations, []);
-
-  assert.equal(run(washed.state, 'DISPOSE_WASTE').outcome, 'ok', '지울 위반이 없으면 조용히 넘어간다');
-});
-
 test('단계별 관찰 기록이 남는다', () => {
   const r = run(S0(), 'SAVE_NOTE', { step: '3b', text: '청람색 알갱이가 보인다' });
   assert.equal(r.outcome, 'ok');
@@ -692,33 +677,4 @@ test('reduce 는 원본 상태를 바꾸지 않는다', () => {
   run(s, 'PEEL_BANANA');
   run(s, 'SMEAR', { slide: 'A', thickness: 0.9 });
   assert.equal(JSON.stringify(s), before, 'reduce 는 순수 함수여야 합니다');
-});
-
-test('정리를 안 하면 마칠 때 기록에 남고, 뒤늦게 해도 지워진다', () => {
-  // 「가치·태도 — 안전 규칙 준수」 칸은 오래 비어 있었다. 만들어만 두고 아무 데서도
-  // 기록하지 않았기 때문이다. 늘 "위반 없음" 이 뜨는 칸은 아무 말도 하지 않는 칸이다.
-  let s = run(S0(), 'PEEL_BANANA').state;
-  s = run(s, 'SMEAR', { slide: 'B', thickness: 0.3 }).state;
-  s = run(s, 'FILL_DROPPER', { reagent: REAGENTS.IKI }).state;
-  s = run(s, 'DROP', { slide: 'B', count: 2 }).state;
-
-  const checked = run(s, 'CHECK_TIDY');
-  assert.equal(checked.outcome, 'happened', '막지는 않는다');
-  assert.deepEqual(checked.state.session.violations.slice().sort(),
-    ['cap-left-open', 'hands-unwashed', 'waste-left']);
-
-  // 늦게라도 하면 지워진다. 벌이 아니라 기록이다.
-  let t = checked.state;
-  for (const a of ['WASH_HANDS', 'CLOSE_CAP', 'DISPOSE_WASTE']) t = run(t, a).state;
-  assert.deepEqual(t.session.violations, []);
-
-  // 두 번 봐도 같은 것이 두 번 쌓이지 않는다.
-  assert.deepEqual(run(t, 'CHECK_TIDY').state.session.violations, []);
-});
-
-test('시약을 안 썼으면 닫을 마개도 버릴 폐액도 없다', () => {
-  const s = run(S0(), 'PEEL_BANANA').state;
-  const checked = run(s, 'CHECK_TIDY');
-  assert.deepEqual(checked.state.session.violations, ['hands-unwashed'],
-    '안 한 일을 안 했다고 적지 않는다');
 });

@@ -203,18 +203,21 @@ export function dropTable(store, openZoom = () => {}) {
 /**
  * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
  *
- * 시약병·폐액통·휴지의 안전 수칙은 늦게라도 하면 자기 평가의 위반 기록에서 지워진다
- * (rules.js 의 safetyAction). 그 셋을 부르는 곳이 여기 말고는 없다 —
- * 없으면 위반 기록이 한 번 남고 영영 지워지지 않는다.
+ * ── 시약병·폐액통·휴지가 여기 없는 이유 ──────────────────────────
+ * 예전에는 셋을 눌러 「마개 닫기」·「폐액 버리기」·「손 씻기」 를 했고, 그것을 자기 평가에서
+ * 지켰는지 따졌다. 그 조작을 **통째로 걷어냈다** — 가상 실험에서 그것을 따지면
+ * 안전 습관이 아니라 **화면 속 단추를 눌렀다는 사실**을 평가하게 된다. 진짜 마개는
+ * 교실에서 닫는다. 자기 평가 쪽에는 이제 **가만히 적힌 안내**만 있다.
+ *
+ * 셋 다 실험대에 그대로 남아 있고 **하는 일이 있다** — 스포이트를 시약병에 대면 채우고,
+ * 폐액통에 대면 헹구고, 휴지를 현미경에 대면 렌즈를 닦는다 (`dropTable`).
+ * 눌렀을 때는 말풍선이 이름과 쓰임을 말한다. **말없이 먹통인 물건은 남기지 않는다.**
  */
 export function tapTable(store, onOpenZoom) {
   return {
     banana: () => store.dispatch('PEEL_BANANA', {}),
     slide: (item, el) => onOpenZoom('slide', item.slide, el),
     microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
-    bottle: () => store.dispatch('CLOSE_CAP', {}),
-    waste: () => store.dispatch('DISPOSE_WASTE', {}),
-    tissue: () => store.dispatch('WASH_HANDS', {}),
   };
 }
 

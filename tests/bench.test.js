@@ -182,13 +182,45 @@ test('받침 유리를 개수대에 대면 씻는다', () => {
   assert.deepEqual(store.calls, [{ type: 'RINSE_SLIDE', payload: { slide: 'C' } }]);
 });
 
-test('안전 수칙 세 가지를 실험대에서 부를 수 있다', () => {
-  // 이 셋은 rules.js 에 오래 있었지만 부르는 곳이 없었다 —
-  // 위반 기록이 한 번 남으면 자기 평가에서 영영 지워지지 않았다.
-  const expected = { bottle: 'CLOSE_CAP', waste: 'DISPOSE_WASTE', tissue: 'WASH_HANDS' };
-  for (const [kind, action] of Object.entries(expected)) {
-    const store = fakeStore();
-    tapTable(store, () => {})[kind]({ kind }, null);
-    assert.deepEqual(store.calls.map((c) => c.type), [action], `${kind} 을 눌러도 ${action} 이 안 간다`);
+test('말풍선이 없는 조작을 약속하지 않는다 — 세 난이도 모두', () => {
+  /*
+   * 탭을 걷어내면서 **말풍선의 「클릭하면 …」 은 남기기 쉽다.** 그러면 학생은 눌러 보고
+   * 아무 일도 안 나는 것을 보고 고장이라고 여긴다 — **기능이 없는데 안내가 있는 것은
+   * 안내가 없는 것보다 나쁘다.**
+   *
+   * ★ **세 난이도를 다 훑는다.** `UI.bench.hints` 는 난이도마다 문자열이 따로 있어서,
+   * 한 단계만 보는 검사는 나머지 둘에 남은 약속을 못 본다. fermentation 세션이 바로
+   * 그 구멍에 물렸다 — 2단계 문구에 약속을 되살렸는데 1단계만 보는 검사가 초록불이었다.
+   */
+  const taps = tapTable(fakeStore(), () => {});
+  for (const [kind, byLevel] of Object.entries(UI.bench.hints)) {
+    for (const [level, lines] of Object.entries(byLevel)) {
+      const promises = (lines ?? []).filter((t) => /클릭/.test(t));
+      if (promises.length === 0) continue;
+      assert.ok(taps[kind],
+        `${kind} 의 ${level}단계 말풍선이 클릭을 약속하는데 누르는 조작이 없습니다`
+        + ` — 학생은 눌러 보고 고장이라고 여깁니다: ${promises.join(' / ')}`);
+    }
   }
+});
+
+test('시약병·폐액통·휴지는 눌러도 조작이 일어나지 않는다', () => {
+  /*
+   * 손 씻기·마개 닫기·폐액 버리기를 **통째로 걷어냈다.** 가상 실험에서 그것을 따지면
+   * 안전 습관이 아니라 **화면 속 단추를 눌렀다는 사실**을 평가하게 된다.
+   *
+   * 그래도 셋은 실험대에 남아 있고 **하는 일이 있다** — 스포이트를 대면 채우고, 헹구고,
+   * 휴지를 현미경에 대면 렌즈를 닦는다. 끌기는 살아 있고 탭만 없앤 것이다.
+   * 눌렀을 때는 말풍선이 이름과 쓰임을 말한다 — **말없이 먹통인 물건은 남기지 않는다.**
+   */
+  const store = fakeStore();
+  const taps = tapTable(store, () => {});
+  for (const kind of ['bottle', 'waste', 'tissue']) {
+    assert.equal(taps[kind], undefined, `${kind} 에 안전 수칙 탭이 남아 있습니다`);
+  }
+  // 끌기는 살아 있어야 한다 — 여기까지 지우면 스포이트를 채울 길이 없어진다.
+  const drops = dropTable(store, () => {});
+  assert.ok(drops.dropper.bottle, '스포이트를 시약병에 대는 길이 없어졌습니다');
+  assert.ok(drops.dropper.waste, '스포이트를 헹구는 길이 없어졌습니다');
+  assert.ok(drops.tissue.microscope, '휴지로 렌즈를 닦는 길이 없어졌습니다');
 });

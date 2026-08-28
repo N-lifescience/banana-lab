@@ -216,16 +216,28 @@ const stage = await page.evaluate(() => window.__store.getState().microscope.sta
 ok(stage === null, '내리기 버튼으로 재물대가 비워진다');
 ok(!(await page.locator('#unmount').isVisible()), '내리면 버튼이 사라진다');
 
-// 안전 수칙을 실험대에서 지울 수 있는가
-await page.evaluate(() => window.__store.dispatch('NOTE_VIOLATION', { kind: 'cap-left-open' }));
-await page.waitForTimeout(60);
+/*
+ * **탭으로 하던 안전 수칙을 걷어낸 뒤, 그 물건이 말없이 먹통이 되지 않았는가.**
+ *
+ * 시약병·폐액통·휴지는 눌러서 「마개 닫기」·「폐액 버리기」·「손 씻기」 를 하던 물건이다.
+ * 그 조작을 없앴다. 그런데 물건은 실험대에 그대로 있다 — **누르면 아무 일도 안 나는 물건**이
+ * 남으면 학생은 앱이 고장 난 줄 안다. 우리가 이미 한 번 잡은 버그의 얼굴이다.
+ *
+ * 그래서 두 가지를 잰다: 실험대가 **안 바뀌는가**(조작이 없어졌는가)와
+ * 말풍선이 **여전히 말을 하는가**(이름과 쓰임).
+ */
 const bottleBox = await box('[data-id="bottleIKI"]');
+const beforeTap = await page.evaluate(() => JSON.stringify(window.__store.getState()).length);
 await page.mouse.move(...center(bottleBox));
 await page.mouse.down();
 await page.mouse.up();
-await page.waitForTimeout(120);
-const viol = await page.evaluate(() => window.__store.getState().session.violations);
-ok(!viol.includes('cap-left-open'), '시약병을 누르면 마개를 닫은 것으로 기록된다', JSON.stringify(viol));
+await page.waitForTimeout(150);
+const afterTap = await page.evaluate(() => JSON.stringify(window.__store.getState()).length);
+ok(beforeTap === afterTap, '시약병을 눌러도 조작이 일어나지 않는다', `${beforeTap} → ${afterTap}`);
+const bottleTip = await page.locator('#bench-tip').innerText().catch(() => '');
+ok(bottleTip.trim().length > 0,
+   '그래도 시약병은 말을 한다 — 말없이 먹통인 물건은 남기지 않는다',
+   bottleTip.replace(/\n/g, ' | ') || '(아무 말도 없음)');
 
 /* ---------- 키보드만으로 끌어다 놓기 ---------- */
 
@@ -660,7 +672,6 @@ ok(emptyWhy.includes('금이'), '고배율에서 조동나사를 돌리면 깨�
 // 휴지로 렌즈를 닦을 수 있는가
 await page.keyboard.press('Escape');
 await page.waitForTimeout(150);
-await page.evaluate(() => window.__store.dispatch('NOTE_VIOLATION', { kind: 'hands-unwashed' }));
 await page.evaluate(() => {
   const st = window.__store.getState();
   window.__store.dispatch('MOUNT', { slide: 'A' });
@@ -1544,20 +1555,33 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
    * 그래서 **마지막 쪽에서 먼저** 눌러 보고, 그 다음에 앞쪽에서 눌러 본다.
    * (fermentation 세션이 자기 저장소에서 실제로 두 번 물린 자리다.)
    */
+  // ① 마지막 읽기 쪽(4)에서는 **그 자리에 머문다.** 누르는 순간 실험대가 열리고,
+  //    그 쪽이 실험하는 내내 보는 「탐구 과정」이다.
   await nb.locator('.note-tab[data-stage="4"]').click();
   await nb.waitForTimeout(200);
   await nb.locator('#mark-read').click();
   await nb.waitForTimeout(250);
   const afterLast = await activeTab();
+
+  /*
+   * ② **가운데 쪽들을 먼저 읽어 두고 맨 앞에서 누른다.** 이것이 갈리는 조합이다.
+   *
+   * 마지막 쪽에서 안 넘기는 앱에서는 「4쪽 먼저 → 1쪽에서 누르기」로 **두 구현이 같은 답**을
+   * 낸다. 2·3 을 채워 두어야 「자리로 고르기(→2)」와 「안 읽은 쪽으로 고르기(→1 또는 5)」가
+   * 갈린다. (chromatography·centrifuge 두 세션이 숫자로 갈라 보였다)
+   */
+  await nb.evaluate(() => {
+    window.__store.dispatch('MARK_READ', { stage: '2' });
+    window.__store.dispatch('MARK_READ', { stage: '3' });
+  });
+  await nb.waitForTimeout(150);
   await nb.locator('.note-tab[data-stage="1"]').click();
   await nb.waitForTimeout(200);
   await nb.locator('#mark-read').click();
   await nb.waitForTimeout(250);
-  // **두 번 다 봐야 한다.** 뒤엣것만 보면 「안 읽은 쪽으로 간다」 는 틀린 규칙도 통과한다 —
-  // 4 쪽에서 1 쪽으로 거꾸로 끌려가 놓고, 그 다음 눌렀을 때만 우연히 맞기 때문이다.
-  ok(afterLast === '5' && await activeTab() === '2',
+  ok(afterLast === '4' && await activeTab() === '2',
      '노트 — 뒤쪽을 먼저 읽어 뒀어도 앞뒤가 안 뒤바뀐다',
-     `4쪽에서 누른 뒤 ${afterLast}(5여야 함) → 1쪽에서 누른 뒤 ${await activeTab()}(2여야 함)`);
+     `4쪽에서 누른 뒤 ${afterLast}(4여야 함) → 2·3 읽어 둔 뒤 1쪽에서 누르니 ${await activeTab()}(2여야 함)`);
 
   // 여기서부터는 다시 처음 상태로 본다.
   await nb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
@@ -1616,12 +1640,14 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 }
 
 /* ────────────────────────────────────────────────────────────────
- * 자기 평가의 **안전 규칙 준수가 거짓말을 하지 않는가.**
+ * 자기 평가의 가치·태도는 **적어만 둔다.**
  *
- * 이 칸은 `session.violations` 만 보고 그렸다. 그런데 그 목록은 **보고서를 열 때**에만
- * 채워진다 — 자기 평가 쪽은 보고서를 열기 **전에** 보는 곳이다. 그래서 손 한 번 안 씻고
- * 들어가도 세 줄 모두 「지켰습니다 ✓」 가 떴다. 사장님이 그대로 보셨다:
- * **"나 안 지켰는데도 그냥 체크가 되어 있네."**
+ * 예전에는 손 씻기·마개 닫기·폐액 버리기를 지켜보고 ✓/✗ 를 붙였다. 그런데 그 판정은
+ * 「화면 속 단추를 눌렀는가」 를 재는 것이었다 — 안전 습관이 아니라 조작 순서 외우기다.
+ * 판정도 조작도 통째로 걷어냈다.
+ *
+ * 그래서 여기서 잴 것은 둘이다: **아무 판정도 안 하는가**, 그리고 **그래도 말은 하는가.**
+ * 앞엣것만 재면 **빈 칸**도 통과한다 — 지우고 아무것도 안 넣은 화면이 제일 그럴듯하게 통과한다.
  * ──────────────────────────────────────────────────────────────── */
 {
   const sv = await browser.newPage({ viewport: { width: 1400, height: 950 } });
@@ -1629,20 +1655,39 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await unlock(sv);
   await sv.locator('.note-tab[data-stage="7"]').click();
   await sv.waitForTimeout(250);
-  const hands = () => sv.evaluate(() => {
-    const li = document.querySelector('#violations .value-item');
-    return { state: li?.dataset.state ?? '(없음)', text: li?.innerText.replace(/\s+/g, ' ').trim() ?? '' };
+  const values = () => sv.evaluate(() => {
+    const box = document.querySelector('#values-list')?.closest('.self-eval-item');
+    return { lines: document.querySelectorAll('#values-list li').length,
+             text: box?.innerText.replace(/\s+/g, ' ').trim() ?? '' };
   });
   {
-    const h = await hands();
-    ok(h.state !== 'kept', '자기 평가 — 안 씻은 손을 씻었다고 하지 않는다', JSON.stringify(h));
-    ok(!/지켰습니다/.test(h.text), '자기 평가 — 「지켰습니다」 가 뜨지 않는다', h.text);
+    const v = await values();
+    ok(v.lines >= 3, '자기 평가 — 실제 실험에서 지킬 것이 적혀 있다', `${v.lines}줄`);
+    ok(!/지켰습니다|놓쳤습니다|아직 하지 않았습니다|✓|✗/.test(v.text),
+       '자기 평가 — 무엇을 했는지 판정하지 않는다', v.text.slice(0, 120));
+    ok(/확인하지 않습니다/.test(v.text),
+       '자기 평가 — 판정하지 않는다는 사실을 밝힌다', v.text.slice(0, 120));
   }
 
-  // **반대 방향.** 실제로 씻으면 지켰다고 해야 한다 — 안 그러면 늘 「아직」 인 칸일 뿐이다.
-  await sv.evaluate(() => window.__store.dispatch('WASH_HANDS', {}));
+  /*
+   * **실험을 하고 와도 그대로인가.** 위 검사만 두면 「처음에는 안 하다가 나중에 판정하는」
+   * 화면도 통과한다. 시약을 쓰고 돌아와서 글자 그대로 같은지 본다.
+   */
+  const before = (await values()).text;
+  await sv.evaluate(() => {
+    const d = (t, p = {}) => window.__store.dispatch(t, p);
+    d('PEEL_BANANA', {});
+    d('SMEAR', { slide: 'A', thickness: 0.3 });
+    d('FILL_DROPPER', { reagent: 'IKI' });
+  });
+  await sv.waitForTimeout(300);
+  await sv.locator('.note-tab[data-stage="1"]').click();
+  await sv.waitForTimeout(150);
+  await sv.locator('.note-tab[data-stage="7"]').click();
   await sv.waitForTimeout(250);
-  ok((await hands()).state === 'kept', '자기 평가 — 씻고 나면 지켰다고 한다', JSON.stringify(await hands()));
+  ok((await values()).text === before,
+     '자기 평가 — 실험을 하고 와도 같은 글이 그대로 있다',
+     before === (await values()).text ? '같음' : '달라짐');
   await sv.close();
 }
 

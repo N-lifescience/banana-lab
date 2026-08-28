@@ -180,10 +180,13 @@ function selfEval(st) {
     <div class="rp-row"><h3>${escapeHtml(label)}</h3>
       <p>${or(st.session.notes[`feedback.${key}`], R.notWritten)}</p></div>`).join('');
 
-  const v = st.session.violations;
-  const violations = v.length
-    ? `<ul class="rp-steps">${v.map((k) => `<li><span>${escapeHtml(N.violations[k] ?? k)}</span></li>`).join('')}</ul>`
-    : `<p>${N.noViolations}</p>`;
+  /*
+   * 가치·태도 — **학생이 무엇을 했는지 적지 않는다.** 화면(자기 평가 쪽)과 같은 글을
+   * 그대로 싣는다. 종이와 화면이 다른 말을 하면 학생도 선생님도 어느 쪽을 믿어야 할지 모른다.
+   */
+  const values = `<ul class="rp-steps">${
+    N.valuesList.map((line) => `<li><span>${escapeHtml(line.replace(/\*\*/g, ''))}</span></li>`).join('')
+  }</ul>`;
 
   return `
     <section>
@@ -193,7 +196,7 @@ function selfEval(st) {
         <tbody>${rows}</tbody>
       </table>
       ${reflections}
-      <div class="rp-row"><h3>${N.valuesLabel}</h3>${violations}</div>
+      <div class="rp-row"><h3>${N.valuesLabel}</h3>${values}</div>
     </section>`;
 }
 
@@ -317,11 +320,13 @@ function fileTag(who) {
  * 그 방식은 **상태에 칸이 하나 생길 때마다 조용히 새어 나간다.** 실제로 이렇게 새고 있었다:
  *
  *   session.log         학생이 **무엇을 어떤 차례로 눌렀는지** 전부
- *   session.violations  안전 수칙 기록 (이건 종이에 실린다 — 남긴다)
- *   session.seed · step · readStages · tidy · undosLeft
+ *   session.violations  안전 수칙 기록
+ *   session.seed · step · readStages · undosLeft
  *   microscope · tools  기구 상태 전부
  *
- * 이 가운데 **보고서가 실제로 읽는 것은 다섯뿐**이다. 나머지는 종이 어디에도 안 실린다.
+ * 이 가운데 **보고서가 실제로 읽는 것은 넷뿐**이다.
+ * (`violations` 는 나중에 통째로 없앴다 — 가치·태도 절이 학생이 한 일을 읽지 않게 되면서,
+ *  읽지도 않는 것을 보내고 있던 셈이 됐다.) 나머지는 종이 어디에도 안 실린다.
  * 안 실리는 것을 보내 놓고 방침에 적어 두는 것은 고지가 아니라 **수집이다.**
  * 방침을 고치기 전에 **보내는 것부터 줄인다.**
  *
@@ -334,7 +339,7 @@ function fileTag(who) {
  * (`tests/privacy.test.js`).
  */
 export const SUBMIT_TOP_KEYS = ['slides'];
-export const SUBMIT_SESSION_KEYS = ['level', 'notes', 'captures', 'violations'];
+export const SUBMIT_SESSION_KEYS = ['level', 'notes', 'captures'];
 
 export function payloadOf(st, who, kind) {
   const state = {};
