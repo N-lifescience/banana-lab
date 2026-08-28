@@ -337,6 +337,37 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   const everOpened = new Set();
 
   /**
+   * 「읽었습니다」 관문을 **판을 갈지 않고 제자리에서** 다시 판정한다.
+   *
+   * 칸의 글은 **손이 칸을 떠날 때**(`change`) 저장된다. 그래서 예상을 다 적어 놓고도
+   * 상태에는 아직 없고, 단추는 「예상 결과를 먼저 고르고 나서 누르세요」 인 채로 있다.
+   * 학생은 **칸을 한 번 빠져나가야 풀린다는 것을 알 길이 없다** — 다 적었는데 안 열리는
+   * 화면을 보고 고장으로 읽는다.
+   *
+   * 그렇다고 치는 동안 다시 그릴 수는 없다. 치던 칸이 갈려 나가면 글자가 허공으로 간다.
+   * 그래서 **단추의 잠금과 까닭 글자만** 손본다.
+   * (웨이브 3 의 fermentation 세션이 짚었다 — 미루기만 넣으면 이 자리가 되살아난다)
+   */
+  function patchGate() {
+    const btn = panelEl.querySelector('#mark-read');
+    if (!btn) return;
+    const st = store.getState();
+    const typed = {};
+    panelEl.querySelectorAll('[data-note]').forEach((el) => { typed[el.dataset.note] = el.value; });
+    const merged = { ...st, session: { ...st.session, notes: { ...st.session.notes, ...typed } } };
+    const blocked = activeStage === '3' && !predictDone(merged);
+    if (blocked) {
+      btn.setAttribute('aria-disabled', 'true');
+      btn.setAttribute('aria-describedby', 'read-why');
+    } else {
+      btn.removeAttribute('aria-disabled');
+      btn.removeAttribute('aria-describedby');
+    }
+    const why = panelEl.querySelector('#read-why');
+    if (why) why.textContent = blocked ? N.readNeedsPredict : N.readLeadIn;
+  }
+
+  /**
    * 탐구 과정 — **한 번에 한 STEP.**
    *
    * 여섯 STEP 을 한꺼번에 펼쳐 놓으면 학생이 그것을 「읽을 글」로 받는다. 주욱 읽고 내려간
@@ -769,6 +800,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       el.addEventListener('change', () => {
         store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });
       });
+      // 치는 동안에는 판을 갈지 않는다(치던 칸이 사라진다). 관문만 제자리에서 고친다.
+      el.addEventListener('input', patchGate);
     });
     // 선택형 예상 — 고른 보기를 **글로** 저장한다. 6단계에서 실제 결과와 나란히 읽히려면
     // 코드가 아니라 문장이어야 한다.
@@ -880,7 +913,32 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
    */
   let pressing = false;
   let pendingRender = false;
-  root.addEventListener('pointerdown', () => { pressing = true; });
+  root.addEventListener('pointerdown', (e) => {
+    pressing = true;
+    /*
+     * **손이 칸을 떠나기 전에 적은 것을 먼저 챙긴다.**
+     *
+     * 마지막 칸에 적고 곧장 다음 STEP 을 누르면, 그 글은 **아직 상태에 없다**(`change` 는
+     * 포커스가 빠질 때 난다). 그래서 자물쇠가 「아직 안 적었다」 로 보고 **다음 STEP 이
+     * 잠긴 채**다 — 학생은 방금 다 적어 놓고 안 열리는 화면을 본다.
+     *
+     * 누르는 그 순간 먼저 저장한다. 다시 그리기는 `pressing` 이 막고 있으므로
+     * 화면이 갈리지 않는다. (웨이브 2 의 chromatography 세션이 4쪽에서 같은 자리를 찾았다)
+     */
+    const el = document.activeElement;
+    if (el?.matches?.('[data-note]') && el !== e.target) {
+      store.dispatch('SAVE_NOTE', { step: el.dataset.note, text: el.value });
+      /*
+       * 방금 저장한 덕분에 **누른 그 STEP 이 열릴 수 있게 됐다면, 그대로 열어 준다.**
+       *
+       * 잠긴 STEP 은 `<details>` 가 아니라 `<div>` 라서, 누름이 아무것도 펼치지 않는다.
+       * 저장만 하고 두면 학생은 **두 번 눌러야** 한다 — 한 번은 자물쇠를 풀고, 한 번은 연다.
+       * 그 사이에 화면은 「열렸다」 는 신호를 주지 않으므로 첫 누름은 안 먹은 것으로 보인다.
+       */
+      const locked = e.target.closest?.('.note-step--locked');
+      if (locked) manualOpen.set(locked.dataset.stepGroup, true);
+    }
+  });
   // 글칸에서 손이 떠나면 미뤄 둔 것을 따라잡는다. 다음 칸으로 옮기는 중이면
   // 그 칸이 포커스를 받은 뒤라 `typing` 이 다시 참이 되어 또 미뤄진다 — 그게 맞다.
   root.addEventListener('focusout', () => {

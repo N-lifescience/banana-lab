@@ -1941,8 +1941,10 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     await one.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
     await one.locator('.note-tab[data-stage="3"]').click();
     await one.waitForTimeout(300);
-    const areas = await one.locator('#note-panel textarea[data-note]').count();
-    ok(areas > 0, '   (앞 조건) 예상 쪽에 적을 칸이 있다', `${areas}칸`);
+    const keys = await one.evaluate(() =>
+      [...document.querySelectorAll('#note-panel textarea[data-note]')].map((t) => t.dataset.note));
+    const areas = keys.length;
+    ok(areas > 0, '   (앞 조건) 예상 쪽에 적을 칸이 있다', `${areas}칸 ${keys.join(' ')}`);
 
     /*
      * ★ **칸을 잇달아 채운다.** 「마지막 칸에 적고 곧장 누르면」 보다 이쪽이 더 잘 걸린다 —
@@ -1968,7 +1970,106 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       document.querySelector('.note-tab[aria-selected="true"]')?.dataset.stage);
     ok(at === '4', '노트 — 마지막 칸에 적고 곧장 눌러도 **한 번에** 넘어간다',
        `${at} (3이면 그 누름이 삼켜진 것)`);
+
+    /*
+     * ★ **누름이 살아난 대신 글이 사라지지 않았는지도 같이 잰다.**
+     *
+     * 위 고침은 「손이 눌러 두는 동안 다시 그리기를 미루는」 것이다. 미루기만 하고
+     * 흘려보내면 **누름은 살아나고 그때 적은 글이 사라지는 쪽**으로 간다 — 넘어간 다음
+     * 쪽만 보고 통과라 부르면 그 손해를 못 본다.
+     * (웨이브 2 의 chromatography 세션이 짚었다)
+     */
+    /*
+     * 저장된 곳을 **이름으로 찾아 묻는다.** `session.predict` 같은 자리를 지어내 물으면
+     * 늘 0 이 나오고, 그 0 은 「글이 사라졌다」 가 아니라 「내가 딴 데를 봤다」 이다.
+     * 칸이 스스로 밝히는 `data-note` 를 열쇠로 쓴다.
+     */
+    const kept = await one.evaluate((names) => {
+      const { notes } = window.__store.getState().session;
+      return names.filter((k) => String(notes[k] ?? '').trim()).length;
+    }, keys);
+    ok(kept === areas, '노트 — 넘어가면서 **그때 적은 글도 함께 저장된다**', `${kept}/${areas}칸`);
     await one.close();
+  }
+
+  {
+    /*
+     * ★ **다 적자마자 관문이 풀리는가** — 칸을 떠나지 않은 채로.
+     *
+     * 글은 손이 칸을 떠날 때 저장된다. 그래서 다 적어 놓고도 단추는 「먼저 고르고 나서
+     * 누르세요」 인 채로 있다. **칸을 한 번 빠져나가야 풀린다는 것을 학생이 알 길이 없다.**
+     * 눌러 보면 넘어가긴 하지만, 그 전에 이미 「안 열리는 화면」 을 본 뒤다.
+     * (웨이브 3 의 fermentation 세션이 짚었다)
+     */
+    const three = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await three.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+    await three.locator('.note-tab[data-stage="3"]').click();
+    await three.waitForTimeout(300);
+    const gateOf = () => three.evaluate(() => ({
+      off: document.querySelector('#mark-read')?.getAttribute('aria-disabled') === 'true',
+      why: document.getElementById('read-why')?.textContent?.trim() ?? '',
+    }));
+    ok((await gateOf()).off, '   (앞 조건) 아무것도 안 적었을 때는 잠겨 있다', JSON.stringify(await gateOf()));
+    const cells = await three.locator('#note-panel textarea[data-note]').count();
+    for (let i = 0; i < cells; i += 1) {
+      await three.locator('#note-panel textarea[data-note]').nth(i).click();
+      await three.keyboard.type('색이 변한다');
+    }
+    const after = await gateOf();   // 마지막 칸에 **손을 둔 채로** 본다
+    ok(after.off === false,
+       '노트 — 다 적자마자 관문이 풀린다 (칸을 떠날 때까지 기다리게 하지 않는다)',
+       JSON.stringify(after));
+    ok(!/고르고|먼저/.test(after.why),
+       '노트 — 다 적은 뒤에는 「먼저 고르라」 는 말이 사라진다', `"${after.why}"`);
+    await three.close();
+  }
+
+  {
+    const one = await browser.newPage({ viewport: { width: 1400, height: 950 }, hasTouch: true });
+    await one.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+    await one.close();
+  }
+
+  {
+    /*
+     * ★ **4쪽 STEP 에도 같은 자리가 있다.**
+     *
+     * 마지막 관찰 기록을 적고 곧장 다음 STEP 을 누르면, 그 글은 아직 상태에 없다
+     * (`change` 는 포커스가 빠질 때 난다). 자물쇠는 「아직 안 적었다」 로 보고
+     * **다음 STEP 을 잠근 채**로 둔다 — 학생은 방금 다 적어 놓고 안 열리는 화면을 본다.
+     * 게다가 잠긴 STEP 은 `<div>` 라서 누름이 아무것도 펼치지 않는다.
+     */
+    const two = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+    await two.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await two.evaluate(() => { for (const st of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: st }); });
+    await two.locator('.note-tab[data-stage="4"]').click();
+    await two.waitForTimeout(300);
+    const now = 'details[data-step-group][data-state="now"]';
+    const cells = await two.locator(`${now} textarea[data-note]`).count();
+    ok(cells > 0, '   (앞 조건) 지금 STEP 에 관찰 기록 칸이 있다', `${cells}칸`);
+    for (let i = 0; i < cells; i += 1) {
+      await two.locator(`${now} textarea[data-note]`).nth(i).click();
+      await two.keyboard.type('색이 변했다');
+    }
+    const nextId = await two.evaluate(() =>
+      document.querySelector('details[data-step-group][data-state="now"]')?.nextElementSibling?.dataset.stepGroup);
+    const nextSel = `[data-step-group="${nextId}"]`;
+    ok(await two.evaluate((sel) => document.querySelector(sel)?.dataset.state, nextSel) === 'locked',
+       '   (앞 조건) 다음 STEP 은 아직 잠겨 있다', String(nextId));
+    await two.locator(nextSel).click({ force: true });   // **한 번만** 누른다
+    await two.waitForTimeout(500);
+    const opened = await two.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      return { tag: el?.tagName, open: el?.open ?? false };
+    }, nextSel);
+    ok(opened.tag === 'DETAILS' && opened.open === true,
+       'STEP — 마지막 칸에 적고 곧장 누르면 **한 번에** 자물쇠가 풀리고 펼쳐진다',
+       `${opened.tag} · 열림 ${opened.open}`);
+    const notes = await two.evaluate(() => window.__store.getState().session.notes);
+    const wrote = Object.entries(notes).filter(([k, v]) => /^1[a-z]$/.test(k) && String(v).trim()).length;
+    ok(wrote === cells, 'STEP — 그 누름에 **그때 적은 관찰 기록도 함께 저장된다**',
+       `${wrote}/${cells}칸`);
+    await two.close();
   }
 
   await nb.locator('.note-tab[data-stage="3"]').click();
