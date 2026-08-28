@@ -2470,6 +2470,58 @@ for (const w of [320, 768, 1400]) {
   await tp.close();
 }
 
+{
+  /*
+   * ★ **규칙이 하는 말이 화면까지 오는가.**
+   *
+   * 「미동나사가 끝까지 갔습니다」를 규칙에 넣고 단위 검사로 확인했다. 그런데 확대 뷰의
+   * 다이얼은 `skipNotify: true` 로 던진다 — **단위 검사는 그 두 줄을 안 지나간다.**
+   * 여기서는 실제로 다이얼을 돌려 **화면에 그 말이 뜨는지**를 본다.
+   *
+   * ★ 토스트는 **줄을 선다.** 앞 말이 다 빠지기 전에 보면 옛 말을 보고 「말이 없다」로
+   * 읽는다 — 실제로 두 번 헛짚었다. 줄이 빌 때까지 기다린 뒤에 돌린다.
+   * (웨이브 3 의 germination 세션이 같은 함정을 자기 저장소에서 짚었다)
+   */
+  const dial = await browser.newPage({ viewport: { width: 1280, height: 850 } });
+  await dial.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await dial.evaluate(() => { for (const st of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: st }); });
+  await dial.evaluate(() => {
+    const s = window.__store;
+    s.dispatch('PEEL_BANANA', {});
+    s.dispatch('SMEAR', { slide: 'A', thickness: 0.3 });
+    s.dispatch('PICK_COVERSLIP', {});
+    s.dispatch('PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 });
+    s.dispatch('SET_OBJECTIVE', { objective: 4 });
+    s.dispatch('MOUNT', { slide: 'A' });
+    for (let i = 0; i < 40; i += 1) s.dispatch('COARSE_FOCUS', { delta: 0.05 });
+    s.dispatch('SET_OBJECTIVE', { objective: 40 });
+  });
+  await dial.evaluate(() => {
+    const el = [...document.querySelectorAll('#bench [role=button], #bench button')]
+      .find((b) => /현미경/.test(b.getAttribute('aria-label') || ''));
+    el?.click();
+  });
+  await dial.waitForTimeout(600);
+  ok(await dial.locator('#dial-fine').count() === 1, '   (앞 조건) 확대 뷰에 미동 다이얼이 있다');
+  for (let i = 0; i < 60; i += 1) {
+    const left = await dial.evaluate(() => document.querySelector('#toast-region')?.innerText.trim() || '');
+    if (!left) break;
+    await dial.waitForTimeout(700);
+  }
+  ok(await dial.evaluate(() => (document.querySelector('#toast-region')?.innerText.trim() || '') === ''),
+     '   (앞 조건) 앞선 말이 다 빠졌다 — 안 빠졌으면 옛 말을 보고 판정하게 된다');
+  await dial.locator('#dial-fine').focus();
+  for (let i = 0; i < 70; i += 1) { await dial.keyboard.press('ArrowRight'); await dial.waitForTimeout(20); }
+  await dial.waitForTimeout(900);
+  const atLimit = await dial.evaluate(() => window.__store.getState().microscope.fine);
+  ok(Math.abs(atLimit - 0.2) < 0.001, '   (앞 조건) 미동나사가 실제로 끝까지 갔다', String(atLimit));
+  const spoke = await dial.evaluate(() => document.querySelector('#toast-region')?.innerText.trim() || '(없음)');
+  ok(/조동/.test(spoke),
+     '확대 뷰 — 미동나사가 끝까지 가면 **화면이 그 사실을 말한다** (skipNotify 가 삼키지 않는다)',
+     `"${spoke}"`);
+  await dial.close();
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
