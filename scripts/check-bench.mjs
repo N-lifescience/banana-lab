@@ -766,6 +766,7 @@ async function checkButtonContrast(page, where) {
       return [255, 255, 255];
     };
     const out = [];
+    let seen = 0;
     for (const el of document.querySelectorAll('button')) {
       if (!el.offsetParent) continue;
       // SVG 안의 글자는 CSS color 가 아니라 애셋이 정한 fill 로 칠해진다.
@@ -786,10 +787,18 @@ async function checkButtonContrast(page, where) {
       const [a, b] = [lum(fg) + 0.05, lum(bg) + 0.05].sort((x, y) => y - x);
       const ratio = a / b;
       if (ratio < 3) out.push(`${el.id || el.className || htmlText}=${ratio.toFixed(2)}`);
+      seen += 1;
     }
-    return out;
+    return { out, seen };
   });
-  ok(bad.length === 0, `버튼 글자가 배경에 묻히지 않는다 (${where})`, bad.join(' / '));
+  /*
+   * ★ **0을 세었을 때 무슨 색이 나오는지 먼저 본다.**
+   * 단추를 하나도 못 찾으면 「묻힌 것 0건」이 그냥 나온다 — 아무것도 안 재고 초록불이다.
+   * (웨이브 1 의 micrometer 세션이 한 저장소에서만 이 얼굴을 다섯 번 만나고 규칙으로 세웠다)
+   */
+  ok(bad.seen > 0, `   (앞 조건) ${where} — 글자 있는 단추를 실제로 쟀다`, `${bad.seen}개`);
+  ok(bad.out.length === 0, `버튼 글자가 배경에 묻히지 않는다 (${where})`,
+     `${bad.seen}개 중 ${bad.out.length}개 묻힘 ${bad.out.join(' / ')}`);
 }
 
 await checkButtonContrast(page, '라이트');
@@ -958,6 +967,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     host.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px';
     document.body.appendChild(host);
     const bad = [];
+    let seen = 0;
     for (const [name, mod] of Object.entries(ASSETS)) {
       const [, , vw, vh] = CONTRACT[name].viewBox.split(/\s+/).map(Number);
       let box = null;
@@ -983,11 +993,15 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
           bad.push(`${name}.${k} 적힌 값 ${saved[k]} / 실제 ${live[k]}`);
         }
       }
+      seen += 1;
     }
     host.remove();
-    return bad;
+    return { bad, seen };
   });
-  ok(drift.length === 0, '적어 둔 그려진 범위가 실제 그림과 맞는다', drift.slice(0, 3).join(' / '));
+  // ★ **0을 세었을 때 무슨 색인지** — 애셋을 하나도 못 그리면 「어긋남 0건」이 그냥 나온다.
+  ok(drift.seen > 0, '   (앞 조건) 애셋을 실제로 그려서 쟀다', `${drift.seen}종`);
+  ok(drift.bad.length === 0, '적어 둔 그려진 범위가 실제 그림과 맞는다',
+     `${drift.seen}종 중 ${drift.bad.length}건 ${drift.bad.slice(0, 3).join(' / ')}`);
   await cb.close();
 }
 
