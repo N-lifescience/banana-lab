@@ -115,6 +115,19 @@ ok(await page.evaluate(() => window.__layoutCode === undefined),
 // 세면 "하네스가 배포되지 않았다" 를 확인할 때마다 "콘솔 에러 0건" 이 실패한다 — 실제로 그랬다.
 const errorsBeforeProbe = errors.length;
 const harness = await page.goto(`${BASE}/harness.html`).catch(() => null);
+/*
+ * ★ **`.catch(() => null)` 로 삼킨 뒤 「없다」를 재면, 서버가 죽어도 통과한다.**
+ *
+ * 응답이 없으면 화면이 안 넘어가고 `div#sheet` 도 0개다 — 그래서 아래 줄이 초록불이
+ * 되면서 detail 에는 **「응답 없음」이라고 스스로 적는다.** 그 모순을 아무도 안 본다.
+ *
+ * ★ 이 구멍은 **서버가 아예 없을 때는 안 보인다** — 그때는 첫 `goto` 에서 죽는다.
+ *   **서버가 그 지점에서 죽을 때만** 열린다(오늘 밤 여러 번 그랬던 그 상황이다).
+ *   재려면 서버를 안 띄우지 말고 **그 한 번의 요청만** 막아야 한다.
+ * (웨이브 3 의 fermentation 세션이 잡고, micrometer 가 재는 법을 붙였다)
+ */
+ok(Boolean(harness), '   (앞 조건) 하네스 주소에서 응답을 받았다',
+   harness ? `HTTP ${harness.status()}` : '★ 응답 없음 (서버가 죽었을 수 있습니다)');
 ok(!(await page.locator('div#sheet').count()),
    '개발 하네스(애셋 시트)는 배포본에 없다', harness ? `HTTP ${harness.status()}` : '응답 없음');
 errors.length = errorsBeforeProbe;
