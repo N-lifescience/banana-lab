@@ -791,9 +791,15 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       });
     });
     panelEl.querySelector('#mark-read')?.addEventListener('click', (e) => {
-      // 막힌 단추는 눌려도 아무 일이 없다. `disabled` 를 안 쓰므로 여기서 한 번 더 본다 —
-      // 화면에만 표시하고 넘기기를 안 막으면 **표시가 거짓말이 된다.**
-      if (e.currentTarget.getAttribute('aria-disabled') === 'true') return;
+      /*
+       * 막힌 단추는 눌려도 아무 일이 없다. `disabled` 를 안 쓰므로 여기서 한 번 더 본다 —
+       * 화면에만 표시하고 넘기기를 안 막으면 **표시가 거짓말이 된다.**
+       *
+       * ★ **DOM 의 표시가 아니라 지금 상태를 본다.** 표시는 낡을 수 있다 — 마지막 칸에
+       * 적고 곧장 누르면, 그 순간 단추에 붙어 있는 `aria-disabled` 는 **적기 전의 값**이라
+       * 방금 채운 칸을 못 본 채로 그 누름을 삼킨다. (germination 이 짚었다)
+       */
+      if (activeStage === '3' && !predictDone(store.getState())) return;
       /*
        * 누른 쪽은 끝났다. 학생이 탭을 도로 찾아 누르게 두지 않는다 — 다음 쪽으로 데려간다.
        *
@@ -857,7 +863,33 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       </div>`;
   }
 
+  /*
+   * **누르는 동안에는 다시 그리지 않는다.**
+   *
+   * 학생이 실제로 하는 것은 이것이다 — 마지막 칸에 적고 **곧장** 「읽었습니다」 를 누른다.
+   * 그러면 이렇게 된다:
+   *
+   *     누름 → 칸에서 포커스가 빠짐 → change → 저장 → **다시 그리기** →
+   *     단추가 DOM 에서 사라짐 → 누름이 완성되지 못하고 **아무 일도 안 일어난다**
+   *
+   * `click` 은 누른 자리와 뗀 자리가 같아야 나는데, 그 사이에 단추가 갈려 버린다.
+   * **두 번 눌러야 겨우 넘어간다** — 학생 눈에는 고장 난 단추다. 마우스도 손가락도 그렇다.
+   * (웨이브 3 의 germination 세션이 플레이하다 찾았다. 검사 이백 개가 초록불이었다)
+   *
+   * 손을 뗀 **다음 차례**에 따라잡는다. `pointerup` 뒤에 `click` 이 오므로 그 뒤여야 한다.
+   */
+  let pressing = false;
+  let pendingRender = false;
+  root.addEventListener('pointerdown', () => { pressing = true; });
+  window.addEventListener('pointerup', () => {
+    setTimeout(() => {
+      pressing = false;
+      if (pendingRender) { pendingRender = false; render(); }
+    }, 0);
+  });
+
   function render() {
+    if (pressing) { pendingRender = true; return; }
     const st = store.getState();
     tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
       tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));

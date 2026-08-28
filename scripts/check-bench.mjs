@@ -1827,6 +1827,38 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   ok(/1:true/.test(marks) && /2:false/.test(marks),
      '노트 — ✓ 는 넘어간 쪽이 아니라 **읽은 쪽**에 붙는다', marks);
 
+  /*
+   * ★ **마지막 칸에 적고 곧장 누르면 그 누름이 사라졌다.**
+   *
+   * 누름 → 칸에서 포커스가 빠짐 → change → 저장 → 다시 그리기 → 단추가 사라짐 →
+   * **아무 일도 안 일어남.** 두 번 눌러야 겨우 넘어갔다 — 학생 눈에는 고장 난 단추다.
+   * 검사 이백 개가 초록불이었다. (germination 이 플레이하다 찾았다)
+   *
+   * 재는 법: 앞 칸들은 Tab 으로 빠져나오고 **마지막 칸은 적은 채로** 곧장 누른다.
+   * `force` 로 눌러야 한다(`aria-disabled` 때문에 플레이라이트가 기다린다).
+   */
+  {
+    const one = await browser.newPage({ viewport: { width: 1400, height: 950 }, hasTouch: true });
+    await one.goto(`${BASE}/?level=3`, { waitUntil: 'networkidle' });
+    await one.locator('.note-tab[data-stage="3"]').click();
+    await one.waitForTimeout(300);
+    const areas = await one.locator('#note-panel textarea[data-note]').count();
+    ok(areas > 0, '   (앞 조건) 예상 쪽에 적을 칸이 있다', `${areas}칸`);
+    for (let i = 0; i < areas - 1; i += 1) {
+      await one.locator('#note-panel textarea[data-note]').nth(i).fill('색이 변한다');
+      await one.keyboard.press('Tab');
+      await one.waitForTimeout(120);
+    }
+    await one.locator('#note-panel textarea[data-note]').last().type('색이 변한다');
+    await one.locator('#mark-read').click({ force: true });
+    await one.waitForTimeout(500);
+    const at = await one.evaluate(() =>
+      document.querySelector('.note-tab[aria-selected="true"]')?.dataset.stage);
+    ok(at === '4', '노트 — 마지막 칸에 적고 곧장 눌러도 **한 번에** 넘어간다',
+       `${at} (3이면 그 누름이 삼켜진 것)`);
+    await one.close();
+  }
+
   await nb.locator('.note-tab[data-stage="3"]').click();
   await nb.waitForTimeout(250);
   const gate = () => nb.evaluate(() => {

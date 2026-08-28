@@ -134,9 +134,15 @@ test('탐구 노트가 막는 자리는 하나뿐이고, 왜 막혔는지 말한
   assert.equal(hits.length, 1,
     `탐구 노트가 막는 자리는 「예상을 세워야 다음 쪽」 하나뿐이어야 합니다 (지금 ${hits.length}개)`);
 
-  // **표시만 하고 넘기기를 안 막으면 표시가 거짓말이 된다.** 눌렀을 때 되돌아가는 줄이 있어야 한다.
-  assert.ok(/aria-disabled'\) === 'true'\) return;/.test(src),
-    '막힌 단추를 눌렀을 때 되돌아가는 줄이 없습니다 — aria-disabled 는 표시일 뿐 막지 않습니다');
+  /*
+   * **표시만 하고 넘기기를 안 막으면 표시가 거짓말이 된다.** 눌렀을 때 되돌아가는 줄이 있어야 한다.
+   *
+   * ★ 그 판정은 **지금 상태**로 해야 한다. 앞서는 `getAttribute('aria-disabled')` 를 봤는데,
+   * 마지막 칸에 적고 곧장 누르면 그 표시가 **적기 전의 값**이라 방금 채운 칸을 못 본 채로
+   * 그 누름을 삼켰다. **DOM 표시는 낡을 수 있고, 상태는 안 낡는다.**
+   */
+  assert.ok(/!predictDone\(store\.getState\(\)\)\) return;/.test(src),
+    '막힌 단추를 눌렀을 때 되돌아가는 줄이 없거나, 지금 상태가 아니라 DOM 표시를 보고 있습니다');
 
   // 그 자리에 붙는 이유 문구 — strings.js 에 있어야 하고 비어 있으면 안 된다.
   assert.ok(typeof UI.notebook.readNeedsPredict === 'string'
