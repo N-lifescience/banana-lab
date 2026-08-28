@@ -17,7 +17,7 @@
  * 브라우저를 띄워야만 알 수 있다.
  */
 
-import { SLIDE_IDS, initialState } from './state.js';
+import { REAGENTS, SLIDE_IDS, initialState } from './state.js';
 
 /** 조리개를 "움직였는가" 는 상태에 따로 없다. 처음 값에서 벗어났는지로 본다. */
 const DEFAULT_DIAPHRAGM = initialState().microscope.diaphragm;
@@ -78,6 +78,48 @@ export function stepDone(st, groupId, index) {
 export function groupDone(st, groupId) {
   const fns = STEP_DONE[groupId];
   return Boolean(fns?.length) && fns.every((f) => f(st));
+}
+
+/**
+ * 안전·정리 세 가지가 **지금** 어떤 상태인가.
+ *
+ * ── 왜 여기 있는가 ────────────────────────────────────────────────
+ * 자기 평가 쪽의 「가치·태도 — 안전 규칙 준수」 는 `session.violations` 만 보고 그렸다.
+ * 그런데 그 목록은 **보고서를 열 때(`CHECK_TIDY`)** 에만 채워진다. 자기 평가 쪽은 보고서를
+ * 열기 **전에** 보는 곳이라, 손을 안 씻고 마개를 열어 둔 채로 들어가도 목록은 늘 비어 있었고
+ * 화면에는 세 줄 모두 「지켰습니다 ✓」 가 떴다. **안 지켰는데 지켰다고 하는 화면이었다.**
+ *
+ * 그래서 판정을 여기 한 곳에 둔다. 화면과 `CHECK_TIDY` 가 **같은 함수**를 본다.
+ * 따로 세면 언젠가 어긋나고, 그때 학생은 노트와 보고서가 서로 다른 말을 하는 것을 본다.
+ *
+ * ── 네 가지 상태 ──────────────────────────────────────────────────
+ *   `kept`   했다.
+ *   `missed` 안 한 채로 끝냈다 — `CHECK_TIDY` 가 적어 둔 것.
+ *   `todo`   아직 안 했다. 아직 실험 중이니 놓쳤다고 단정하지 않는다.
+ *   `na`     할 일이 없다 — 시약을 아예 안 썼으면 닫을 마개도 버릴 폐액도 없다.
+ *
+ * 점수에 넣지 않는다. 막지도 않는다. 보여 줄 뿐이다.
+ */
+export function tidyStatus(st) {
+  const { tidy, violations } = st.session;
+  // `REAGENTS.NONE` 은 `null` 이다. `!== 'NONE'` 으로 쓰면 **늘 참**이 되어,
+  // 시약을 한 방울도 안 쓴 학생에게도 마개와 폐액을 따진다.
+  const usedReagent = SLIDE_IDS.some((id) => st.slides[id].drops > 0)
+    || st.tools.dropper.holds !== REAGENTS.NONE;
+  const applies = { 'hands-unwashed': true, 'cap-left-open': usedReagent, 'waste-left': usedReagent };
+  const status = {};
+  for (const kind of Object.keys(applies)) {
+    if (tidy.includes(kind)) status[kind] = 'kept';
+    else if (violations.includes(kind)) status[kind] = 'missed';
+    else status[kind] = applies[kind] ? 'todo' : 'na';
+  }
+  return status;
+}
+
+/** 지금 끝내면 놓친 것으로 적힐 것들. `CHECK_TIDY` 가 이 목록을 남긴다. */
+export function untidyNow(st) {
+  const status = tidyStatus(st);
+  return Object.keys(status).filter((k) => status[k] === 'todo');
 }
 
 /** (가)(나)(다) 를 한 번씩 다 기록했는가 — 탐구 노트 5단계가 끝났다는 뜻이다. */

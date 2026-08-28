@@ -104,10 +104,15 @@ test('UI 는 포인터 이벤트만 쓴다 — 마우스/터치 전용 이벤트
   }
 });
 
-test('UI 는 버튼을 disabled 로 막지 않는다', () => {
-  // 이 프로젝트는 잘못된 조작을 막지 않는다. 누를 수 있어야 하고,
+test('실험대는 어떤 버튼도 disabled 로 막지 않는다', () => {
+  // 이 프로젝트는 잘못된 **조작**을 막지 않는다. 누를 수 있어야 하고,
   // 누른 결과가 시야에 나타나는 것이 설계다. AGENTS.md 2.1 참조.
+  //
+  // 탐구 노트는 다르다. 거기서 막는 것은 조작이 아니라 **쪽을 넘기는 순서**다
+  // (예상을 세우기 전에 다음 쪽으로 가지 않는다). 그 예외는 아래 테스트가 따로 지킨다 —
+  // 여기서 통째로 허용해 버리면 실험대에 disabled 가 스며들어도 아무도 모른다.
   for (const [name, src] of uiSources()) {
+    if (name === 'notebook.js') continue;
     assert.equal(/\bdisabled\b/.test(src), false,
       `src/ui/${name} 에 disabled 가 있습니다 — 막지 말고 결과로 답하세요 (AGENTS.md 2.1)`);
   }
@@ -117,6 +122,29 @@ test('UI 는 버튼을 disabled 로 막지 않는다', () => {
       .replace(/<!--[\s\S]*?-->/g, '');
     assert.equal(/\bdisabled\b/.test(html), false, 'index.html 에 disabled 가 있습니다');
   }
+});
+
+test('탐구 노트가 막는 자리는 하나뿐이고, 왜 막혔는지 말한다', () => {
+  // 막는 것 자체보다 **말 없이 막는 것**이 나쁘다. 회색 단추만 두면 학생은 고장으로 읽는다.
+  // 그래서 개수를 세고, 그 옆에 이유 문구가 실제로 있는지 본다.
+  // 개수를 세는 이유: 하나씩 늘어나는 것은 아무도 안 막는다. 늘리려면 이 줄을 고쳐야 한다.
+  const src = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const hits = src.match(/\bdisabled\b/g) ?? [];
+  assert.equal(hits.length, 1,
+    `탐구 노트의 disabled 는 「예상을 세워야 다음 쪽」 하나뿐이어야 합니다 (지금 ${hits.length}개)`);
+
+  // 그 자리에 붙는 이유 문구 — strings.js 에 있어야 하고 비어 있으면 안 된다.
+  assert.ok(typeof UI.notebook.readNeedsPredict === 'string'
+    && UI.notebook.readNeedsPredict.trim().length > 0,
+    'UI.notebook.readNeedsPredict 가 필요합니다 — 왜 못 누르는지 말해야 합니다');
+
+  // STEP 잠금은 disabled 를 쓰지 않는다(열리는 척하다 안 열리는 것이 가장 나쁘다).
+  // 대신 이유를 적는다. 그 문구도 실제로 있어야 한다.
+  assert.equal(typeof UI.notebook.stepLockedWhy, 'function',
+    'UI.notebook.stepLockedWhy(id) 가 필요합니다 — 어느 STEP 으로 돌아가야 하는지 말해야 합니다');
+  assert.ok(UI.notebook.stepLockedWhy('3').includes('3'),
+    'stepLockedWhy 는 돌아갈 STEP 번호를 담아야 합니다');
 });
 
 test('UI 는 상태를 직접 고치지 않고 reduce 를 거친다', () => {

@@ -1419,14 +1419,92 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
 
   ok(await openCount() === 1, '4절 — 지금 할 차례인 STEP 하나만 펼쳐져 있다', await shape());
 
-  // **끝내면 저절로 접히는가.** 이것이 toggle 함정의 눈에 보이는 얼굴이다.
+  /** STEP 하나의 관찰 기록 칸을 **다시 찾아 가며** 채운다 (칸마다 노트가 다시 그려진다). */
+  async function writeGroup(id) {
+    let n = 0;
+    for (let i = 0; i < 12; i += 1) {
+      const wrote = await ac.evaluate((gid) => {
+        const t = [...document.querySelectorAll('#note-step-4 textarea[data-note]')]
+          .find((x) => x.dataset.note.startsWith(gid) && !x.value.trim());
+        if (!t) return false;
+        t.value = '적었습니다';
+        t.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }, id);
+      if (!wrote) break;
+      n += 1;
+      await ac.waitForTimeout(180);
+    }
+    return n;
+  }
+
+  // **조작만으로는 안 넘어간다.** 적을 자리가 계속 펼쳐져 있어야 한다 —
+  // 조작을 마치자마자 접혀 버리면 다음은 잠겨 있으므로 **아무것도 안 펼쳐진 벽**이 남는다.
   await ac.evaluate(() => window.__store.dispatch('PEEL_BANANA', {}));
   await ac.waitForTimeout(400);
+  const acted = await shape();
+  ok(/1:done펼침/.test(acted) && await openCount() === 1,
+     '4절 — 조작만 하고 안 적으면 그 STEP 이 펼쳐진 채로 남는다', acted);
+
+  // **끝내면 저절로 접히는가.** 이것이 toggle 함정의 눈에 보이는 얼굴이다.
+  // 「끝냈다」 는 조작과 기록이 **둘 다** 된 것이다.
+  ok(await writeGroup('1') > 0, '   (앞 조건) STEP 1 의 관찰 기록을 채웠다');
   const after = await shape();
   ok(/1:done접힘/.test(after) && /2:now펼침/.test(after),
-     '4절 — STEP 을 마치면 저절로 접히고 다음이 펼쳐진다', after);
+     '4절 — 조작하고 적고 나면 저절로 접히고 다음이 펼쳐진다', after);
 
-  // **접힘은 잠금이 아니다** — 앞으로 올 STEP 도 눌러서 열려야 한다.
+  /*
+   * **앞 STEP 을 안 적었으면 뒤 STEP 은 열리지 않는다.**
+   *
+   * 여기서 두 가지가 갈린다. 「안 열린다」 만 보면, 눌러도 아무 일 안 나는 화면과
+   * 왜 안 되는지 말해 주는 화면이 **똑같이 통과한다.** 학생에게는 그 둘이 전혀 다르다 —
+   * 말이 없으면 고장으로 읽고 새로고침한다. 그래서 **이유가 화면에 있는지**를 함께 잰다.
+   * 그리고 그 이유는 **어느 STEP 으로 돌아가야 하는지**를 담아야 한다.
+   */
+  const locked = () => ac.evaluate(() => {
+    const el = document.querySelector('[data-step-group="5"]');
+    return { tag: el?.tagName, state: el?.dataset.state,
+             why: el?.querySelector('.step-locked-why')?.innerText.trim() ?? '' };
+  });
+  {
+    const L = await locked();
+    ok(L.tag === 'DIV' && L.state === 'locked',
+       '4절 — 앞 STEP 을 안 적으면 뒤 STEP 이 열리지 않는다', JSON.stringify(L));
+    ok(L.why.length > 0 && /STEP\s*2/.test(L.why),
+       '4절 — 안 열리는 이유와 돌아갈 STEP 을 화면에 말한다', L.why || '(아무 말도 없음)');
+  }
+
+  /*
+   * **적고 나면 실제로 열리는가.** 위 검사만 두면 「영영 안 열리는 화면」 도 통과한다.
+   * STEP 1 의 관찰 기록 칸을 채워서 자물쇠가 풀리는지 본다 — 두 방향을 다 재야 판정이 된다.
+   */
+  /*
+   * **한 칸 채울 때마다 노트가 통째로 다시 그려진다.** 칸 목록을 미리 붙잡아 두고 훑으면
+   * 두 번째부터는 DOM 에서 떨어져 나간 칸에 쓰게 되고, 아무 오류 없이 한 칸만 저장된다.
+   * 그러면 자물쇠가 안 풀리는데 그것을 「기능이 안 된다」 로 읽게 된다. 매번 다시 찾는다.
+   *
+   * 잠긴 STEP 은 몸통을 안 그리므로 그 칸들은 아직 DOM 에 없다. 앞을 적으면 다음이 드러난다 —
+   * 그래서 한 칸씩, 드러나는 대로 채워 나간다.
+   */
+  let filled = 0;
+  for (let n = 0; n < 40 && (await locked()).state === 'locked'; n += 1) {
+    const wrote = await ac.evaluate(() => {
+      const t = [...document.querySelectorAll('#note-step-4 textarea[data-note]')]
+        .find((x) => !x.value.trim());
+      if (!t) return false;
+      t.value = '적었습니다';
+      t.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    });
+    if (!wrote) break;
+    filled += 1;
+    await ac.waitForTimeout(180);
+  }
+  ok(filled > 0, '   (앞 조건) 앞 STEP 의 관찰 기록 칸을 실제로 채웠다', `${filled}칸`);
+  ok((await locked()).state !== 'locked',
+     '4절 — 앞을 다 적고 나면 뒤 STEP 이 열린다', JSON.stringify(await locked()));
+
+  // **접힘은 잠금이 아니다** — 자물쇠가 풀린 다음에는 앞으로 올 STEP 도 눌러서 열려야 한다.
   await ac.locator('details[data-step-group="5"] > summary').click({ timeout: 3000 });
   await ac.waitForTimeout(250);
   ok(/5:later펼침/.test(await shape()), '4절 — 앞으로 올 STEP 도 눌러서 열린다', await shape());
@@ -1437,7 +1515,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   ok(/5:later펼침/.test(await shape()), '4절 — 손으로 연 STEP 은 다시 그려도 열려 있다', await shape());
 
   ok(await ac.evaluate(() => document.querySelectorAll('#note-step-4 [disabled]').length) === 0,
-     '4절 — 접힘을 잠금으로 쓰지 않는다 (disabled 0개)');
+     '4절 — 잠글 때도 disabled 를 쓰지 않는다 (열리는 척하다 안 열리는 것이 가장 나쁘다)');
   await ac.close();
 }
 

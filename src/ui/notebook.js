@@ -17,7 +17,7 @@ import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE } from '../sim/optics.js';
 import { UI } from './strings.js';
-import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
+import { stepDone, groupDone, resultsDone, tidyStatus } from '../sim/progress.js';
 
 
 const N = UI.notebook;
@@ -134,6 +134,20 @@ const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length >
  * 따로 세면 언젠가 어긋나고, 그때 학생은 탭이 전부 ✓ 인데 보고서가 안 나오는 화면을 본다.
  */
 const predictDone = (st) => SLIDE_IDS.every((id) => hasNote(st, `predict.${id}`));
+
+/**
+ * 이 STEP 의 관찰 기록을 **다 적었는가.**
+ *
+ * 3단계는 STEP 하나에 칸이 하나(목표만 준다), 1·2단계는 세부 단계마다 하나다.
+ * 여기서 나오는 값이 **다음 STEP 이 열리는 조건**이다 — 안 적고 지나가면 6단계 복습과
+ * 보고서에 빈칸이 남고, 학생은 그것을 제출한 뒤에야 안다.
+ *
+ * 무엇을 적었는지는 보지 않는다. 채점이 아니다.
+ */
+export function stepNotesWritten(st, group) {
+  if (st.session.level >= 3) return hasNote(st, group.id);
+  return group.steps.every((_, i) => hasNote(st, substepId(group, i)));
+}
 const wrapupDone = (st) =>
   ['q.a', 'q2', ...(isGroup(st) ? ['q3'] : [])].every((k) => hasNote(st, k));
 const selfEvalDone = (st) => N.selfEvalItems.every(({ key }) => hasNote(st, `selfeval.${key}`));
@@ -330,15 +344,31 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   function renderStage4(st) {
     const level = st.session.level;
     const groupsDone = UI.protocol.map((g) => groupDone(st, g.id));
-    const nowIdx = groupsDone.findIndex((d) => !d);
     const doneCount = groupsDone.filter(Boolean).length;
+    // 앞 STEP 을 안 적었으면 뒤 STEP 은 열리지 않는다. **누가 막고 있는지**를 들고 다닌다 —
+    // 「열리지 않습니다」 만 띄우면 학생은 어디로 돌아가야 하는지 모른다.
+    const unwritten = UI.protocol.map((g) => !stepNotesWritten(st, g));
+
+    /*
+     * 「지금 할 차례」 는 **조작을 마쳤고 적기까지 한** 첫 STEP 의 다음이다.
+     *
+     * 조작만 보고 정하면 이렇게 된다 — STEP 1 의 조작을 끝내는 순간 1 이 접히는데,
+     * 적지 않았으니 STEP 2 는 잠겨 있다. **아무것도 펼쳐지지 않은 화면**이 남고 학생은
+     * 벽을 본다. 안 적었으면 적을 자리가 계속 펼쳐져 있어야 한다.
+     */
+    const nowIdx = groupsDone.findIndex((d, i) => !(d && !unwritten[i]));
+
     const stepsHtml = UI.protocol.map((group, gi) => {
+      const blockerIdx = unwritten.slice(0, gi).findIndex(Boolean);
+      const lockedBy = blockerIdx === -1 ? null : UI.protocol[blockerIdx].id;
+      if (lockedBy) return stepShell(group, gi, groupsDone, '', lockedBy, nowIdx);
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
         const val = st.session.notes[group.id] ?? '';
         return stepShell(group, gi, groupsDone, `
           <label class="notes-label" for="note-${group.id}">${N.goalOnlyLabel(group.title)}</label>
-          <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>`);
+          <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>`,
+        null, nowIdx);
       }
       // 읽는 순서가 아니라 하는 순서를 따라간다 — 그게 이 쪽에서 하려는 일이다.
       const done = group.steps.map((_, i) => stepDone(st, group.id, i));
@@ -366,7 +396,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           </li>`;
       }).join('');
       return stepShell(group, gi, groupsDone,
-        `<ul class="substep-list">${items}</ul>${group.id === '4' ? questionA(st) : ''}`);
+        `<ul class="substep-list">${items}</ul>${group.id === '4' ? questionA(st) : ''}`,
+        null, nowIdx);
     }).join('');
     const tally = nowIdx === -1
       ? `<p class="step-tally step-tally--done">${N.stepAllDone}</p>`
@@ -381,9 +412,28 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
    *
    * **학생이 손으로 여닫은 것이 이긴다.** 없으면 지금 할 STEP 만 펼친다.
    */
-  function stepShell(group, gi, groupsDone, body) {
+  function stepShell(group, gi, groupsDone, body, lockedBy, nowIdx) {
     const isDone = groupsDone[gi];
-    const isNow = gi === groupsDone.findIndex((d) => !d);
+    const isNow = gi === nowIdx;
+
+    /*
+     * 앞 STEP 의 관찰 기록이 비어 있으면 이 STEP 은 **열리지 않는다.**
+     *
+     * `<details>` 를 죽이는 대신 아예 다른 껍데기로 그린다 — 열리는 척하다가 안 열리는 것이
+     * 가장 나쁘다. 제목은 그대로 남긴다. 몇 칸짜리 여정인지는 계속 보여야 한다.
+     */
+    if (lockedBy) {
+      return `
+        <div class="note-step note-step--locked" data-step-group="${group.id}"
+          data-state="locked" data-done="false">
+          <div class="step-summary">
+            <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
+            <span class="step-open-hint">${N.stepLockedHint}</span>
+          </div>
+          <p class="step-locked-why">${N.stepLockedWhy(lockedBy)}</p>
+        </div>`;
+    }
+
     const state = isDone ? 'done' : (isNow ? 'now' : 'later');
     const open = manualOpen.has(group.id) ? manualOpen.get(group.id) : isNow;
     // 접힌 STEP 에도 「눌러서 열린다」 를 적는다. 말하지 않으면 잠긴 것으로 읽힌다.
@@ -628,18 +678,27 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           placeholder="${escapeHtml(eg)}">${escapeHtml(st.session.notes[`feedback.${key}`] ?? '')}</textarea>
       </div>`).join('');
 
-    // 이 칸은 학생이 채우는 곳이 아니다. 실험하는 동안 지켜본 것을 그대로 보여 준다.
-    // 지킨 것도 함께 적는다 — 빈 목록에 "위반 없음" 한 줄만 뜨면 무엇을 보고 하는 말인지
-    // 알 수 없고, 아무것도 안 해도 늘 그렇게 뜨는 줄 알게 된다.
-    const violations = st.session.violations;
+    /*
+     * 이 칸은 학생이 채우는 곳이 아니다. 실험하는 동안 지켜본 것을 그대로 보여 준다.
+     *
+     * **`session.violations` 만 보면 안 된다.** 그 목록은 보고서를 열 때(`CHECK_TIDY`) 에만
+     * 채워지는데, 이 쪽은 보고서를 열기 **전에** 보는 곳이다. 그래서 손을 안 씻고 들어와도
+     * 세 줄 모두 「지켰습니다 ✓」 가 떴다 — 안 지켰는데 지켰다고 하는 화면이었다.
+     * 지금은 `tidyStatus` 한 곳을 본다. `CHECK_TIDY` 도 같은 함수를 본다.
+     */
+    const status = tidyStatus(st);
+    const stateWord = { kept: N.valuesKept, missed: N.valuesMissed, todo: N.valuesTodo, na: N.valuesNA };
+    const stateMark = { kept: '✓', missed: '✗', todo: '·', na: '–' };
     const violationItems = N.valuesWatched.map(({ kind, label }) => {
-      const missed = violations.includes(kind);
-      return `<li class="value-item" data-missed="${missed}">
-        <span class="value-mark" aria-hidden="true">${missed ? '✗' : '✓'}</span>
+      const s = status[kind];
+      return `<li class="value-item" data-state="${s}" data-missed="${s === 'missed'}">
+        <span class="value-mark" aria-hidden="true">${stateMark[s]}</span>
         <span class="value-label">${label}</span>
-        <span class="value-state">${missed ? N.valuesMissed : N.valuesKept}</span>
+        <span class="value-state">${stateWord[s]}</span>
       </li>`;
     }).join('');
+    const allKept = N.valuesWatched.every(({ kind }) => status[kind] === 'kept' || status[kind] === 'na');
+    const anyTodo = N.valuesWatched.some(({ kind }) => status[kind] === 'todo');
     return `
       <div id="self-eval">
         <h3>${N.likertHeading}</h3>
@@ -650,7 +709,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           <h3>${N.valuesLabel}</h3>
           <p class="stage-text values-lead">${N.valuesLead}</p>
           <ul id="violations" class="values-list">${violationItems}</ul>
-          ${violations.length === 0 ? `<p class="no-violations">${N.noViolations}</p>` : ''}
+          ${allKept ? `<p class="no-violations">${N.noViolations}</p>` : ''}
+          ${anyTodo ? `<p class="stage-empty">${N.valuesTodoLead}</p>` : ''}
         </div>
       </div>`;
   }
@@ -706,7 +766,16 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       });
     });
     panelEl.querySelector('#mark-read')?.addEventListener('click', () => {
-      store.dispatch('MARK_READ', { stage: activeStage });
+      /*
+       * 누른 쪽은 끝났다. 학생이 탭을 도로 찾아 누르게 두지 않는다 — 다음 쪽으로 데려간다.
+       *
+       * **표시할 쪽과 옮겨 갈 쪽을 헷갈리면 엉뚱한 쪽에 ✓ 가 붙는다.** 지금 쪽을 먼저 붙잡고,
+       * 그 다음에 옮긴다. dispatch 가 render 를 부르므로 옮기는 것이 먼저여야 한 번만 그린다.
+       */
+      const stage = activeStage;
+      const next = N.stages[N.stages.findIndex((s) => s.id === stage) + 1];
+      if (next) activeStage = next.id;
+      store.dispatch('MARK_READ', { stage });
     });
   }
 
@@ -726,10 +795,21 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       return `<p class="read-mark" data-done="true">${N.readDone}${
         left.length === 0 ? ` ${N.readAllDone}` : ''}</p>`;
     }
+    /*
+     * 예상 쪽은 예상을 세우기 전에는 넘어가지 못한다.
+     *
+     * 실험대 조작을 막는 것이 아니라 **노트의 진행 순서**다 (AGENTS.md 의 「막지 마라」 는
+     * 조작 이야기다). 다만 막을 때는 반드시 왜 막혔는지 말한다 — 말 없는 회색 단추는
+     * 학생 눈에 고장이다. 무엇을 골랐는지는 보지 않는다. 세워 봤다는 사실만 본다.
+     */
+    // aria-disabled 를 겹쳐 달지 않는다 — 네이티브 disabled 가 이미 그 뜻이다.
+    // 못 누르는 이유는 바로 위 문단에 글로 있어, 읽는 순서대로 이유를 먼저 만난다.
+    const blocked = activeStage === '3' && !predictDone(st);
     return `
       <div class="read-mark">
-        <p>${N.readLeadIn}</p>
-        <button type="button" id="mark-read" class="read-confirm">${N.readConfirm}</button>
+        <p>${blocked ? N.readNeedsPredict : N.readLeadIn}</p>
+        <button type="button" id="mark-read" class="read-confirm"${
+          blocked ? ' disabled' : ''}>${N.readConfirm}</button>
       </div>`;
   }
 

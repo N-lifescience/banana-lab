@@ -2,9 +2,9 @@
  * 실험대(bench) 애셋 — 라인 + 플랫 구현.
  *
  * 한 사람이 작업하는 실험실 벤치 공간:
- * - `#room`: 천장 격자 및 매입 조명, 서비스 채널 및 콘센트/가스 밸브가 있는 뒷벽
- * - `#shelf`: 상부 시약 선반 (수직 지지 기둥 및 선반 상판, y=65 고정)
- * - `#surface`: 흑색 에폭시 레진 작업면 및 하부 서랍 캐비닛 (작업면 상단 모서리 y=155 고정)
+ * - `#room`: 천장 격자 및 매입 조명, 서비스 채널이 있는 뒷벽
+ * - `#shelf`: 상부 시약 선반 (선반 상판, y=65 고정)
+ * - `#surface`: 흑색 에폭시 레진 작업면 및 그 아래 몸통 (작업면 상단 모서리 y=155 고정)
  * - `#surface-shade`: 작업면 전면 모서리 하단 음영
  *
  * docs/01-art-direction.md 및 docs/02-asset-contract.md 규칙을 준수합니다.
@@ -53,27 +53,6 @@ export function render(_state = {}) {
     <rect x="0" y="132" width="400" height="23" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
     <line x1="0" y1="143" x2="400" y2="143" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
-    <!-- 2구 전원 콘센트 1 (개수대와 휴지 사이 빈 공간) -->
-    <rect x="80" y="135" width="22" height="16" rx="2" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <circle cx="86" cy="143" r="3" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <circle cx="96" cy="143" r="3" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 가스/진공 밸브 노즐 (현미경과 폐액통 사이 빈 공간) -->
-    <rect x="248" y="136" width="9" height="19" rx="1" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <path d="M 246,136 L 259,136 L 252.5,129 Z" fill="${PALETTE.rubber[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 2구 전원 콘센트 2 (폐액통과 쓰레기통 사이 빈 공간) -->
-    <rect x="312" y="135" width="22" height="16" rx="2" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <circle cx="318" cy="143" r="3" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <circle cx="328" cy="143" r="3" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 5. 선반 지지 메인 기둥 상단부 (y: 28 ~ 65) -->
-    <!-- 좌측 기둥 상단 -->
-    <rect x="52" y="28" width="14" height="37" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="62" y="28" width="4" height="37" fill="${PALETTE.metal[1]}"/>
-    <!-- 우측 기둥 상단 -->
-    <rect x="334" y="28" width="14" height="37" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="344" y="28" width="4" height="37" fill="${PALETTE.metal[1]}"/>
   </g>
 
   <!-- 상부 시약 선반 (shelf) 본체 (상판 윗면 y=65 고정) -->
@@ -84,20 +63,6 @@ export function render(_state = {}) {
     <rect x="11" y="73" width="378" height="4" fill="${PALETTE.bench[1]}"/>
     <line x1="10" y1="65" x2="390" y2="65" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
 
-    <!-- 선반 지지 기둥 중간부 (y: 78 ~ 155) -->
-    <!-- 좌측 기둥 -->
-    <rect x="52" y="78" width="14" height="77" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="62" y="78" width="4" height="77" fill="${PALETTE.metal[1]}"/>
-    <line x1="59" y1="82" x2="59" y2="150" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 우측 기둥 -->
-    <rect x="334" y="78" width="14" height="77" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="344" y="78" width="4" height="77" fill="${PALETTE.metal[1]}"/>
-    <line x1="341" y1="82" x2="341" y2="150" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 선반 지지 삼각 브래킷 -->
-    <polygon points="48,78 66,78 52,102" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <polygon points="334,78 352,78 348,102" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
   </g>
 
   <!-- 실험대 작업면(surface) 본체 (상판 앞 모서리 y=155 고정) -->
@@ -114,24 +79,21 @@ export function render(_state = {}) {
     <!-- 2. 에폭시 상판 전면 모서리 두께면 (10 mm 두께의 단단한 덩어리감) -->
     <rect x="0" y="248" width="400" height="12" fill="${PALETTE.bodyDark[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
-    <!-- 3. 하부 서랍 캐비닛 프레임 (밝은 아이보리 캐비닛) -->
-    <rect x="0" y="260" width="400" height="40" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <!--
+      3. 작업면 아래 몸통.
 
-    <!-- 서랍 3개 구획 -->
-    <!-- 서랍 1 (좌측) -->
-    <rect x="10" y="264" width="118" height="32" rx="2" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="52" y="268" width="34" height="4" rx="1.5" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+      예전에는 여기가 화면에서 **가장 밝은 아이보리**였다. 밝은 것은 앞으로 나와 보이므로
+      작업면 아래가 아래로 안 읽히고 평평했다 — 어디가 상판이고 어디가 그 밑인지 모른다.
+      상판보다 어두운 한 톤으로 내리고, 상판이 드리우는 그늘 띠를 위에 얹는다.
+      그라데이션이 아니라 **색 두 단**이다 (docs/01-art-direction.md).
+    -->
+    <rect x="0" y="260" width="400" height="40" fill="${PALETTE.bench[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
-    <!-- 서랍 2 (중앙) -->
-    <rect x="141" y="264" width="118" height="32" rx="2" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="183" y="268" width="34" height="4" rx="1.5" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <!-- 상판이 드리우는 그늘 — 이 한 줄이 「그 밑」 을 만든다 -->
+    <rect x="0" y="260" width="400" height="9" fill="${PALETTE.bodyDark[0]}"/>
 
-    <!-- 서랍 3 (우측) -->
-    <rect x="272" y="264" width="118" height="32" rx="2" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="314" y="268" width="34" height="4" rx="1.5" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-
-    <!-- 캐비닛 하단 걸레받이 (Toe-kick) -->
-    <rect x="0" y="296" width="400" height="4" fill="${PALETTE.bodyDark[1]}"/>
+    <!-- 몸통 하단 걸레받이 (Toe-kick) — 바닥에 닿는 자리는 가장 어둡다 -->
+    <rect x="0" y="292" width="400" height="8" fill="${PALETTE.bodyDark[1]}"/>
   </g>
 
   <!-- 상판 전면 하단 모서리 음영 (surface-shade) -->

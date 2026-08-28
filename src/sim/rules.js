@@ -18,6 +18,7 @@ import {
   isStaining, initialSlide, HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
 import { focusTolerance, EYEPIECE } from './optics.js';
+import { untidyNow } from './progress.js';
 
 export { PAN_LIMIT };
 
@@ -566,12 +567,10 @@ export const ACTIONS = {
    * 뒤늦게 실험대에서 휴지·시약병·폐액통을 누르면 기록이 지워진다.
    */
   CHECK_TIDY(state) {
-    const { tidy, violations } = state.session;
-    // 시약을 아예 안 썼으면 닫을 마개도 버릴 폐액도 없다. 안 한 일을 안 했다고 적지 않는다.
-    const usedReagent = SLIDE_IDS.some((id) => state.slides[id].drops > 0)
-      || state.tools.dropper.holds !== REAGENTS.NONE;
-    const want = ['hands-unwashed', ...(usedReagent ? ['cap-left-open', 'waste-left'] : [])];
-    const missed = want.filter((k) => !tidy.includes(k) && !violations.includes(k));
+    const { violations } = state.session;
+    // 판정은 `progress.js` 의 `tidyStatus` 한 곳에만 있다. 화면(자기 평가 쪽)도 같은 것을 본다 —
+    // 따로 세면 노트와 보고서가 서로 다른 말을 하게 된다.
+    const missed = untidyNow(state);
     if (missed.length === 0) return ok(state);
     const next = {
       ...state,
