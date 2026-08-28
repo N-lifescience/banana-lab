@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ASSETS, PENDING, SAMPLE_STATES } from '../src/assets/index.js';
 import { CONTRACT, requiredNodes, isMutable } from '../src/assets/contract.js';
+import { PALETTE } from '../src/style/tokens.js';
 
 test('등록된 애셋은 모두 계약에 선언돼 있다', () => {
   for (const name of Object.keys(ASSETS)) {
@@ -75,6 +76,42 @@ test('실험대 배경의 랜드마크가 제자리에 있다', () => {
     `선반 상판 윗면이 y=${shelfTopY} 에 있어야 합니다 — 선반 위 물건이 뜹니다`);
   assert.equal(topYOfGroup(svg, 'surface'), surfaceFrontY,
     `작업면 앞 모서리가 y=${surfaceFrontY} 에 있어야 합니다 — 작업면 위 물건이 뜹니다`);
+});
+
+test('실험대 배경에 금속 부속이 남아 있지 않다', () => {
+  /*
+   * 콘센트 두 개 · 선반 지지 기둥 · 「연필처럼 생긴」 가스 밸브 노즐 · 서랍 손잡이 —
+   * 전부 지웠다. 넷 다 **금속 색**을 쓰던 것들이라, 하나라도 되살아나면 여기서 걸린다.
+   *
+   * 이 검사가 없으면 「지웠습니다」 는 스크린샷 한 장으로만 남는다. 다음 사람이 배경을
+   * 손보다 하나를 도로 그려 넣어도 초록불이다.
+   */
+  const svg = ASSETS.bench.render({});
+  for (const hex of PALETTE.metal) {
+    assert.equal(svg.includes(hex), false,
+      `실험대 배경에 금속 부속(${hex})이 있습니다 — 콘센트·기둥·밸브·서랍 손잡이는 지웠습니다`);
+  }
+});
+
+test('작업면 아래가 「그 밑」 으로 읽히게 쌓여 있다', () => {
+  /*
+   * 예전에는 작업면 아래가 **화면에서 가장 밝은 아이보리**였다. 밝은 것은 앞으로 나와 보이므로
+   * 아래가 아래로 안 읽히고 평평했다. 어두운 그늘 띠를 넣어 단을 만들었다.
+   *
+   * **색 이름만 훑으면 안 된다** — 같은 어두운 색이 상판에도 쓰인다. 작업면 앞 모서리
+   * 아래(y ≥ 248)에 있는 사각형만 골라서 본다.
+   */
+  const svg = ASSETS.bench.render({});
+  const below = [...svg.matchAll(/<rect[^>]*y="(\d+)"[^>]*fill="(#[0-9A-Fa-f]{6})"[^>]*>/g)]
+    .filter((m) => Number(m[1]) >= 248)
+    .map((m) => ({ y: Number(m[1]), fill: m[2] }));
+
+  assert.ok(below.length >= 3,
+    `작업면 아래에 단이 ${below.length}개뿐입니다 — 두께면·그늘·몸통이 있어야 합니다`);
+  assert.equal(below.some((r) => r.fill === PALETTE.paper[0]), false,
+    '작업면 아래에 가장 밝은 아이보리가 있습니다 — 아래가 앞으로 튀어나와 보입니다');
+  assert.ok(below.some((r) => r.y < 280 && r.fill === PALETTE.bodyDark[1]),
+    '상판 바로 밑에 그늘 띠가 없습니다 — 앞뒤가 평평해 보입니다');
 });
 
 test('등록된 애셋은 render 와 applyState 를 모두 내보낸다', () => {
