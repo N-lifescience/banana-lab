@@ -243,11 +243,28 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
     const toast = [...document.querySelectorAll('#toast-region *')].find((e) => e.getBoundingClientRect().width > 20);
     if (!toast) return { none: true };
     const tb = toast.getBoundingClientRect();
+    /*
+     * ★ **뒤에 가려진 것은 세지 않는다.**
+     *
+     * 확대 뷰 같은 모달이 열려 있으면 그 뒤의 실험대 이름표는 **이미 안 보인다.**
+     * 그것까지 세면 「토스트가 덮었다」는 숫자가 부풀고, **덮지도 않은 것을 고치러**
+     * 간다. 실제로 그럴 뻔했다 — 「숟가락 68 %」 같은 값이 나왔다.
+     * 화면 안에 있고 그 자리에서 **실제로 맨 위인 것**만 센다.
+     * (웨이브 3 의 germination 세션이 자기 자에서 잡았다)
+     */
+    const onTop = (el, r) => {
+      const cx = Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1);
+      const cy = Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1);
+      const hit = document.elementFromPoint(cx, cy);
+      return Boolean(hit) && (hit === el || el.contains(hit) || hit.contains(el));
+    };
     const worstOf = (sel) => {
       let pct = 0; let who = '';
       for (const el of document.querySelectorAll(sel)) {
         const r = el.getBoundingClientRect();
         if (r.width < 4 || r.height < 4) continue;
+        if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+        if (!onTop(el, r)) continue;
         const ov = Math.max(0, Math.min(tb.right, r.right) - Math.max(tb.left, r.left))
                  * Math.max(0, Math.min(tb.bottom, r.bottom) - Math.max(tb.top, r.top));
         const p = ov / (r.width * r.height) * 100;
