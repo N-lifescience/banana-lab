@@ -79,6 +79,34 @@ ok(await page.locator('#edit-panel').count() === 0,
 ok(await page.evaluate(() => window.__layoutCode === undefined),
    '`?edit=1` 없이는 __layoutCode 도 없다');
 
+/* ---------- 번들에 실려 나가면 안 되는 것 ---------- */
+/*
+ * **로컬 빌드로는 절대 안 보이는 검사다.** `VITE_VERCEL_*` 는 Vercel 빌드에만 있다.
+ *
+ * `import.meta.env` 를 통째로 읽으면 Vite 가 `VITE_` 로 시작하는 것을 전부 박아 넣고,
+ * Vercel 이 시스템 값 스물몇 개를 그 접두사로 자동 노출한다 — 그 순간
+ * **커밋한 사람의 실명과 커밋 메시지가 학생 브라우저로 나간다.**
+ *
+ * 소스에서 `import.meta.env` 를 통째로 읽는지 보는 검사는 `tests/privacy.test.js` 에 있다.
+ * 여기서는 **실제로 나간 물건**을 받아서 본다 — 소스가 멀쩡해도 빌드가 다르면 여기서 걸린다.
+ * (웨이브 3 의 fermentation 세션이 이 모양을 냈다)
+ */
+{
+  const html = await (await fetch(`${BASE}/`)).text();
+  const srcs = [...new Set([...html.matchAll(/\/assets\/[A-Za-z0-9._-]+\.js/g)].map((m) => m[0]))];
+  ok(srcs.length > 0, '   (앞 조건) 배포본에서 번들 주소를 찾았다', `${srcs.length}개`);
+  let hits = 0;
+  let bytes = 0;
+  for (const src of srcs) {
+    const code = await (await fetch(`${BASE}${src}`)).text();
+    bytes += code.length;
+    hits += (code.match(/VITE_VERCEL_/g) ?? []).length;
+  }
+  ok(hits === 0,
+     '번들에 Vercel 시스템 환경변수가 안 실린다 (커밋한 사람의 실명·커밋 메시지)',
+     `${srcs.length}개 덩어리 ${bytes} bytes 중 VITE_VERCEL_ ${hits}건`);
+}
+
 /* ---------- 개발 하네스는 배포되지 않는다 ----------
    vite build 는 index.html 하나만 묶는다. 다만 `npm run preview` 는 모르는 주소를
    index.html 로 되돌려 주므로 HTTP 200 이 올 수 있다 — 상태 코드가 아니라

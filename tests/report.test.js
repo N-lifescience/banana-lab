@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { initialState } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
 import { buildSheet, payloadOf, SUBMIT_TOP_KEYS, SUBMIT_SESSION_KEYS } from '../src/ui/report.js';
+import { escapeHtml } from '../src/ui/notebook.js';
 import { UI } from '../src/ui/strings.js';
 
 /**
@@ -54,6 +55,50 @@ test('가치·태도 절은 학생이 무엇을 했는지 읽지 않는다', () 
     const bare = line.replace(/\*\*/g, '');
     assert.ok(busy.includes(bare.slice(0, 12)), `안내 한 줄이 종이에 없습니다: ${bare}`);
   }
+});
+
+test('정화 함수가 실제로 태그와 속성 탈출을 막는다', () => {
+  /*
+   * `Projects/CLAUDE.md` 와 `dorms-ready.md` 가 못 박은 요건이다 —
+   * **`innerHTML` 을 쓸 거면 정화 함수 + 그 함수에 대한 테스트까지 있어야 근거가 된다.**
+   *
+   * 함수는 있었는데 **테스트가 없었다.** 그래서 「정화한다」 는 코드에 적힌 주장일 뿐
+   * 지켜지는 약속이 아니었다 — 함수를 통과 함수로 바꿔도 아무 검사도 안 울었다.
+   * (웨이브 2 의 catalase 세션이 자기 저장소에서 잡았다)
+   *
+   * **따옴표까지 막아야 한다.** `<` 만 막으면 `value="…"` 안으로 들어간 글이
+   * `" onfocus="…` 로 속성을 탈출한다.
+   */
+  assert.equal(escapeHtml('<img src=x onerror=alert(1)>'),
+    '&lt;img src=x onerror=alert(1)&gt;');
+  assert.equal(escapeHtml('" onfocus="alert(1)'), '&quot; onfocus=&quot;alert(1)');
+  assert.equal(escapeHtml("' onload='x"), '&#39; onload=&#39;x');
+  assert.equal(escapeHtml('a & b'), 'a &amp; b');
+  // 숫자·null 이 와도 터지지 않는다 — 빈 칸을 그리는 자리에서 실제로 온다.
+  assert.equal(escapeHtml(0), '0');
+  assert.equal(escapeHtml(null), 'null');
+});
+
+test('학생이 적은 태그가 종이에서 살아나지 않는다', () => {
+  /*
+   * 함수만 재면 **그 함수를 안 부르는 자리**를 못 본다. 학생 글이 실제로 정화를 거쳐
+   * 종이에 나가는지 끝에서 확인한다 — 두 층을 다 재야 근거가 된다.
+   */
+  let st = initialState(2);
+  const evil = '<img src=x onerror=alert(1)>" onfocus="alert(2)';
+  for (const step of ['1a', 'q.a', 'q2', 'feedback.learned', 'predict.A']) {
+    st = reduce(st, { type: 'SAVE_NOTE', payload: { step, text: evil } }).state;
+  }
+  const html = buildSheet(st, { name: evil, school: evil, team: evil }, 'group');
+  /*
+   * **`onerror` 라는 낱말이 있는지를 재면 안 된다.** 정화를 거치면 그 글자는 남는다 —
+   * 남아도 되는 것이다(`&lt;img … onerror=…&gt;` 는 그냥 글이다). 재야 하는 것은
+   * **살아 있는 태그와 살아 있는 속성**이다. 낱말을 재면 옳게 도는 코드를 막는다.
+   */
+  assert.equal(/<img/i.test(html), false, '학생이 적은 <img> 태그가 종이에 살아 있습니다');
+  assert.equal(/onfocus="/i.test(html), false, '속성 탈출이 종이에 살아 있습니다 — 따옴표가 안 막혔습니다');
+  assert.equal(html.includes(evil), false, '학생 글이 정화를 안 거치고 그대로 실렸습니다');
+  assert.ok(html.includes('&lt;img'), '정화된 글이 종이에 실리지 않았습니다');
 });
 
 test('보고서에 학생이 적은 것과 넣은 이름이 실린다', () => {

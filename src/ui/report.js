@@ -40,9 +40,19 @@ const or = (v, fallback = R.blank) => (String(v ?? '').trim() ? escapeHtml(v) : 
 /* 종이 한 벌 만들기 — 여기서는 상태를 읽기만 한다                       */
 /* ------------------------------------------------------------------ */
 
-function head(st, who) {
+function head(st, who, group = false) {
   const level = UI.start.levels.find((l) => l.id === st.session.level);
-  const rows = R.fields
+  /*
+   * **모둠 활동지에는 모둠 이름을 싣는다.**
+   *
+   * 폼이 묻고(`R.groupFields`) 꾸러미에 담아 보내는데(`payloadOf`) **종이에는 안 나왔다** —
+   * `R.fields` 만 돌고 있었다. 선생님이 인쇄물을 쌓아 놓고 보면 **어느 모둠 것인지 알 방법이
+   * 없다.** 게다가 아무도 안 읽는 것을 모아 보내는 셈이라, `violations` 를 뺄 때 세운 규칙
+   * (「종이가 안 읽는 것은 수집하지 않는다」)을 같은 꾸러미의 다른 층에서 어기고 있었다.
+   * (웨이브 2 의 catalase 세션이 잡았다)
+   */
+  const fields = group ? [...R.fields, ...R.groupFields] : R.fields;
+  const rows = fields
     .filter((f) => String(who[f.key] ?? '').trim())
     .map((f) => `<div><dt>${f.label}</dt><dd>${escapeHtml(who[f.key])}</dd></div>`)
     .join('');
@@ -210,7 +220,7 @@ function selfEval(st) {
 export function buildSheet(st, who, kind) {
   const group = kind ? kind === 'group' : isGroup(st);
   return `
-    ${head(st, who)}
+    ${head(st, who, group)}
     <section><h2>${R.sections.problem}</h2><p>${N.problem}</p></section>
     <section><h2>${R.sections.materials}</h2>
       <ul class="rp-steps">${N.materials.map((m) =>
