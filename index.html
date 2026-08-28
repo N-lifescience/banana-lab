@@ -336,6 +336,17 @@
   #toast-region{position:fixed;left:50%;top:14px;transform:translateX(-50%);
     display:flex;flex-direction:column;gap:8px;z-index:200;max-width:min(92vw,520px);
     pointer-events:none}
+  /*
+   * **폰에서는 아래에 뜬다.**
+   *
+   * 위에 두면 실험대의 조작 줄(`.bench-bar`)을 덮는다 — 390px 에서 「(다) 재물대에서
+   * 내리기」가 95 % 가려졌다. 손가락은 그대로 닿지만(`pointer-events:none`) **눈에는
+   * 안 보인다.** 방금 무엇을 하고 나서 다음 조작을 찾는 그 순간에 가리는 셈이다.
+   * 좁은 화면에서는 아래로 내린다 — 거기에는 덮을 조작이 없다.
+   */
+  @media (max-width: 767px){
+    #toast-region{top:auto;bottom:14px}
+  }
 
   /* 색은 둘뿐이다 — 초록은 뜻대로 됐다, 빨강은 뜻대로 안 됐다 (toast.js).
      앞서는 흰 바탕에 왼쪽 띠만 색이 있었는데, 교실 프로젝터와 스마트폰 바깥에서는

@@ -212,6 +212,47 @@ for (const w of [320, 375, 390]) {
   await phone.close();
 }
 
+/* ---------------- 5.6 토스트가 조작 줄을 덮지 않는가 ---------------- */
+
+/*
+ * 토스트는 **뭘 하고 난 직후**에 뜬다. 바로 그때 학생은 다음 조작을 찾는다.
+ * 좁은 화면에서 위쪽에 뜨면 실험대의 조작 줄을 덮는다 — 390px 에서
+ * 「(다) 재물대에서 내리기」가 95 % 가려졌다. 손가락은 그대로 닿지만
+ * (`pointer-events:none`) **눈에는 안 보인다.** 「눌리는가」만 재면 이걸 못 본다.
+ */
+for (const w of [320, 390, 768, 1280]) {
+  const t = await browser.newPage({ viewport: { width: w, height: 780 } });
+  await t.goto(devUrl(`/?level=1`), { waitUntil: 'networkidle' });
+  await t.evaluate(() => { for (const s of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: s }); });
+  await t.evaluate(() => {
+    const s = window.__store;
+    s.dispatch('PEEL_BANANA', {});
+    s.dispatch('SMEAR', { slide: 'C', thickness: 0.3 });
+    s.dispatch('MOUNT', { slide: 'C' });   // 조작 줄에 「재물대에서 내리기」가 생긴다
+  });
+  await t.waitForTimeout(400);
+  const cover = await t.evaluate(() => {
+    const toast = [...document.querySelectorAll('#toast-region *')].find((e) => e.getBoundingClientRect().width > 20);
+    if (!toast) return { none: true };
+    const tb = toast.getBoundingClientRect();
+    const worst = [];
+    for (const el of document.querySelectorAll('.bench-bar button')) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 4) continue;
+      const ov = Math.max(0, Math.min(tb.right, r.right) - Math.max(tb.left, r.left))
+               * Math.max(0, Math.min(tb.bottom, r.bottom) - Math.max(tb.top, r.top));
+      if (ov > 0) worst.push({ name: el.textContent.trim().slice(0, 16), pct: Math.round(ov / (r.width * r.height) * 100) });
+    }
+    return { worst, buttons: document.querySelectorAll('.bench-bar button').length };
+  });
+  record(!cover.none && cover.buttons > 0, `   (앞 조건) ${w}px 에 토스트와 조작 단추가 둘 다 있다`,
+    JSON.stringify(cover));
+  const bad = (cover.worst ?? []).filter((x) => x.pct > 20);
+  record(bad.length === 0, `토스트 ${w}px — 실험대 조작 단추를 가리지 않는다`,
+    bad.length ? bad.map((x) => `${x.name} ${x.pct}%`).join(' · ') : '가린 것 없음');
+  await t.close();
+}
+
 /* ---------------- 6. 라이트/다크 스크린샷 ---------------- */
 
 await page.screenshot({ path: 'shots/ui-light.png', fullPage: true });
