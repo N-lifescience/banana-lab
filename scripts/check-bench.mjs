@@ -33,7 +33,18 @@ process.on('uncaughtException', bail);
 process.on('unhandledRejection', bail);
 const out = [];
 globalThis.out = out;
-const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
+/*
+ * **한 줄씩 그때그때 찍는다.**
+ *
+ * 예전에는 결과를 맨 끝에서 한꺼번에 찍었다. 그래서 중간에 브라우저가 죽으면
+ * **앞에서 통과한 백몇 줄이 한 줄도 안 나왔다** — 「어디까지 봤는가」와 「아무것도 못 봤는가」가
+ * 구분되지 않는다. 여덟 저장소가 한 기계에서 함께 도는 동안 이 일이 자주 난다.
+ * (웨이브 3 의 centrifuge 세션이 세 번 헛돌고 나서 짚었다)
+ */
+const ok = (pass, name, detail = '') => {
+  out.push({ pass, name, detail });
+  console.log(`${pass ? '  통과' : '실패'}  ${name}${detail ? `  — ${detail}` : ''}`);
+};
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
@@ -1787,10 +1798,13 @@ ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();
 
-let fail = 0;
-for (const r of out) {
-  if (!r.pass) fail++;
-  console.log(`${r.pass ? '  통과' : '실패'}  ${r.name}${r.detail ? `  — ${r.detail}` : ''}`);
+// 줄은 이미 하나씩 찍혔다 (`ok`). 여기서는 **실패만 다시 모아** 맨 밑에 놓는다 —
+// 백몇 줄 위로 스크롤해 찾게 두지 않는다.
+const failed = out.filter((r) => !r.pass);
+const fail = failed.length;
+if (fail) {
+  console.log('\n다시 모은 실패:');
+  for (const r of failed) console.log(`실패  ${r.name}${r.detail ? `  — ${r.detail}` : ''}`);
 }
 console.log(`\n${out.length - fail}/${out.length} 통과`);
 process.exit(fail ? 1 : 0);
