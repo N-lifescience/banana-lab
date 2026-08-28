@@ -1119,8 +1119,17 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await rp.waitForTimeout(120);
   const fit = await rp.evaluate(() => {
     const d = document.querySelector('#report-dialog');
-    return { scrollW: d.scrollWidth, clientW: d.clientWidth };
+    if (!d) return { scrollW: 0, clientW: 0, shown: 0 };
+    const r = d.getBoundingClientRect();
+    return { scrollW: d.scrollWidth, clientW: d.clientWidth, shown: Math.round(r.width * r.height) };
   });
+  /*
+   * ★ **부등식은 양변이 0이면 저절로 참이다.** 보고서 창이 감춰지면 `0 <= 0` 이라
+   * 「안 넘친다」가 그냥 통과한다 — 셀 것이 없어 보이는 비교식도 「0이 정답인 검사」와
+   * 같은 부류다. **양변이 0이 되는 경우를 먼저 막는다.**
+   * (웨이브 2 의 osmosis 세션이 자기 보고서 창에서 잡았다)
+   */
+  ok(fit.shown > 0, '   (앞 조건) 좁은 창에서도 보고서 창이 실제로 떠 있다', `${fit.shown}px²`);
   ok(fit.scrollW <= fit.clientW, '좁은 창에서도 보고서 창이 가로로 넘치지 않는다', JSON.stringify(fit));
   await rp.setViewportSize({ width: 1400, height: 900 });
 

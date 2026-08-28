@@ -53,9 +53,12 @@ function run() {
 /** 실패한 검사 이름을 몇 개만 뽑아 보여 준다 — 무엇이 물었는지가 이 도구의 답이다. */
 function bites(out) {
   const lines = out.split('\n')
-    .filter((l) => /^\s*(✖|실패)/.test(l))
+    // 검사마다 실패 표시가 다르다 — `npm run check` 는 `✖`, check-bench 는 `실패`,
+    // check-ui 는 `✗`. 하나만 알면 「이름을 못 읽음」이 되고, 그러면 **무엇이 물었는지**를
+    // 못 본다 — 이 도구가 답해야 할 바로 그것이다.
+    .filter((l) => /^\s*(✖|✗|실패)/.test(l))
     .map((l) => l.trim()
-      .replace(/^(✖|실패)\s*/, '')
+      .replace(/^(✖|✗|실패)\s*/, '')
       .replace(/\s*\([\d.]+m?s\)\s*$/, '')   // 걸린 시간은 이름이 아니다
       .replace(/\s+—.*$/, ''))
     // `✖ failing tests:` 는 묶음 머리글이지 검사 이름이 아니다

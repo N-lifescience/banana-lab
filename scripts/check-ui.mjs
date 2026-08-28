@@ -131,6 +131,15 @@ if (!slot) {
 
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
+/*
+ * ★ **`.catch(() => true)` 로 삼키면 「없다」와 「닫혔다」가 같아진다.**
+ *
+ * `#zoom` 이 아예 없어도(화면이 안 그려졌어도) `true` 가 되어 「닫힌다」가 통과한다.
+ * 그 자리가 살아 있는지를 먼저 찍는다.
+ * (웨이브 3 의 fermentation 세션이 자기 저장소에서 `goto` 를 삼킨 자리를 찾았다)
+ */
+const zoomExists = await page.locator('#zoom').count();
+record(zoomExists === 1, '   (앞 조건) 확대 뷰 자리가 화면에 있다', `${zoomExists}개`);
 const closed = await page.$eval('#zoom', (el) => el.hidden).catch(() => true);
 const focusBack = await page.evaluate(() => document.activeElement?.dataset?.id ?? null);
 record(closed, 'Esc 로 확대 뷰가 닫힌다');
@@ -195,8 +204,15 @@ for (const w of [320, 375, 390]) {
   await phone.waitForTimeout(350);
   const flat = await phone.evaluate(() => {
     const d = document.documentElement;
-    return { over: d.scrollWidth - d.clientWidth };
+    return { over: d.scrollWidth - d.clientWidth, wide: document.querySelector('.start-card')?.getBoundingClientRect().width ?? 0 };
   });
+  /*
+   * ★ **부등식은 양변이 0이면 저절로 참이다.** 화면이 안 그려지면
+   * `scrollWidth - clientWidth` 가 `0 - 0` 이라 「안 삐져나간다」가 그냥 통과한다.
+   * 「그 화면이 살아 있는가」를 먼저 찍는다.
+   * (웨이브 2 의 osmosis 세션이 보고서 창에서 같은 자리를 찾았다)
+   */
+  record(flat.wide > 0, `   (앞 조건) 시작 화면 ${w}px — 화면이 실제로 그려졌다`, `너비 ${flat.wide}px`);
   record(flat.over <= 0, `시작 화면 ${w}px — 가로로 삐져나가지 않는다`, `넘침 ${flat.over}px`);
   await phone.evaluate(() => window.scrollTo(0, 99999));
   await phone.waitForTimeout(250);
@@ -277,7 +293,15 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
       note: worstOf('#note-panel button, #note-panel textarea, .note-tab'),
       // 조작 단추만 보면 바닥 링크를 놓친다 — centrifuge 가 아래로 내린 뒤 잡은 자리다.
       foot: worstOf('.site-foot a, a[href], .site-foot button'),
-      buttons: document.querySelectorAll('.bench-bar button').length,
+      /*
+       * ★ **보이는 단추만 센다.** 덮임을 재는 검사는 「숨은 것을 세는」 검사와 증상이
+       * 반대다 — 단추가 사라지면 덮인 넓이가 0이 되어 **본 검사가 더 초록불이 된다.**
+       * 0 % 는 「안 가렸다」가 아니라 **「거기 없다」**일 수 있다. 앞 조건까지 숨은 것을
+       * 세면 그 거짓말을 못 잡는다.
+       * (웨이브 1 의 micrometer 세션이 「방향이 반대여서 더 나쁘다」로 짚었다)
+       */
+      buttons: [...document.querySelectorAll('.bench-bar button')]
+        .filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).length,
     };
   });
   record(!cover.none && cover.buttons > 0, `   (앞 조건) ${w}×${h} 에 토스트와 조작 단추가 둘 다 있다`,
