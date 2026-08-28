@@ -869,6 +869,28 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const bananaLine = code.split('\n').find((l) => l.includes("id: 'banana'"));
   ok(/^\s*at\(\d+, \d+,/.test(bananaLine ?? ''),
      '편집 — 선에 안 붙은 자리는 at(x, y) 로 나온다', JSON.stringify(bananaLine));
+
+  /*
+   * ★ **내는 것만으로는 반쪽이다.** 그 코드를 붙여 넣었을 때 **같은 자리로 돌아와야** 한다.
+   * `defaultItems()` 는 마지막에 `y` 를 `bottom` 에서 다시 계산해 덮어쓰므로,
+   * `at()` 이 `bottom` 을 함께 안 내면 **y 가 조용히 틀어진다.**
+   * (웨이브 3 의 germination 세션이 왕복까지 재서 짚었다)
+   *
+   * 코드가 낸 y(mm)와 지금 화면에 앉은 자리(mm)가 같은지 본다.
+   */
+  const roundTrip = await ed.evaluate(() => {
+    const line = window.__layoutCode().split('\n').find((l) => l.includes("id: 'banana'"));
+    const m = line && line.match(/at\((\d+), (\d+),/);
+    if (!m) return null;
+    const el = document.querySelector('[data-id="banana"]');
+    const stage = el.parentElement.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const mmPerPx = 1500 / stage.width;
+    return { code: Number(m[2]), shown: Math.round((r.top - stage.top) * mmPerPx) };
+  });
+  ok(roundTrip && Math.abs(roundTrip.code - roundTrip.shown) <= 8,
+     '편집 — 코드가 낸 자리가 화면에 앉은 자리와 같다 (붙여 넣으면 그대로 돌아온다)',
+     roundTrip ? `코드 ${roundTrip.code} mm · 화면 ${roundTrip.shown} mm` : '(at 줄을 못 찾음)');
   ok(code.split('\n').filter((l) => l.includes('labelKey')).length === ITEM_COUNT,
      `코드에 실험대 물건 ${ITEM_COUNT}개가 모두 나온다`);
 
