@@ -1829,6 +1829,13 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const rz = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   await rz.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
   await unlock(rz);
+  /*
+   * ★ **몇 개를 보고 0쌍인지 함께 센다.**
+   *
+   * 겹친 쌍만 세면, 폭을 줄인 뒤 **이름표가 통째로 사라져도 0쌍**이라 초록불이다.
+   * 앞 조건은 처음 폭에서만 서 있었다 — 줄인 뒤는 아무도 안 보고 있었다.
+   * (웨이브 3 의 centrifuge 세션이 자기 저장소에서 같은 구멍을 찾았다)
+   */
   const overlap = () => rz.evaluate(() => {
     const ns = [...document.querySelectorAll('.token-name')].map((e) => e.getBoundingClientRect());
     let n = 0;
@@ -1836,16 +1843,20 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       const a = ns[i]; const z = ns[j];
       if (a.left < z.right && z.left < a.right && a.top < z.bottom && z.top < a.bottom) n += 1;
     }
-    return n;
+    return { pairs: n, seen: ns.length };
   });
-  ok(await rz.evaluate(() => document.querySelectorAll('.token-name').length) > 0,
-     '   (앞 조건) 이름표가 그려져 있다');
-  ok(await overlap() === 0, '   (앞 조건) 넓은 화면에서는 안 겹친다', `${await overlap()}쌍`);
+  const wide = await overlap();
+  ok(wide.seen > 0, '   (앞 조건) 이름표가 그려져 있다', `${wide.seen}개`);
+  ok(wide.pairs === 0, '   (앞 조건) 넓은 화면에서는 안 겹친다', `${wide.seen}개 중 ${wide.pairs}쌍`);
 
   for (const w of [390, 320, 768]) {
     await rz.setViewportSize({ width: w, height: 850 });
     await rz.waitForTimeout(450);
-    ok(await overlap() === 0, `이름표 — ${w}px 로 **줄인 뒤에도** 안 겹친다`, `${await overlap()}쌍`);
+    const now = await overlap();
+    ok(now.seen === wide.seen,
+       `   (앞 조건) ${w}px 로 줄여도 이름표가 그대로 있다`, `${now.seen}개 (넓을 때 ${wide.seen}개)`);
+    ok(now.pairs === 0, `이름표 — ${w}px 로 **줄인 뒤에도** 안 겹친다`,
+       `${now.seen}개 중 ${now.pairs}쌍`);
   }
   await rz.close();
 }
