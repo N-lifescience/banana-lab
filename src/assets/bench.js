@@ -77,7 +77,7 @@ export function render(_state = {}) {
     <line x1="200" y1="155" x2="200" y2="248" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
     <!-- 2. 에폭시 상판 전면 모서리 두께면 (10 mm 두께의 단단한 덩어리감) -->
-    <rect x="0" y="248" width="400" height="12" fill="${PALETTE.bodyDark[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="248" width="400" height="8" fill="${PALETTE.bodyDark[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!--
       3. 작업면 아래 몸통.
@@ -87,17 +87,20 @@ export function render(_state = {}) {
       상판보다 어두운 한 톤으로 내리고, 상판이 드리우는 그늘 띠를 위에 얹는다.
       그라데이션이 아니라 **색 두 단**이다 (docs/01-art-direction.md).
     -->
-    <rect x="0" y="260" width="400" height="40" fill="${PALETTE.bench[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="272" width="400" height="28" fill="${PALETTE.bench[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
-    <!-- 상판이 드리우는 그늘 — 이 한 줄이 「그 밑」 을 만든다 -->
-    <rect x="0" y="260" width="400" height="9" fill="${PALETTE.bodyDark[0]}"/>
-
-    <!-- 몸통 하단 걸레받이 (Toe-kick) — 바닥에 닿는 자리는 가장 어둡다 -->
+    <!-- 몸통 하단 걸레받이 (Toe-kick) — 바닥에 닿는 자리는 다시 어둡다 -->
     <rect x="0" y="292" width="400" height="8" fill="${PALETTE.bodyDark[1]}"/>
   </g>
 
-  <!-- 상판 전면 하단 모서리 음영 (surface-shade) -->
-  <rect id="surface-shade" x="0" y="255" width="400" height="5" fill="${PALETTE.bodyDark[1]}"/>
+  <!--
+    상판이 드리우는 그늘 (surface-shade) — **이 띠 하나가 「그 밑」 을 만든다.**
+
+    위에서부터 어둡게 → 가장 어둡게 → 물러난 밝기 → 어둡게 로 쌓인다.
+    상판 두께면, 그 아래 그늘, 물러난 몸통, 바닥에 닿는 걸레받이.
+    그라데이션이 아니라 **색 단**이다 (docs/01-art-direction.md).
+  -->
+  <rect id="surface-shade" x="0" y="256" width="400" height="16" fill="${PALETTE.bodyDark[1]}"/>
 </svg>`;
 }
 

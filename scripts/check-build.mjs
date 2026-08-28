@@ -48,11 +48,27 @@ ok(await page.locator('.token-name').count() === ITEM_COUNT, '이름표가 보�
 /* ---------- 뒷문이 닫혀 있는가 ---------- */
 ok(await page.evaluate(() => window.__store === undefined),
    '배포본에 window.__store 가 없다');
+
+/*
+ * 배치 편집 모드는 **배포본에서도 열려야 한다.**
+ *
+ * 예전에는 여기서 「없다」 를 확인했다. 그런데 실험대 배치를 정하는 사람은 교실에서 쓰는
+ * 선생님이고, 그 사람 손에 있는 것은 배포된 주소다. 개발 서버에서만 열리면 있으나 마나다.
+ * 상태를 바꾸는 뒷문(`window.__store`)은 그대로 닫아 둔다 — 그쪽은 성격이 다르다.
+ */
 await page.goto(`${BASE}/?level=1&edit=1`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(200);
-ok(await page.locator('#edit-panel').count() === 0, '배포본에 배치 편집 모드가 없다');
+ok(await page.locator('#edit-panel').count() === 1, '배포본에서도 배치 편집 모드가 열린다');
+ok(await page.evaluate(() => typeof window.__layoutCode === 'function'),
+   '배포본 편집 모드에서 __layoutCode 로 좌표를 꺼낼 수 있다');
+
+// **주소에 붙이지 않으면 열리지 않는다.** 위 검사만 두면 「늘 켜져 있는 편집 모드」 도 통과한다.
+await page.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(200);
+ok(await page.locator('#edit-panel').count() === 0,
+   '`?edit=1` 없이는 편집 모드가 안 열린다 — 학생 화면은 그대로다');
 ok(await page.evaluate(() => window.__layoutCode === undefined),
-   '배포본에 __layoutCode 가 없다');
+   '`?edit=1` 없이는 __layoutCode 도 없다');
 
 /* ---------- 개발 하네스는 배포되지 않는다 ----------
    vite build 는 index.html 하나만 묶는다. 다만 `npm run preview` 는 모르는 주소를
@@ -79,6 +95,17 @@ ok(await page.locator('#bench-lock').isVisible(), '처음에는 실험대가 잠
 for (const stage of ['1', '2', '3', '4']) {
   await page.locator(`.note-tab[data-stage="${stage}"]`).click();
   await page.waitForTimeout(80);
+  // 예상 쪽은 예상을 세우기 전에는 안 넘어간다. 학생과 똑같이 세 장 다 고른다 —
+  // 여기서 안 고르면 단추가 안 눌리고, 그건 앱이 깨진 것이 아니라 설계대로다.
+  if (stage === '3') {
+    ok(await page.locator('#mark-read').isDisabled(),
+       '배포본에서도 예상을 안 세우면 다음 쪽으로 못 간다');
+    for (const id of ['A', 'B', 'C']) {
+      await page.locator(`[data-choice="predict.${id}"]`).first().click();
+      await page.waitForTimeout(80);
+    }
+    ok(await page.locator('#mark-read').isEnabled(), '배포본에서도 예상을 세우면 눌린다');
+  }
   await page.locator('#mark-read').click();
   await page.waitForTimeout(80);
 }
