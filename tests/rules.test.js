@@ -678,3 +678,54 @@ test('reduce 는 원본 상태를 바꾸지 않는다', () => {
   run(s, 'SMEAR', { slide: 'A', thickness: 0.9 });
   assert.equal(JSON.stringify(s), before, 'reduce 는 순수 함수여야 합니다');
 });
+
+test('미동나사가 끝에 닿았는데도 안 맞으면 — 말한다. 막지는 않는다', () => {
+  /*
+   * 미동나사는 ±0.2 까지만 돈다. 고배율에서 초점이 그보다 멀리 어긋나 있으면
+   * **스무 번을 더 돌려도 값도 화면도 그대로**다 — 학생은 나사가 고장 난 줄 안다.
+   * 실제로 그랬다: 40배 · coarse 1 · fine 0.2 · 스무 번 · **한 마디도 없음.**
+   * (웨이브 1 의 micrometer 세션이 자기 저장소에서 잡았고, 여기도 똑같았다)
+   */
+  let s = S0();
+  s = run(s, 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'A', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  s = run(s, 'PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 }).state;
+  s = run(s, 'SET_OBJECTIVE', { objective: 4 }).state;
+  s = run(s, 'MOUNT', { slide: 'A' }).state;
+  for (let i = 0; i < 40; i += 1) s = run(s, 'COARSE_FOCUS', { delta: 0.05 }).state;
+  s = run(s, 'SET_OBJECTIVE', { objective: 40 }).state;
+
+  let said = null;
+  let turned = 0;
+  for (let i = 0; i < 20; i += 1) {
+    const r = reduce(s, { type: 'FINE_FOCUS', payload: { delta: 0.05 } });
+    if (r.outcome === 'blocked') assert.fail('미동나사를 막으면 안 됩니다 (AGENTS.md §2.1)');
+    if (r.message) said ??= r.message;
+    if (r.state.microscope.fine !== s.microscope.fine) turned += 1;
+    s = r.state;
+  }
+  assert.ok(turned > 0, '(앞 조건) 처음 몇 번은 실제로 돌아가야 합니다');
+  assert.equal(Math.round(s.microscope.fine * 100) / 100, 0.2, '(앞 조건) 끝에 닿아 있어야 합니다');
+  assert.ok(Math.abs(s.microscope.coarse + s.microscope.fine) >= 0.03,
+    '(앞 조건) 그런데도 초점은 안 맞아 있어야 합니다');
+  assert.ok(said, '끝에 닿았는데도 안 맞으면 왜 안 되는지 말해야 합니다');
+  assert.match(said, /조동/, '빠져나갈 길(조동나사)을 짚어야 합니다');
+
+  // ★ 그 말을 따라가면 **실제로 맞아야 한다.** 말만 하고 길이 없으면 새 거짓말이다.
+  let n = 0;
+  while (Math.abs(s.microscope.coarse + s.microscope.fine) > 0.15 && n < 60) {
+    s = run(s, 'COARSE_FOCUS', { delta: -0.05 }).state; n += 1;
+  }
+  let m = 0;
+  while (Math.abs(s.microscope.coarse + s.microscope.fine) >= 0.03 && m < 40) {
+    const d = (s.microscope.coarse + s.microscope.fine) > 0 ? -0.01 : 0.01;
+    s = run(s, 'FINE_FOCUS', { delta: d }).state; m += 1;
+  }
+  assert.ok(Math.abs(s.microscope.coarse + s.microscope.fine) < 0.03,
+    `말대로 따라가면 초점이 맞아야 합니다 — 조동 ${n}번 · 미동 ${m}번 뒤 합 ${(s.microscope.coarse + s.microscope.fine).toFixed(3)}`);
+
+  // 그리고 맞는 동안에는 **그 말을 하지 않아야** 한다 — 늘 하면 아무도 안 읽는다.
+  const quiet = reduce(s, { type: 'FINE_FOCUS', payload: { delta: 0.01 } });
+  assert.equal(quiet.message ?? null, null, '초점이 맞은 뒤에는 그 말을 하지 않아야 합니다');
+});

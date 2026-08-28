@@ -220,8 +220,16 @@ for (const w of [320, 375, 390]) {
  * 「(다) 재물대에서 내리기」가 95 % 가려졌다. 손가락은 그대로 닿지만
  * (`pointer-events:none`) **눈에는 안 보인다.** 「눌리는가」만 재면 이걸 못 본다.
  */
-for (const w of [320, 390, 768, 1280]) {
-  const t = await browser.newPage({ viewport: { width: w, height: 780 } });
+/*
+ * ★ **폭만 주면 720 짜리 세로로 잰다 — 폰에 그런 화면은 없다.**
+ *
+ * 브라우저 UI 를 빼면 폰의 실제 세로는 568~667 쪽이다. 720 으로 재면 아래쪽에 여유가
+ * 생겨서 「안 가림」 이 나온다 — **재는 화면이 학생의 화면과 다른 것**이다.
+ * 폭과 높이를 **짝으로** 준다. (웨이브 3 의 centrifuge 세션이 짚었다:
+ * 같은 폭에서도 568 은 노트 100 % · 720 은 0 % 로 갈렸다)
+ */
+for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700], [768, 700], [1280, 800]]) {
+  const t = await browser.newPage({ viewport: { width: w, height: h } });
   await t.goto(devUrl(`/?level=1`), { waitUntil: 'networkidle' });
   await t.evaluate(() => { for (const s of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: s }); });
   await t.evaluate(() => {
@@ -250,10 +258,12 @@ for (const w of [320, 390, 768, 1280]) {
     return {
       bar: worstOf('.bench-bar button'),
       note: worstOf('#note-panel button, #note-panel textarea, .note-tab'),
+      // 조작 단추만 보면 바닥 링크를 놓친다 — centrifuge 가 아래로 내린 뒤 잡은 자리다.
+      foot: worstOf('.site-foot a, a[href], .site-foot button'),
       buttons: document.querySelectorAll('.bench-bar button').length,
     };
   });
-  record(!cover.none && cover.buttons > 0, `   (앞 조건) ${w}px 에 토스트와 조작 단추가 둘 다 있다`,
+  record(!cover.none && cover.buttons > 0, `   (앞 조건) ${w}×${h} 에 토스트와 조작 단추가 둘 다 있다`,
     JSON.stringify(cover));
   /*
    * ★ **양쪽을 다 잰다 — 한쪽만 재면 고침이 문제를 옮기기만 한다.**
@@ -264,10 +274,10 @@ for (const w of [320, 390, 768, 1280]) {
    * 여기서는 **가려진 비율을 숫자로 남기고**, 어느 쪽이 나빠지든 빨간불이 나게 둔다.
    * (웨이브 1 의 micrometer 세션이 「그 처방으로는 안 된다」고 되돌려 잰 것을 받았다)
    */
-  record(true, `토스트 ${w}px — 무엇을 얼마나 가리는지 (숫자로 남긴다)`,
-    `조작 줄 ${cover.bar?.pct ?? 0}% ${cover.bar?.who ?? ''} · 노트 ${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
+  record(true, `토스트 ${w}×${h} — 무엇을 얼마나 가리는지 (숫자로 남긴다)`,
+    `조작 줄 ${cover.bar?.pct ?? 0}% ${cover.bar?.who ?? ''} · 노트 ${cover.note?.pct ?? 0}% · 바닥 ${cover.foot?.pct ?? 0}%`);
   record((cover.note?.pct ?? 0) <= 20,
-    `토스트 ${w}px — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
+    `토스트 ${w}×${h} — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
     `${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
   await t.close();
 }

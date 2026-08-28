@@ -455,6 +455,23 @@ export const ACTIONS = {
     if (m.objective <= 10 && Math.abs(m.coarse + fine) < focusTolerance(m.objective)) {
       next = withScope(next, { lowMagFocused: true });
     }
+    /*
+     * **끝에 닿았는데도 안 맞으면 말한다** (AGENTS.md §2.1 — 막힌 이유와 빠져나갈 길).
+     *
+     * 미동나사는 ±0.2 까지만 돈다. 초점이 그보다 멀리 어긋나 있으면 **스무 번을 더
+     * 돌려도 값도 화면도 그대로**다 — 학생은 나사가 고장 난 줄 안다. 실제로 그랬다:
+     * 40배에서 `coarse 1` · `fine 0.2` · 스무 번 · **한 마디도 없음.**
+     *
+     * 막지는 않는다. 계속 돌 수 있고, 다만 왜 안 되는지와 어디로 가면 되는지를 말한다.
+     * 같은 말은 토스트가 겹쳐 띄우지 않으므로 매 번 말해도 화면이 시끄러워지지 않는다.
+     * (웨이브 1 의 micrometer 세션이 자기 저장소에서 잡았고, 여기도 똑같았다)
+     */
+    const atLimit = fine === m.fine && delta !== 0;
+    if (atLimit && Math.abs(m.coarse + fine) >= focusTolerance(m.objective)) {
+      return happened(next,
+        '미동나사가 끝까지 갔습니다. 조동나사로 크게 맞춘 뒤 미동나사로 다듬으세요.',
+        'fine-at-limit');
+    }
     return ok(next);
   },
 
