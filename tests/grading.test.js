@@ -87,3 +87,29 @@ test('배율 첨삭 — 접안 10배 × 대물렌즈', () => {
   assert.match(wrong.message, /40배/);
   assert.doesNotMatch(wrong.message, /400/);
 });
+
+test('되짚어 주는 말이 화면의 식과 어긋나지 않는다', async () => {
+  /*
+   * 식은 화면에 있고, **막혔을 때 보는 문장**은 따로 적혀 있다. 둘이 따로 적혀 있으면
+   * 언젠가 어긋난다 — 그리고 그 문장을 보는 사람은 **가장 많이 거들어 주는 1단계 학생**이다.
+   * 그 자리에서 식과 다른 말을 하면 되짚기가 아니라 **잘못 이끄는 것**이다.
+   *
+   * ★ 문장을 글자로 안 박는다 — **식에 있는 숫자가 문장에도 있는가**만 본다.
+   *   (답인 총배율은 뺀다. 그것을 말해 주면 문제가 아니게 된다)
+   * (웨이브 1 의 micrometer 세션이 자기 저장소에서 「× 10 µm 가 빠져 있다」로 잡았다)
+   */
+  const { UI } = await import('../src/ui/strings.js');
+  const { EYEPIECE } = await import('../src/sim/optics.js');
+  for (const objective of [4, 10, 40]) {
+    const total = EYEPIECE * objective;
+    const shown = UI.zoom.magLine(EYEPIECE, objective, total);
+    const said = gradeMagnification('99', objective).message;
+    const needed = (shown.match(/\d+/g) ?? []).filter((n) => n !== String(total));
+    for (const n of needed) {
+      assert.ok(said.includes(n),
+        `화면의 식은 "${shown}" 인데 되짚는 말은 "${said}" 입니다 — ${n} 이 빠졌습니다`);
+    }
+    assert.ok(!said.includes(String(total)),
+      `되짚는 말이 답(${total})을 그대로 알려 주면 문제가 아니게 됩니다 — "${said}"`);
+  }
+});
