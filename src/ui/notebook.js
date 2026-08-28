@@ -881,6 +881,11 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   let pressing = false;
   let pendingRender = false;
   root.addEventListener('pointerdown', () => { pressing = true; });
+  // 글칸에서 손이 떠나면 미뤄 둔 것을 따라잡는다. 다음 칸으로 옮기는 중이면
+  // 그 칸이 포커스를 받은 뒤라 `typing` 이 다시 참이 되어 또 미뤄진다 — 그게 맞다.
+  root.addEventListener('focusout', () => {
+    setTimeout(() => { if (pendingRender && !pressing) { pendingRender = false; render(); } }, 0);
+  });
   window.addEventListener('pointerup', () => {
     setTimeout(() => {
       pressing = false;
@@ -889,7 +894,22 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   });
 
   function render() {
-    if (pressing) { pendingRender = true; return; }
+    /*
+     * **학생이 글을 쓰고 있는 동안에는 노트를 다시 그리지 않는다.**
+     *
+     * 칸 하나를 채우고 **곧장 다음 칸**을 누르면 이렇게 된다:
+     *   앞 칸에서 포커스가 빠짐 → change → 저장 → 다시 그리기 →
+     *   방금 누른 칸이 **갈려 나가고**, 학생이 친 글자는 떨어져 나간 옛 칸으로 들어간다.
+     *   → **화면에는 빈 칸인데 상태에는 글이 있다.** 학생 눈에는 적은 것이 사라진 것이다.
+     *
+     * 실제로 그랬다 — `predict.B` 가 화면 `""` · 상태 `"둘째 예상"`.
+     * (웨이브 1 의 micrometer 세션이 「두 칸을 잇달아 채우면 더 잘 걸린다」 로 짚었다)
+     *
+     * 손이 그 칸을 떠날 때(`focusout`) 따라잡는다.
+     */
+    const typing = panelEl.contains(document.activeElement)
+      && document.activeElement.matches?.('[data-note]');
+    if (pressing || typing) { pendingRender = true; return; }
     const st = store.getState();
     tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
       tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));

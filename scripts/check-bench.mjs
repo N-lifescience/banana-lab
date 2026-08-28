@@ -1921,12 +1921,25 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     await one.waitForTimeout(300);
     const areas = await one.locator('#note-panel textarea[data-note]').count();
     ok(areas > 0, '   (앞 조건) 예상 쪽에 적을 칸이 있다', `${areas}칸`);
-    for (let i = 0; i < areas - 1; i += 1) {
-      await one.locator('#note-panel textarea[data-note]').nth(i).fill('색이 변한다');
-      await one.keyboard.press('Tab');
-      await one.waitForTimeout(120);
+
+    /*
+     * ★ **칸을 잇달아 채운다.** 「마지막 칸에 적고 곧장 누르면」 보다 이쪽이 더 잘 걸린다 —
+     * 앞 칸에서 포커스가 빠지며 판이 다시 그려지면, 방금 누른 **다음 칸이 갈려 나가고**
+     * 학생이 친 글자는 떨어져 나간 옛 칸으로 들어간다.
+     * **화면에는 빈 칸인데 상태에는 글이 있다** — 학생 눈에는 적은 것이 사라진 것이다.
+     * 실제로 그랬다 (`predict.B` 화면 `""` · 상태 `"둘째 예상"`).
+     * (micrometer 가 「두 칸을 잇달아 채우면 더 잘 걸린다」 로 짚었다)
+     */
+    for (let i = 0; i < areas; i += 1) {
+      await one.locator('#note-panel textarea[data-note]').nth(i).click();
+      await one.keyboard.type('색이 변한다');
     }
-    await one.locator('#note-panel textarea[data-note]').last().type('색이 변한다');
+    await one.waitForTimeout(250);
+    const shown = await one.evaluate(() =>
+      [...document.querySelectorAll('#note-panel textarea[data-note]')].map((t) => t.value));
+    ok(shown.every((v) => v.trim()),
+       '노트 — 다음 칸을 누르며 적어도 앞뒤 칸의 글이 화면에 남는다',
+       shown.map((v) => `"${v}"`).join(' '));
     await one.locator('#mark-read').click({ force: true });
     await one.waitForTimeout(500);
     const at = await one.evaluate(() =>
