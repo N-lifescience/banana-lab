@@ -765,7 +765,10 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         store.dispatch('DELETE_CAPTURE', { at: Number(btn.dataset.del) });
       });
     });
-    panelEl.querySelector('#mark-read')?.addEventListener('click', () => {
+    panelEl.querySelector('#mark-read')?.addEventListener('click', (e) => {
+      // 막힌 단추는 눌려도 아무 일이 없다. `disabled` 를 안 쓰므로 여기서 한 번 더 본다 —
+      // 화면에만 표시하고 넘기기를 안 막으면 **표시가 거짓말이 된다.**
+      if (e.currentTarget.getAttribute('aria-disabled') === 'true') return;
       /*
        * 누른 쪽은 끝났다. 학생이 탭을 도로 찾아 누르게 두지 않는다 — 다음 쪽으로 데려간다.
        *
@@ -802,14 +805,22 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
      * 조작 이야기다). 다만 막을 때는 반드시 왜 막혔는지 말한다 — 말 없는 회색 단추는
      * 학생 눈에 고장이다. 무엇을 골랐는지는 보지 않는다. 세워 봤다는 사실만 본다.
      */
-    // aria-disabled 를 겹쳐 달지 않는다 — 네이티브 disabled 가 이미 그 뜻이다.
-    // 못 누르는 이유는 바로 위 문단에 글로 있어, 읽는 순서대로 이유를 먼저 만난다.
+    /*
+     * **`disabled` 를 쓰지 않는다.**
+     *
+     * 그 속성은 단추에서 포커스를 빼앗는다. 그러면 키보드로 그 단추에 닿을 수가 없고,
+     * 낭독기는 그냥 지나친다 — **왜 못 누르는지를 들을 방법이 사라진다.** 막으면서
+     * 이유를 말하겠다는 것과 정면으로 부딪힌다 (AGENTS.md §2.1 도 같은 말이다).
+     *
+     * `aria-disabled` 는 「지금은 못 누른다」 를 알리면서 포커스를 남긴다. 눌러도 안 넘어가는
+     * 것은 같다 — 넘기는 쪽에서 한 번 더 본다.
+     */
     const blocked = activeStage === '3' && !predictDone(st);
     return `
       <div class="read-mark">
         <p>${blocked ? N.readNeedsPredict : N.readLeadIn}</p>
         <button type="button" id="mark-read" class="read-confirm"${
-          blocked ? ' disabled' : ''}>${N.readConfirm}</button>
+          blocked ? ' aria-disabled="true"' : ''}>${N.readConfirm}</button>
       </div>`;
   }
 

@@ -1550,13 +1550,25 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await nb.waitForTimeout(250);
   const gate = () => nb.evaluate(() => {
     const b = document.querySelector('#mark-read');
-    return { off: b?.disabled ?? null,
+    return { off: b?.getAttribute('aria-disabled') === 'true',
+             reachable: Boolean(b && !b.disabled),
              why: b?.closest('.read-mark')?.querySelector('p')?.innerText.trim() ?? '' };
   });
   {
     const g = await gate();
-    ok(g.off === true, '노트 — 예상을 안 세우면 「읽었습니다」 가 안 눌린다', JSON.stringify(g));
+    ok(g.off === true, '노트 — 예상을 안 세우면 「읽었습니다」 가 막혀 있다', JSON.stringify(g));
     ok(/예상/.test(g.why), '노트 — 왜 안 눌리는지 화면에 말한다', g.why || '(아무 말도 없음)');
+
+    // **`disabled` 로 막지 않는다.** 그 속성은 포커스를 빼앗아, 키보드로 그 단추에 닿을 수 없고
+    // 낭독기가 지나쳐 버린다 — 왜 못 누르는지 들을 방법이 사라진다.
+    ok(g.reachable, '노트 — 막혔어도 키보드로 닿는다 (disabled 가 아니다)', JSON.stringify(g));
+
+    // **표시만 하고 안 막으면 표시가 거짓말이 된다.** 실제로 눌러 보고 안 넘어가는지 본다.
+    // `force` 를 붙인다 — 플레이라이트는 `aria-disabled="true"` 를 「못 누르는 것」 으로 보고
+    // 그냥 기다리다 시간이 다한다. 여기서 보려는 것은 **눌렸을 때 무슨 일이 나는가**다.
+    await nb.locator('#mark-read').click({ force: true });
+    await nb.waitForTimeout(250);
+    ok(await activeTab() === '3', '노트 — 막힌 단추는 눌려도 안 넘어간다', await activeTab());
   }
 
   // **반대 방향도 잰다.** 「늘 안 눌리는 단추」 도 위 검사만으로는 통과한다.

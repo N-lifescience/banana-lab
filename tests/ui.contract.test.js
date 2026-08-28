@@ -104,16 +104,15 @@ test('UI 는 포인터 이벤트만 쓴다 — 마우스/터치 전용 이벤트
   }
 });
 
-test('실험대는 어떤 버튼도 disabled 로 막지 않는다', () => {
+test('UI 는 버튼을 disabled 로 막지 않는다', () => {
   // 이 프로젝트는 잘못된 **조작**을 막지 않는다. 누를 수 있어야 하고,
   // 누른 결과가 시야에 나타나는 것이 설계다. AGENTS.md 2.1 참조.
   //
-  // 탐구 노트는 다르다. 거기서 막는 것은 조작이 아니라 **쪽을 넘기는 순서**다
-  // (예상을 세우기 전에 다음 쪽으로 가지 않는다). 그 예외는 아래 테스트가 따로 지킨다 —
-  // 여기서 통째로 허용해 버리면 실험대에 disabled 가 스며들어도 아무도 모른다.
+  // 탐구 노트가 쪽을 넘기는 순서를 막는 자리가 생겼지만, 거기서도 `disabled` 는 안 쓴다 —
+  // 그 속성은 포커스를 빼앗아 **왜 못 누르는지 들을 방법까지 없앤다.** `aria-disabled` 를 쓴다.
+  // 금지되는 것은 「막는 것」 이 아니라 **`disabled` 라는 수단**이다.
   for (const [name, src] of uiSources()) {
-    if (name === 'notebook.js') continue;
-    assert.equal(/\bdisabled\b/.test(src), false,
+    assert.equal(/(?<!aria-)\bdisabled\b/.test(src), false,
       `src/ui/${name} 에 disabled 가 있습니다 — 막지 말고 결과로 답하세요 (AGENTS.md 2.1)`);
   }
   if (existsSync(new URL('../index.html', import.meta.url))) {
@@ -130,9 +129,14 @@ test('탐구 노트가 막는 자리는 하나뿐이고, 왜 막혔는지 말한
   // 개수를 세는 이유: 하나씩 늘어나는 것은 아무도 안 막는다. 늘리려면 이 줄을 고쳐야 한다.
   const src = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  const hits = src.match(/\bdisabled\b/g) ?? [];
+  // 화면에 다는 표시만 센다. 아래에서 따로 보는 「눌러도 되돌아가는 줄」 은 표시가 아니다.
+  const hits = src.match(/aria-disabled="true"/g) ?? [];
   assert.equal(hits.length, 1,
-    `탐구 노트의 disabled 는 「예상을 세워야 다음 쪽」 하나뿐이어야 합니다 (지금 ${hits.length}개)`);
+    `탐구 노트가 막는 자리는 「예상을 세워야 다음 쪽」 하나뿐이어야 합니다 (지금 ${hits.length}개)`);
+
+  // **표시만 하고 넘기기를 안 막으면 표시가 거짓말이 된다.** 눌렀을 때 되돌아가는 줄이 있어야 한다.
+  assert.ok(/aria-disabled'\) === 'true'\) return;/.test(src),
+    '막힌 단추를 눌렀을 때 되돌아가는 줄이 없습니다 — aria-disabled 는 표시일 뿐 막지 않습니다');
 
   // 그 자리에 붙는 이유 문구 — strings.js 에 있어야 하고 비어 있으면 안 된다.
   assert.ok(typeof UI.notebook.readNeedsPredict === 'string'
