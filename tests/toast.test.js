@@ -217,3 +217,22 @@ test('같은 막힘이 이미 떠 있으면 갈아 끼우지 않는다 — 깜�
   assert.equal(shown.length, 2,
     `다른 막힘은 곧장 떠야 합니다 — 뜬 차례: ${JSON.stringify(shown)}`);
 });
+
+test('다른 말 위에 같은 글자로 오는 막힘은 삼키지 않는다 — 깜빡임 고침이 삼킴을 되살리면 안 된다', (t) => {
+  /*
+   * 「같은 글자면 그대로 둔다」로만 깜빡임을 막으면, **다른 것 위에 같은 글자 막힘**이
+   * 올 때도 삼킨다 — 그건 깜빡임이 아니라 삼킴이다. 글자만으로는 두 자리를 못 가른다.
+   * (웨이브 2 의 catalase 세션이 깜빡임을 고치다 한 시간 전에 고친 삼킴을 되살렸다.
+   *  그때 한 시간 전에 넣은 검사가 막아 줬다 — 사람 기억이 아니라 검사가 본다)
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+
+  toast.push('덮개 유리를 덮었습니다.', 'happened', 'covered');
+  toast.push('덮개 유리를 덮었습니다.', 'blocked', 'covered');   // 글자가 같지만 막힘이다
+  t.mock.timers.tick(5 * 60 * 1000);
+
+  assert.equal(shown.length, 2,
+    `다른 말 위의 막힘이 삼켜졌습니다 — 뜬 차례: ${JSON.stringify(shown)}`);
+});

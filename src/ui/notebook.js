@@ -136,14 +136,23 @@ const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length >
 const predictDone = (st) => SLIDE_IDS.every((id) => hasNote(st, `predict.${id}`));
 
 /**
- * 「예상을 먼저 …」 — **그 단계에 실제로 있는 조작으로 말한다.**
+ * 예상 쪽에 **고를 보기를 그리는가.**
  *
- * 1·2단계는 보기에서 **고르고**, 3단계는 직접 **쓴다**. 문구가 하나뿐이면 3단계 학생은
- * **화면에 없는 단추를 찾는다.** 막는 것보다 틀린 곳을 가리키며 막는 것이 나쁘다.
+ * 이 한 줄을 **그리는 쪽과 막는 말이 함께 본다.** 따로 세면 언젠가 갈리고, 그때 학생은
+ * **화면에 없는 단추를 찾는다.** 오늘 `nowIdx` 를 두 곳에서 세다 겪은 것과 같은 뿌리다.
+ * (웨이브 1 의 micrometer 세션이 「난이도가 아니라 화면이 무엇을 그렸는지로 가르라」고 짚었다)
+ */
+const drawsChoices = (level) => level < 3;
+
+/**
+ * 「예상을 먼저 …」 — **그 화면에 실제로 있는 조작으로 말한다.**
+ *
+ * 보기를 그리는 단계는 **고르고**, 안 그리는 단계는 직접 **쓴다**. 문구가 하나뿐이면
+ * 한쪽에서 반드시 거짓말한다. 막는 것보다 **틀린 곳을 가리키며 막는 것**이 나쁘다.
  * (웨이브 2 의 catalase 세션이 자기 저장소에서 짚었다)
  */
 const needsPredictText = (level) =>
-  (level >= 3 ? N.readNeedsPredictWritten : N.readNeedsPredict);
+  (drawsChoices(level) ? N.readNeedsPredict : N.readNeedsPredictWritten);
 
 /** 실험대가 아직 잠겨 있는가 — `bench.js` 의 `lockState()` 와 같은 것을 본다. */
 const benchLocked = (st) =>
@@ -303,7 +312,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const key = `predict.${id}`;
       const val = st.session.notes[key] ?? '';
       const whyKey = `predict.why.${id}`;
-      const choices = level >= 3 ? '' : `
+      const choices = !drawsChoices(level) ? '' : `
         <div class="predict-choices" role="group" aria-label="${N.predictLabel}">
           ${N.predictOptions.map((opt) => `
             <button type="button" class="predict-opt${val === opt ? ' predict-opt--chosen' : ''}"

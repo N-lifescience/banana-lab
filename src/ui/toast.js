@@ -56,6 +56,15 @@ export function createToastQueue(root, getLevel) {
   let showingTag = null;
   /** 지금 화면에 떠 있는 **글자**(꾸민 뒤). 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
   let showingShown = null;
+  /**
+   * 지금 떠 있는 것이 **막힘인가.**
+   *
+   * 글자만으로는 두 자리를 못 가른다:
+   *   막힘 위에 **같은 막힘**        → 그대로 둔다   (깜빡임을 막는다)
+   *   다른 것 위에 **같은 글자 막힘** → 반드시 내보낸다 (삼킴을 막는다)
+   * (웨이브 2 의 catalase 세션이 자기 저장소에서 깜빡임을 고치다 삼킴을 되살렸다)
+   */
+  let showingBlocked = false;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
 
@@ -66,9 +75,10 @@ export function createToastQueue(root, getLevel) {
   function showNext() {
     if (showing || queue.length === 0) return;
     showing = true;
-    const { message, shown, good, tag } = queue.shift();
+    const { message, shown, good, tag, blocked } = queue.shift();
     showingTag = tag ?? null;
     showingShown = shown ?? message;
+    showingBlocked = Boolean(blocked);
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -85,6 +95,7 @@ export function createToastQueue(root, getLevel) {
       showing = false;
       showingTag = null;
       showingShown = null;
+      showingBlocked = false;
       showNext();
     };
   }
@@ -121,8 +132,11 @@ export function createToastQueue(root, getLevel) {
          * **다른** 막힘은 그대로 새치기한다 — 그건 다른 사실이다.
          * (웨이브 3 의 centrifuge 세션이 짚었다)
          */
-        if (showingShown === shown) return;
-        queue.unshift({ message: shown, shown, good: false, tag });
+        // **막힘 위의 같은 막힘**만 그대로 둔다. 다른 것 위에 같은 글자로 오는 막힘은
+        // 반드시 내보낸다 — 그건 깜빡임이 아니라 삼킴이다.
+        if (showingBlocked && showingShown === shown) return;
+        if (queue.some((q) => q.blocked && q.shown === shown)) return;
+        queue.unshift({ message: shown, shown, good: false, tag, blocked: true });
         if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
         else showNext();
         return;
