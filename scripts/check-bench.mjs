@@ -1364,20 +1364,45 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       }
       return out;
     });
-    const lied = [];
+    /*
+     * ★ **훑는 것과 누르는 것을 한 번에 하면 안 된다.**
+     *
+     * 앞서는 한 점마다 「옮기고 → 말풍선 읽고 → 눌러 보고」 를 이어서 했다. 그런데
+     * **누르는 순간 그 물건의 말풍선이 고정되고**, 그 뒤로는 훑어도 말풍선이 안 바뀐다
+     * (그 고정은 학생을 위한 것이라 옳은 동작이다). 그래서 두 번째 점부터 **첫 물건의 이름이
+     * 그대로 남아** 「말풍선이 거짓말한다」 로 읽혔다 — **앱은 멀쩡했고 검사가 어지럽힌 것**이다.
+     * 재 보니 420 px 에서 아홉 점이 그렇게 나왔고, 갈라서 재니 **0점**이었다.
+     * (catalase 가 「검사가 실험대를 어지럽힌다」 로 같은 자리를 짚었다)
+     *
+     * 그래서 **훑기만 하는 판**과 **누르기만 하는 판**을 따로 둔다.
+     */
+    const tips = [];
     for (const pt of freshPts) {
       await gp.mouse.move(pt.x, pt.y);
-      await gp.waitForTimeout(30);
-      const tip = await gp.evaluate(() =>
-        document.querySelector('#bench-tip')?.innerText.split('\n')[0]?.trim() ?? '');
-      await gp.mouse.down();
-      const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
-      await gp.mouse.up();
-      if (!got || !tip) continue;
-      const name = await gp.evaluate((id) =>
-        document.querySelector(`[data-id="${id}"]`)?.getAttribute('aria-label') ?? '', got);
-      if (name && tip !== name) lied.push(`"${tip}"≠"${name}"`);
+      await gp.waitForTimeout(70);
+      tips.push(await gp.evaluate(() =>
+        document.querySelector('#bench-tip')?.innerText.split('\n')[0]?.trim() ?? ''));
     }
+    const pressPage = await browser.newPage({ viewport: { width: w, height: 850 } });
+    await pressPage.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+    await unlock(pressPage);
+    await pressPage.waitForTimeout(250);
+    const lied = [];
+    for (let i = 0; i < freshPts.length; i += 1) {
+      await pressPage.mouse.move(freshPts[i].x, freshPts[i].y);
+      await pressPage.mouse.down();
+      const got = await pressPage.evaluate(() =>
+        document.querySelector('.token--dragging')?.dataset.id ?? null);
+      await pressPage.mouse.up();
+      await pressPage.keyboard.press('Escape');
+      if (!got || !tips[i]) continue;
+      const name = await pressPage.evaluate((id) =>
+        document.querySelector(`[data-id="${id}"]`)?.getAttribute('aria-label') ?? '', got);
+      if (name && tips[i] !== name) lied.push(`"${tips[i]}"≠"${name}"`);
+    }
+    await pressPage.close();
+    ok(tips.filter(Boolean).length > 0, `   (앞 조건) ${w}px 에서 말풍선이 실제로 떴다`,
+       `${tips.filter(Boolean).length}점`);
     ok(lied.length === 0, `폰 ${w}px — 말풍선이 집힐 물건의 이름을 말한다`,
        lied.slice(0, 3).join(' '));
     await gp.close();
@@ -1607,7 +1632,9 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     if (!wrote) break;
     await lk.waitForTimeout(180);
   }
-  ok(await lockedCount() === 0, '   (앞 조건) 지금 STEP 을 다 적으면 잠금이 풀린다', `${await lockedCount()}개`);
+  // **한 칸씩만 열린다.** 앞서는 「0개」 를 앞 조건으로 뒀는데 그것이 바로 사장님이
+  // 「개판이더라」 하신 동작이었다 — 다 적으면 **하나 줄어드는** 것이 맞다.
+  ok(await lockedCount() === 4, '   (앞 조건) 지금 STEP 을 다 적으면 잠금이 하나 준다', `${await lockedCount()}개`);
 
   /*
    * ①-b **잠기기 전에 맨 뒤 STEP 을 손으로 펼쳐 둔다.**
@@ -1713,6 +1740,39 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   }
 
   await lk.close();
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * **폭이 바뀌어도 이름표가 안 겹치는가.**
+ *
+ * 줄 내림은 **그때의 폭에서 잰 값**이다. 다시 부르는 곳이 그리는 자리뿐이면,
+ * 창을 줄이거나 **폰을 돌렸을 때** 겹친 채로 남는다 — 열 때는 멀쩡하므로
+ * **한 폭에서만 재는 검사로는 절대 안 보인다.**
+ * (웨이브 2 의 chromatography 세션이 플레이하다 찾았다)
+ * ──────────────────────────────────────────────────────────────── */
+{
+  const rz = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await rz.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await unlock(rz);
+  const overlap = () => rz.evaluate(() => {
+    const ns = [...document.querySelectorAll('.token-name')].map((e) => e.getBoundingClientRect());
+    let n = 0;
+    for (let i = 0; i < ns.length; i += 1) for (let j = i + 1; j < ns.length; j += 1) {
+      const a = ns[i]; const z = ns[j];
+      if (a.left < z.right && z.left < a.right && a.top < z.bottom && z.top < a.bottom) n += 1;
+    }
+    return n;
+  });
+  ok(await rz.evaluate(() => document.querySelectorAll('.token-name').length) > 0,
+     '   (앞 조건) 이름표가 그려져 있다');
+  ok(await overlap() === 0, '   (앞 조건) 넓은 화면에서는 안 겹친다', `${await overlap()}쌍`);
+
+  for (const w of [390, 320, 768]) {
+    await rz.setViewportSize({ width: w, height: 850 });
+    await rz.waitForTimeout(450);
+    ok(await overlap() === 0, `이름표 — ${w}px 로 **줄인 뒤에도** 안 겹친다`, `${await overlap()}쌍`);
+  }
+  await rz.close();
 }
 
 /* ────────────────────────────────────────────────────────────────
@@ -1915,11 +1975,12 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   const sv = await browser.newPage({ viewport: { width: 1400, height: 950 } });
   await sv.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
   await unlock(sv);
-  await sv.locator('.note-tab[data-stage="7"]').click();
+  // 안전 안내는 **2 쪽(준비물)** 으로 옮겼다 — 시작하기 전에 읽어야 하는 것이라서.
+  await sv.locator('.note-tab[data-stage="2"]').click();
   await sv.waitForTimeout(250);
   const values = () => sv.evaluate(() => {
-    const box = document.querySelector('#values-list')?.closest('.self-eval-item');
-    return { lines: document.querySelectorAll('#values-list li').length,
+    const box = document.querySelector('.safety-note');
+    return { lines: document.querySelectorAll('.safety-note li').length,
              text: box?.innerText.replace(/\s+/g, ' ').trim() ?? '' };
   });
   {
@@ -1945,7 +2006,8 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await sv.waitForTimeout(300);
   await sv.locator('.note-tab[data-stage="1"]').click();
   await sv.waitForTimeout(150);
-  await sv.locator('.note-tab[data-stage="7"]').click();
+  // 안전 안내는 **2 쪽(준비물)** 으로 옮겼다 — 시작하기 전에 읽어야 하는 것이라서.
+  await sv.locator('.note-tab[data-stage="2"]').click();
   await sv.waitForTimeout(250);
   ok((await values()).text === before,
      '자기 평가 — 실험을 하고 와도 같은 글이 그대로 있다',

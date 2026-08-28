@@ -1138,6 +1138,29 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   const NAME_ROW_PX = 15;   // index.html 의 .token-name 이 한 줄에 내려가는 거리와 같아야 한다
   const NAME_GAP_PX = 4;
 
+  /*
+   * **폭이 바뀌면 다시 흩어야 한다.**
+   *
+   * 줄 내림은 **그때의 폭에서 잰 값**이다. 그런데 `layoutNames()` 를 다시 부르는 곳이
+   * 그리는 자리밖에 없어서, 창을 줄이거나 **폰을 돌리면 이름표가 겹친 채로 남았다:**
+   *
+   *     1400 px 에서 열고 → 390 px 로 줄임 → 겹침 2쌍
+   *     390 px 로 새로 열면            → 겹침 0쌍
+   *
+   * `resize` 가 아니라 `ResizeObserver` 를 쓴다 — **옆 칸(탐구 노트)이 늘고 줄 때도**
+   * 무대 폭이 바뀌는데 그때는 `resize` 가 안 온다.
+   * (웨이브 2 의 chromatography 세션이 플레이하다 찾았다)
+   */
+  if (typeof ResizeObserver !== 'undefined') {
+    let lastW = 0;
+    new ResizeObserver(() => {
+      const w = Math.round(layer.getBoundingClientRect().width);
+      if (w === lastW) return;   // 세로만 바뀐 것에는 다시 안 잰다
+      lastW = w;
+      layoutNames();
+    }).observe(layer);
+  }
+
   function layoutNames() {
     const names = [...layer.querySelectorAll('.token-name')];
     if (names.length === 0) return;
