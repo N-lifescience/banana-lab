@@ -2522,6 +2522,37 @@ for (const w of [320, 768, 1400]) {
   await dial.close();
 }
 
+{
+  /*
+   * ★ **막는 말이 「그 화면에 있는 조작」을 가리키는가.**
+   *
+   * 1·2단계는 보기에서 **고르고**, 3단계는 직접 **쓴다**. 문구가 하나뿐이면 3단계 학생은
+   * **화면에 없는 단추를 찾는다.** 막는 것보다 **틀린 곳을 가리키며 막는 것**이 나쁘다.
+   *
+   * ★ 문구를 글자로 박지 않는다 — **「화면에 보기가 있는가」로 잰다.** 박아 두면 말을
+   * 다듬을 때마다 검사를 고쳐야 하고, 그러다 검사가 먼저 낡는다.
+   * (웨이브 2 의 catalase 세션이 자기 저장소에서 짚고 재는 법까지 냈다)
+   */
+  for (const lv of [1, 2, 3]) {
+    const g = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await g.goto(`${BASE}/?level=${lv}`, { waitUntil: 'networkidle' });
+    await g.locator('.note-tab[data-stage="3"]').click();
+    await g.waitForTimeout(300);
+    const seen = await g.evaluate(() => ({
+      opts: document.querySelectorAll('#note-panel [data-choice]').length,
+      why: document.getElementById('read-why')?.textContent?.trim() ?? '',
+    }));
+    ok(Boolean(seen.why), `   (앞 조건) ${lv}단계 예상 쪽에 막는 까닭이 적혀 있다`, seen.why);
+    ok(!(seen.opts === 0 && /고르/.test(seen.why)),
+       `노트 — ${lv}단계: 막는 말이 **그 화면에 있는 조작**을 가리킨다`,
+       `보기 ${seen.opts}개 · "${seen.why}"`);
+    ok(!(seen.opts > 0 && /적고/.test(seen.why)),
+       `노트 — ${lv}단계: 보기가 있는데 「적으라」고 하지 않는다`,
+       `보기 ${seen.opts}개 · "${seen.why}"`);
+    await g.close();
+  }
+}
+
 ok(errors.length === 0, '콘솔 에러 0건', errors.slice(0, 3).join(' / '));
 
 await browser.close();

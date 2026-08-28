@@ -54,8 +54,8 @@ export function createToastQueue(root, getLevel) {
   let showing = false;
   /** 지금 화면에 떠 있는 것의 태그. 잘된 조작을 갈아 끼울 때 쓴다. */
   let showingTag = null;
-  /** 지금 화면에 떠 있는 **문장**. 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
-  let showingMessage = null;
+  /** 지금 화면에 떠 있는 **글자**(꾸민 뒤). 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
+  let showingShown = null;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
 
@@ -66,9 +66,9 @@ export function createToastQueue(root, getLevel) {
   function showNext() {
     if (showing || queue.length === 0) return;
     showing = true;
-    const { message, raw, good, tag } = queue.shift();
+    const { message, shown, good, tag } = queue.shift();
     showingTag = tag ?? null;
-    showingMessage = raw;
+    showingShown = shown ?? message;
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -84,7 +84,7 @@ export function createToastQueue(root, getLevel) {
       dismiss = null;
       showing = false;
       showingTag = null;
-      showingMessage = null;
+      showingShown = null;
       showNext();
     };
   }
@@ -93,54 +93,69 @@ export function createToastQueue(root, getLevel) {
     /** 메시지가 없으면 아무것도 하지 않는다 — 'ok' 라도 말할 것이 있으면 띄운다. */
     push(message, outcome, tag) {
       if (!message) return;
-
-      // **같은 말을 쌓지 않는다.**
-      // 조리개·초점 슬라이더는 끄는 동안 수십 번 디스패치된다. 그때마다 같은 문장이 큐에
-      // 쌓이면 손을 뗀 뒤에도 몇십 초 동안 계속 뜬다 — 학생은 자기가 뭘 잘못했는지 몰라
-      // 같은 곳을 계속 만진다. 이미 떠 있거나 줄을 선 것과 같은 말이면 그 자리를 지킨다.
       const good = outcome === 'ok';
-
-      // **잘된 조작은 줄을 서지 않는다 — 마지막 것만 남는다.**
-      // 숟갈을 두 번 뜨면 「1숟갈」 뒤에 「2숟갈」이 줄을 서고, 앞의 것이 다 지나갈 때까지
-      // 화면은 **지난 수를 보여 준다.** 같은 태그를 겹침 방지로 삼키면 더 나빠서,
-      // 두 숟갈째에도 「1숟갈」이 뜬 채로 있게 된다. 지금 사실을 말해야 하므로 갈아 끼운다.
-      if (good && tag) {
-        const at = queue.findIndex((q) => q.tag === tag);
-        if (at >= 0) queue.splice(at, 1);
-      } else if (showingMessage === message || queue.some((q) => q.raw === message)) {
-        /*
-         * 뜻대로 안 된 것은 그대로 줄을 지킨다. 슬라이더를 끄는 동안 같은 경고가
-         * 수십 번 쌓이면 손을 뗀 뒤에도 몇 분 동안 계속 뜬다.
-         *
-         * ★ **태그가 아니라 문장으로 거른다.**
-         *
-         * 앞서는 같은 태그면 삼켰다. 그런데 한 태그가 **다른 말 둘**을 내는 자리가 있다 —
-         * `cross-contamination` 은 「스포이트에 다른 용액이 남아 있는 채로 채웠습니다」와
-         * 「씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다」 둘을 내고,
-         * `cracked` 도 둘이다. 그러면 **둘째가 통째로 삼켜져** 학생은 왜 그렇게 됐는지를
-         * 못 듣는다. 막으려던 것은 「같은 문장이 수십 번」이므로 문장으로 걸러도 그대로 막힌다.
-         * (웨이브 3 의 fermentation 세션이 자기 저장소에서 희석 안내가 삼켜지는 것으로 잡았다)
-         */
-        return;
-      }
       const level = getLevel ? getLevel() : 1;
 
-      // **막힘은 줄을 서지 않는다.**
-      // 이것은 「무슨 일이 있었다」가 아니라 **「방금 네가 한 것이 안 된 이유」**다.
-      // 뒤에 세우면, 앞선 말풍선 두어 개가 지나갈 동안 학생은 아무 답도 못 받은 채 같은
-      // 조작을 되풀이한다. micrometer 파일럿에서 재어 보니 막힌 지 **12.7초** 뒤에 설명이
-      // 도착했다 — 그 사이에 학생은 「안 되네」 하고 손을 뗀다.
-      // 줄을 **비우지는 않는다.** 앞선 것들은 실제로 일어난 일이라 지우면 앞뒤를 못 듣는다.
+      /*
+       * **막힘은 줄을 서지 않고, 겹침 방지에도 안 걸린다.**
+       *
+       * 이것은 「무슨 일이 있었다」가 아니라 **「방금 네가 한 것이 안 된 이유」**다.
+       * 뒤에 세우면, 앞선 말풍선 두어 개가 지나갈 동안 학생은 아무 답도 못 받은 채 같은
+       * 조작을 되풀이한다. micrometer 파일럿에서 재어 보니 막힌 지 **12.7초** 뒤에 설명이
+       * 도착했다 — 그 사이에 학생은 「안 되네」 하고 손을 뗀다.
+       * 줄을 **비우지는 않는다.** 앞선 것들은 실제로 일어난 일이라 지우면 앞뒤를 못 듣는다.
+       *
+       * ★ **거르기보다 앞에 둔다.** 앞서는 겹침 방지가 먼저였다 — 그래서 막힘 설명이
+       * 줄에 있는 다른 말과 글자가 같으면 **통째로 삼켜졌다.** 막혔는데 이유가 안 나오면
+       * 학생은 빠져나올 길이 없다. 되풀이해 막혀도 `unshift` 뒤 곧장 갈아 끼우므로
+       * 쌓이지 않는다. (웨이브 2 의 chromatography 세션이 자기 저장소에서 짚었다)
+       */
       if (outcome === 'blocked') {
-        queue.unshift({ message: detail(message, tag, level, false, true), good: false, tag });
+        const shown = detail(message, tag, level, false, true);
+        queue.unshift({ message: shown, shown, good: false, tag });
         if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
         else showNext();
         return;
       }
 
-      // `raw` 는 꾸미기 전 문장이다. 큐에 든 것은 꾸며진 것이라 들어오는 날것과
-      // 그대로 견주면 **영영 같지 않아** 겹침 방지가 통째로 죽는다.
-      queue.push({ message: detail(message, tag, level, good), raw: message, good, tag });
+      /*
+       * ★ **학생이 실제로 읽는 글자로 거른다.**
+       *
+       * 큐에 드는 것은 `detail()` 을 거친 글자다. 날것으로 걸렀더니 두 가지가 어긋났다:
+       *   · 큐에 든 것은 꾸며진 것이라 날것과 **영영 같지 않아** 겹침 방지가 죽는다
+       *   · **3단계는 뜻대로 안 된 말을 전부 같은 「숨김」으로 바꾼다.** 날것이 달라도
+       *     학생이 보는 글자는 같으므로, 날것으로 걸러 두면 같은 글자가 두 번 뜬다
+       * (웨이브 2 의 chromatography 세션이 3단계 쪽을 짚었다)
+       */
+      const shown = detail(message, tag, level, good);
+
+      /*
+       * **잘된 조작은 줄을 서지 않는다 — 마지막 것만 남는다.**
+       * 숟갈을 두 번 뜨면 「1숟갈」 뒤에 「2숟갈」이 줄을 서고, 앞의 것이 다 지나갈 때까지
+       * 화면은 **지난 수를 보여 준다.** 같은 태그를 겹침 방지로 삼키면 더 나빠서,
+       * 두 숟갈째에도 「1숟갈」이 뜬 채로 있게 된다. 지금 사실을 말해야 하므로 갈아 끼운다.
+       */
+      if (good && tag) {
+        const at = queue.findIndex((q) => q.tag === tag);
+        if (at >= 0) queue.splice(at, 1);
+      } else if (showingShown === shown || queue.some((q) => q.shown === shown)) {
+        /*
+         * **같은 말을 쌓지 않는다.**
+         * 조리개·초점 슬라이더는 끄는 동안 수십 번 디스패치된다. 그때마다 같은 문장이 큐에
+         * 쌓이면 손을 뗀 뒤에도 몇십 초 동안 계속 뜬다 — 학생은 자기가 뭘 잘못했는지 몰라
+         * 같은 곳을 계속 만진다.
+         *
+         * ★ **태그가 아니라 글자로 거른다.** 앞서는 같은 태그면 삼켰는데, 한 태그가
+         * **다른 말 둘**을 내는 자리가 있다 — `cross-contamination` 은 「스포이트에 다른
+         * 용액이 남아 있는 채로 채웠습니다」와 「씻지 않은 스포이트를 썼습니다. 두 용액이
+         * 섞였습니다」 둘을 내고, `cracked` 도 둘이다. 그러면 **둘째가 통째로 삼켜져**
+         * 학생은 왜 그렇게 됐는지를 못 듣는다.
+         * (웨이브 3 의 fermentation 세션이 희석 안내가 삼켜지는 것으로 잡았다)
+         */
+        return;
+      }
+
+      queue.push({ message: shown, shown, good, tag });
       showNext();
     },
   };

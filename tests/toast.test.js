@@ -142,3 +142,39 @@ test('같은 태그라도 **다른 말**은 삼키지 않는다', (t) => {
   assert.ok(shown.some((s) => s.includes('두 용액이 섞였습니다')),
     `같은 태그라도 다른 말은 삼키면 안 됩니다 — 뜬 것: ${JSON.stringify(shown)}`);
 });
+
+test('막힘은 겹침 방지에 걸리지 않는다 — 이유를 못 들으면 빠져나올 길이 없다', (t) => {
+  /*
+   * 앞서는 겹침 방지가 막힘 분기보다 **앞**에 있었다. 그래서 막힘 설명이 줄에 있는 다른
+   * 말과 글자가 같으면 **통째로 삼켜졌다.** 막혔는데 이유가 안 나오면 학생은 같은 조작을
+   * 되풀이하다 손을 뗀다. (웨이브 2 의 chromatography 세션이 짚었다)
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+
+  toast.push('그 자리에는 놓을 수 없습니다.', 'happened', 'nope');
+  toast.push('그 자리에는 놓을 수 없습니다.', 'blocked', 'nope');   // 글자가 같다
+  t.mock.timers.tick(5 * 60 * 1000);
+
+  assert.equal(shown.filter((s) => s.includes('놓을 수 없습니다')).length, 2,
+    `막힘이 삼켜졌습니다 — 뜬 차례: ${JSON.stringify(shown)}`);
+});
+
+test('3단계에서 감춘 말끼리는 겹쳐 쌓지 않는다', (t) => {
+  /*
+   * 3단계는 뜻대로 안 된 말을 **전부 같은 「숨김」**으로 바꾼다. 날것으로 걸러 두면
+   * 원문이 다르니 안 걸러지고, **학생이 보는 글자는 같은데 두 번 뜬다.**
+   * 거르기는 학생이 실제로 읽는 글자로 해야 한다.
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 3);
+
+  toast.push('시야가 어둡습니다.', 'happened', 'dark');
+  toast.push('두께가 너무 두껍습니다.', 'happened', 'thick');   // 원문은 다르다
+  t.mock.timers.tick(5 * 60 * 1000);
+
+  assert.equal(shown.length, 1,
+    `3단계에서는 둘 다 같은 글자로 보이므로 한 번만 떠야 합니다 — 뜬 것: ${JSON.stringify(shown)}`);
+});

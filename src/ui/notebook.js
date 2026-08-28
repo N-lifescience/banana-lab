@@ -135,6 +135,16 @@ const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length >
  */
 const predictDone = (st) => SLIDE_IDS.every((id) => hasNote(st, `predict.${id}`));
 
+/**
+ * 「예상을 먼저 …」 — **그 단계에 실제로 있는 조작으로 말한다.**
+ *
+ * 1·2단계는 보기에서 **고르고**, 3단계는 직접 **쓴다**. 문구가 하나뿐이면 3단계 학생은
+ * **화면에 없는 단추를 찾는다.** 막는 것보다 틀린 곳을 가리키며 막는 것이 나쁘다.
+ * (웨이브 2 의 catalase 세션이 자기 저장소에서 짚었다)
+ */
+const needsPredictText = (level) =>
+  (level >= 3 ? N.readNeedsPredictWritten : N.readNeedsPredict);
+
 /** 실험대가 아직 잠겨 있는가 — `bench.js` 의 `lockState()` 와 같은 것을 본다. */
 const benchLocked = (st) =>
   UI.bench.lock.required.some((id) => !(st.session.readStages ?? []).includes(id));
@@ -368,7 +378,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       btn.removeAttribute('aria-describedby');
     }
     const why = panelEl.querySelector('#read-why');
-    if (why) why.textContent = blocked ? N.readNeedsPredict : N.readLeadIn;
+    if (why) why.textContent = blocked ? needsPredictText(st.session.level) : N.readLeadIn;
   }
 
   /**
@@ -935,7 +945,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const blocked = activeStage === '3' && !predictDone(st);
     return `
       <div class="read-mark">
-        <p id="read-why">${blocked ? N.readNeedsPredict : N.readLeadIn}</p>
+        <p id="read-why">${blocked ? needsPredictText(st.session.level) : N.readLeadIn}</p>
         <button type="button" id="mark-read" class="read-confirm"${
           blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
       </div>`;
