@@ -43,7 +43,7 @@ test('막힘은 줄을 서지 않고 곧장 뜬다', (t) => {
   toast.push('두 번째로 일어난 일입니다.', 'happened', 'b');
   assert.equal(shown.length, 1, '한 번에 하나만 떠야 합니다');
 
-  toast.push('막혔습니다. 이렇게 하면 됩니다.', 'blocked', 'blocked-x');
+  toast.push('막혔습니다. 이렇게 하면 됩니다.', 'blocked');   // 막힘은 앱에서 tag 없이 온다
   assert.equal(shown.at(-1), '막혔습니다. 이렇게 하면 됩니다.',
     `막힘이 줄 뒤에 섰습니다 — 화면에 뜬 차례: ${JSON.stringify(shown)}`);
 });
@@ -59,7 +59,7 @@ test('막힘이 앞선 말풍선을 지워 버리지 않는다', (t) => {
   const toast = createToastQueue(root, () => 2);
 
   toast.push('유리에 금이 갔습니다.', 'happened', 'cracked');
-  toast.push('막혔습니다.', 'blocked', 'broken');
+  toast.push('막혔습니다.', 'blocked');
   t.mock.timers.tick(20000);
   assert.ok(shown.includes('유리에 금이 갔습니다.'),
     `앞선 말풍선이 사라졌습니다 — 뜬 차례: ${JSON.stringify(shown)}`);
@@ -93,7 +93,7 @@ test('3단계도 막힌 이유는 감추지 않는다', (t) => {
 
   const { root: r2, shown: s2 } = fakeDom();
   const t2 = createToastQueue(r2, () => 3);
-  t2.push('금이 간 것은 다시 올릴 수 없습니다. 새것을 꺼내세요.', 'blocked', 'broken');
+  t2.push('금이 간 것은 다시 올릴 수 없습니다. 새것을 꺼내세요.', 'blocked');
   assert.equal(s2[0], '금이 간 것은 다시 올릴 수 없습니다. 새것을 꺼내세요.',
     '3단계에서 막힌 이유가 가려졌습니다 — 여기서 실험이 끝납니다');
 });
@@ -161,7 +161,7 @@ test('막힘은 겹침 방지에 걸리지 않는다 — 이유를 못 들으면
    * 진짜 보증은 **다른 막힘이 줄에 밀려 삼켜지지 않는 것**이다.
    */
   toast.push('덮개 유리를 덮었습니다.', 'happened', 'covered');
-  toast.push('고배율에서는 조동나사를 돌리지 않습니다.', 'blocked', 'coarse-high');
+  toast.push('고배율에서는 조동나사를 돌리지 않습니다.', 'blocked');
   t.mock.timers.tick(5 * 60 * 1000);
 
   assert.ok(shown.some((s) => s.includes('조동나사')),
@@ -201,7 +201,7 @@ test('같은 막힘이 이미 떠 있으면 갈아 끼우지 않는다 — 깜�
   const { root, shown } = fakeDom();
   const toast = createToastQueue(root, () => 1);
 
-  for (let i = 0; i < 10; i += 1) toast.push('그 자리에는 놓을 수 없습니다.', 'blocked', 'nope');
+  for (let i = 0; i < 10; i += 1) toast.push('그 자리에는 놓을 수 없습니다.', 'blocked');
   /*
    * ★ **시계를 돌려 줄을 비운 뒤에 센다.**
    *
@@ -213,7 +213,7 @@ test('같은 막힘이 이미 떠 있으면 갈아 끼우지 않는다 — 깜�
   assert.equal(shown.length, 1, `같은 막힘이 ${shown.length}번 새로 떴습니다 — 깜빡입니다`);
 
   // 다른 막힘은 그대로 새치기한다 — 그건 다른 사실이다.
-  toast.push('유리에 금이 갔습니다.', 'blocked', 'cracked');
+  toast.push('유리에 금이 갔습니다.', 'blocked');
   assert.equal(shown.length, 2,
     `다른 막힘은 곧장 떠야 합니다 — 뜬 차례: ${JSON.stringify(shown)}`);
 });
@@ -230,7 +230,7 @@ test('다른 말 위에 같은 글자로 오는 막힘은 삼키지 않는다 �
   const toast = createToastQueue(root, () => 1);
 
   toast.push('덮개 유리를 덮었습니다.', 'happened', 'covered');
-  toast.push('덮개 유리를 덮었습니다.', 'blocked', 'covered');   // 글자가 같지만 막힘이다
+  toast.push('덮개 유리를 덮었습니다.', 'blocked');   // 글자가 같지만 막힘이다
   t.mock.timers.tick(5 * 60 * 1000);
 
   assert.equal(shown.length, 2,

@@ -801,3 +801,28 @@ test('되풀이해도 아무 일도 없고 아무 말도 없는 조작은 없다
     `스무 번을 눌러도 아무 일도 없고 아무 말도 없는 조작: ${mute.join(', ')}\n`
     + '값이 안 움직이는 것은 괜찮습니다 — 말없이 안 움직이는 것이 문제입니다.');
 });
+
+test('막힌 결과에는 tag 가 없다 — 태그로 막힘을 다루려는 코드는 죽은 갈래가 된다', () => {
+  /*
+   * `blocked()` 는 `{state, outcome, message, **reason**}` 을 돌려준다. `tag` 자리가
+   * **아예 없다.** 그래서 화면 쪽에서 「같은 태그면 거른다」로 막힘을 다루려 하면
+   * 그 조건은 **언제나 거짓**이고, 아무 일도 안 하는 줄이 조용히 남는다.
+   *
+   * 여기가 바뀌면 `toast.js` 의 주석이 거짓이 되므로 **층 사이를 못 박아 둔다.**
+   * (웨이브 2 의 osmosis 세션이 그 구멍에 빠지고 나서 이 못을 냈다)
+   */
+  let s = S0();
+  s = run(s, 'PEEL_BANANA').state;
+  s = run(s, 'SMEAR', { slide: 'A', thickness: 0.3 }).state;
+  s = run(s, 'PICK_COVERSLIP').state;
+  s = run(s, 'PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 }).state;
+  s = run(s, 'SET_OBJECTIVE', { objective: 40 }).state;
+  s = run(s, 'MOUNT', { slide: 'A' }).state;
+  s = run(s, 'COARSE_FOCUS', { delta: 0.5 }).state;   // 고배율에서 조동 → 금이 간다
+  const again = reduce(s, { type: 'MOUNT', payload: { slide: 'A' } });
+
+  assert.equal(again.outcome, 'blocked', '(앞 조건) 금 간 슬라이드를 올리려 하면 막혀야 합니다');
+  assert.equal(again.tag ?? null, null,
+    `막힌 결과가 tag 를 실으면 화면 쪽 태그 거르기가 되살아납니다 — ${JSON.stringify(again.tag)}`);
+  assert.ok(again.reason, '막힌 이유(reason)는 있어야 합니다 — 그것이 하드 게이트의 근거입니다');
+});

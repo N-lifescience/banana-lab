@@ -132,10 +132,16 @@ export function createToastQueue(root, getLevel) {
          * **다른** 막힘은 그대로 새치기한다 — 그건 다른 사실이다.
          * (웨이브 3 의 centrifuge 세션이 짚었다)
          */
-        // **막힘 위의 같은 막힘**만 그대로 둔다. 다른 것 위에 같은 글자로 오는 막힘은
-        // 반드시 내보낸다 — 그건 깜빡임이 아니라 삼킴이다.
+        /*
+         * **막힘 위의 같은 막힘**만 그대로 둔다. 다른 것 위에 같은 글자로 오는 막힘은
+         * 반드시 내보낸다 — 그건 깜빡임이 아니라 삼킴이다.
+         *
+         * 줄에 있는 막힘까지 훑지는 **않는다.** 막힘은 바로 아래에서 `unshift` 한 뒤
+         * 곧장 꺼내지므로 **줄에 머물 수가 없다** — 훑는 줄을 넣어 보고 빼 봤더니
+         * 아무 검사도 안 깨졌다. **빼도 안 깨지면 넣지 않는다.**
+         * (웨이브 2 의 osmosis 세션이 자기 저장소에서 같은 죽은 갈래를 걷어내고 알려 주었다)
+         */
         if (showingBlocked && showingShown === shown) return;
-        if (queue.some((q) => q.blocked && q.shown === shown)) return;
         queue.unshift({ message: shown, shown, good: false, tag, blocked: true });
         if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
         else showNext();
