@@ -1976,10 +1976,25 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
      * 실제로 그랬다 (`predict.B` 화면 `""` · 상태 `"둘째 예상"`).
      * (micrometer 가 「두 칸을 잇달아 채우면 더 잘 걸린다」 로 짚었다)
      */
+    /*
+     * ★ **옮긴 직후 손이 그 칸에 남아 있는지도 매번 본다.**
+     *
+     * 미뤄 둔 다시 그리기가 `pointerup` 에서 풀리면, 그때는 **이미 다음 칸에 손이 있다** —
+     * 그 칸이 갈려 나가면 포커스가 `<body>` 로 떨어지고 **그 뒤에 친 것이 전부 허공으로**
+     * 간다. 값만 보면 앞 칸들이 멀쩡해서 **가운데 칸만 비는 것**으로 나타난다.
+     * (웨이브 2 의 osmosis 세션이 `savingNote` 와 `pressing` 의 순서에서 잡았다)
+     */
+    const landed = [];
     for (let i = 0; i < areas; i += 1) {
       await one.locator('#note-panel textarea[data-note]').nth(i).click();
+      await one.waitForTimeout(200);   // 미뤄 둔 다시 그리기가 돌 시간을 준다
+      landed.push(await one.evaluate(() =>
+        document.activeElement?.dataset?.note ?? document.activeElement?.tagName));
       await one.keyboard.type('색이 변한다');
     }
+    ok(landed.every((v, i) => v === keys[i]),
+       '노트 — **마우스로 옮긴 직후에도** 손이 그 칸에 남아 있다',
+       landed.join(' '));
     await one.waitForTimeout(250);
     const shown = await one.evaluate(() =>
       [...document.querySelectorAll('#note-panel textarea[data-note]')].map((t) => t.value));
