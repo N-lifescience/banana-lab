@@ -93,25 +93,67 @@ test('실험대 배경에 금속 부속이 남아 있지 않다', () => {
   }
 });
 
-test('작업면 아래가 「그 밑」 으로 읽히게 쌓여 있다', () => {
+/** 색의 밝기. 「누운 면이 더 밝은가」 를 재려면 이름이 아니라 값으로 봐야 한다. */
+function lum(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+}
+
+test('선반과 작업면이 「누운 면 + 서 있는 면」 으로 서 있다', () => {
   /*
-   * 예전에는 작업면 아래가 **화면에서 가장 밝은 아이보리**였다. 밝은 것은 앞으로 나와 보이므로
-   * 아래가 아래로 안 읽히고 평평했다. 어두운 그늘 띠를 넣어 단을 만들었다.
+   * 앞에서 본 네모만 쌓아서는 아무리 칠해도 평평하다. 실제로 두 번 그렇게 만들었다.
    *
-   * **색 이름만 훑으면 안 된다** — 같은 어두운 색이 상판에도 쓰인다. 작업면 앞 모서리
-   * 아래(y ≥ 248)에 있는 사각형만 골라서 본다.
+   * 입체는 **면이 둘**일 때 생긴다 — 물건이 딛고 선 **누운 면**이 뒤로 물러나고,
+   * 그 앞으로 **서 있는 면**(두께)이 떨어진다. 그리고 누운 면은 **빛을 더 받는다.**
+   * 위아래를 뒤집으면 다시 평평해지는데, 두 색이 다 팔레트 안이라 `check:art` 는
+   * 초록불을 낸다 — 그래서 여기서 잰다.
+   *
+   * 누운 면은 #room 에 있다. #shelf·#surface 의 맨 위 y 는 **물건이 서는 선**이고
+   * (바로 위 검사), 그 위로 뻗는 면을 그 안에 넣으면 선이 밀려 올라가 물건이 전부 뜬다.
    */
   const svg = ASSETS.bench.render({});
-  const below = [...svg.matchAll(/<rect[^>]*y="(\d+)"[^>]*fill="(#[0-9A-Fa-f]{6})"[^>]*>/g)]
-    .filter((m) => Number(m[1]) >= 248)
-    .map((m) => ({ y: Number(m[1]), fill: m[2] }));
+  const shapes = [
+    ...[...svg.matchAll(/<polygon[^>]*points="([^"]+)"[^>]*fill="(#[0-9A-Fa-f]{6})"/g)]
+      .map((m) => ({ ys: m[1].trim().split(/[\s,]+/).map(Number).filter((_, i) => i % 2), fill: m[2] })),
+    ...[...svg.matchAll(/<rect[^>]*\by="([\d.]+)"[^>]*\bheight="([\d.]+)"[^>]*fill="(#[0-9A-Fa-f]{6})"/g)]
+      .map((m) => ({ ys: [Number(m[1]), Number(m[1]) + Number(m[2])], fill: m[3] })),
+  ];
 
-  assert.ok(below.length >= 3,
-    `작업면 아래에 단이 ${below.length}개뿐입니다 — 두께면·그늘·몸통이 있어야 합니다`);
-  assert.equal(below.some((r) => r.fill === PALETTE.paper[0]), false,
-    '작업면 아래에 가장 밝은 아이보리가 있습니다 — 아래가 앞으로 튀어나와 보입니다');
-  assert.ok(below.some((r) => r.y < 280 && r.fill === PALETTE.bodyDark[1]),
-    '상판 바로 밑에 그늘 띠가 없습니다 — 앞뒤가 평평해 보입니다');
+  for (const [name, line] of [['선반', CONTRACT.bench.landmarks.shelfTopY],
+                              ['작업면', CONTRACT.bench.landmarks.surfaceFrontY]]) {
+    // 누운 면 — 앞 모서리가 물건이 서는 선에 닿고, 거기서 **뒤로(위로)** 물러난다.
+    const deck = shapes.find((sh) => sh.ys.includes(line) && Math.min(...sh.ys) < line);
+    assert.ok(deck, `${name}에 누운 면이 없습니다 — 앞에서 본 네모뿐이라 평평해 보입니다`);
+
+    // 서 있는 면 — 그 선에서 아래로 떨어지는 두께.
+    const front = shapes.find((sh) => Math.min(...sh.ys) === line && Math.max(...sh.ys) > line);
+    assert.ok(front, `${name}에 서 있는 면(두께)이 없습니다`);
+
+    assert.ok(lum(deck.fill) > lum(front.fill),
+      `${name}의 누운 면(${deck.fill})이 서 있는 면(${front.fill})보다 어둡습니다`
+      + ' — 누운 면이 빛을 더 받습니다. 위아래가 뒤집혔습니다');
+  }
+});
+
+test('작업면 아래 몸통이 상판보다 좁다 — 상판이 걸쳐 있어야 입체가 산다', () => {
+  /*
+   * 몸통이 상판과 같은 폭이면 옆이 딱 잘려 「띠 하나」 가 된다. 조금 안으로 들여야
+   * 상판이 좌우로 걸쳐 보이고, 그 옆으로 벽이 드러나 실험대가 방 안에 놓인 것이 된다.
+   */
+  const svg = ASSETS.bench.render({});
+  const g = svg.slice(svg.indexOf('<g id="surface"'), svg.indexOf('</g>', svg.indexOf('<g id="surface"')));
+  // `\bwidth` 는 **`stroke-width="3"` 에도 걸린다** (`-` 가 낱말 경계라서). 그러면 폭 3 짜리
+  // 도형을 상판으로 알고 「3 ≥ 3」 으로 터진다. 앞에 낱말 문자나 붙임표가 없어야 한다.
+  const rects = [...g.matchAll(/<rect[^>]*\sx="([\d.]+)"[^>]*\sy="([\d.]+)"[^>]*\s(?<![-\w])width="([\d.]+)"/g)]
+    .map((m) => ({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]) }));
+  const slab = rects.find((r) => r.y === CONTRACT.bench.landmarks.surfaceFrontY);
+  assert.ok(slab, '작업면 앞 모서리에 상판 두께면이 없습니다');
+  const body = rects.filter((r) => r.y > slab.y);
+  assert.ok(body.length > 0, '상판 아래에 몸통이 없습니다');
+  for (const r of body) {
+    assert.ok(r.w < slab.w,
+      `상판 아래 몸통이 상판과 같은 폭입니다 (${r.w} ≥ ${slab.w}) — 옆이 딱 잘려 띠로 보입니다`);
+  }
 });
 
 test('등록된 애셋은 render 와 applyState 를 모두 내보낸다', () => {
