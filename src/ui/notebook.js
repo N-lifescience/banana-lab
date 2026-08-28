@@ -818,9 +818,9 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const blocked = activeStage === '3' && !predictDone(st);
     return `
       <div class="read-mark">
-        <p>${blocked ? N.readNeedsPredict : N.readLeadIn}</p>
+        <p id="read-why">${blocked ? N.readNeedsPredict : N.readLeadIn}</p>
         <button type="button" id="mark-read" class="read-confirm"${
-          blocked ? ' aria-disabled="true"' : ''}>${N.readConfirm}</button>
+          blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
       </div>`;
   }
 

@@ -1535,6 +1535,33 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     document.querySelector('.note-tab[aria-selected="true"]')?.dataset.stage ?? '(없음)');
 
   ok(await activeTab() === '1', '   (앞 조건) 탐구 노트는 1 쪽에서 시작한다', await activeTab());
+
+  /*
+   * **차례대로만 재면 이 버그는 절대 안 나타난다.**
+   *
+   * 넘길 곳을 「아직 안 읽은 쪽」 으로 고르면, 차례대로 읽는 동안에는 늘 맞다.
+   * 그런데 4 쪽을 먼저 읽어 둔 학생이 3 쪽에서 누르면 **거꾸로 끌려가거나 아무 데도 안 간다.**
+   * 그래서 **마지막 쪽에서 먼저** 눌러 보고, 그 다음에 앞쪽에서 눌러 본다.
+   * (fermentation 세션이 자기 저장소에서 실제로 두 번 물린 자리다.)
+   */
+  await nb.locator('.note-tab[data-stage="4"]').click();
+  await nb.waitForTimeout(200);
+  await nb.locator('#mark-read').click();
+  await nb.waitForTimeout(250);
+  const afterLast = await activeTab();
+  await nb.locator('.note-tab[data-stage="1"]').click();
+  await nb.waitForTimeout(200);
+  await nb.locator('#mark-read').click();
+  await nb.waitForTimeout(250);
+  // **두 번 다 봐야 한다.** 뒤엣것만 보면 「안 읽은 쪽으로 간다」 는 틀린 규칙도 통과한다 —
+  // 4 쪽에서 1 쪽으로 거꾸로 끌려가 놓고, 그 다음 눌렀을 때만 우연히 맞기 때문이다.
+  ok(afterLast === '5' && await activeTab() === '2',
+     '노트 — 뒤쪽을 먼저 읽어 뒀어도 앞뒤가 안 뒤바뀐다',
+     `4쪽에서 누른 뒤 ${afterLast}(5여야 함) → 1쪽에서 누른 뒤 ${await activeTab()}(2여야 함)`);
+
+  // 여기서부터는 다시 처음 상태로 본다.
+  await nb.goto(`${BASE}/?level=1`, { waitUntil: 'networkidle' });
+  await nb.waitForTimeout(250);
   await nb.locator('#mark-read').click();
   await nb.waitForTimeout(250);
   ok(await activeTab() === '2', '노트 — 「읽었습니다」 를 누르면 다음 쪽으로 데려간다', await activeTab());
@@ -1550,8 +1577,12 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   await nb.waitForTimeout(250);
   const gate = () => nb.evaluate(() => {
     const b = document.querySelector('#mark-read');
+    const said = b?.getAttribute('aria-describedby');
     return { off: b?.getAttribute('aria-disabled') === 'true',
              reachable: Boolean(b && !b.disabled),
+             // 낭독기가 단추를 읽을 때 이유까지 함께 읽는가. 이 줄이 없으면 이유는
+             // **눈으로 보는 사람에게만** 있는 것이 된다.
+             told: Boolean(said && document.getElementById(said)?.innerText.trim()),
              why: b?.closest('.read-mark')?.querySelector('p')?.innerText.trim() ?? '' };
   });
   {
@@ -1562,6 +1593,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     // **`disabled` 로 막지 않는다.** 그 속성은 포커스를 빼앗아, 키보드로 그 단추에 닿을 수 없고
     // 낭독기가 지나쳐 버린다 — 왜 못 누르는지 들을 방법이 사라진다.
     ok(g.reachable, '노트 — 막혔어도 키보드로 닿는다 (disabled 가 아니다)', JSON.stringify(g));
+    ok(g.told, '노트 — 낭독기도 이유를 함께 듣는다 (aria-describedby)', JSON.stringify(g));
 
     // **표시만 하고 안 막으면 표시가 거짓말이 된다.** 실제로 눌러 보고 안 넘어가는지 본다.
     // `force` 를 붙인다 — 플레이라이트는 `aria-disabled="true"` 를 「못 누르는 것」 으로 보고
