@@ -826,3 +826,36 @@ test('막힌 결과에는 tag 가 없다 — 태그로 막힘을 다루려는 �
     `막힌 결과가 tag 를 실으면 화면 쪽 태그 거르기가 되살아납니다 — ${JSON.stringify(again.tag)}`);
   assert.ok(again.reason, '막힌 이유(reason)는 있어야 합니다 — 그것이 하드 게이트의 근거입니다');
 });
+
+test('막힘 문장은 다른 어떤 문장과도 겹치지 않는다 — 겹치면 화면에서 삼켜진다', async () => {
+  /*
+   * 말풍선은 **학생이 읽는 글자**로 겹침을 거른다. 그래서 막힘 문장이 잘된 조작이나
+   * 일어난 일의 문장과 **글자가 같아지면**, 막힘이 삼켜져 **「막혔는데 아무 말도 없다」**
+   * 가 된다. 그때는 아무도 이 자리를 안 본다.
+   *
+   * ★ 화면 쪽에 갈래(「떠 있는 것이 막힘인가」)를 두는 길도 있다. 그런데 **갈래는 그날
+   *   조용히 일해서 아무도 배우지 못한다.** 여기서 전제를 붙들면 겹치는 문장을 쓰는
+   *   그날 **커밋 게이트가 사람을 부른다.** 이 저장소는 막힘 문장이 소스에 상수로 있고
+   *   `BLOCKING_REASONS` 관문을 거쳐야 늘어나므로 이쪽이 성립한다.
+   *   (웨이브 3 의 fermentation 세션이 셋째 길로 냈다)
+   */
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/sim/rules.js', import.meta.url), 'utf8');
+  const grab = (fn) => {
+    const re = new RegExp(`${fn}\\(\\s*[^,]+,\\s*(\`[^\`]*\`|'[^']*')`, 'g');
+    const out = new Set();
+    let m;
+    while ((m = re.exec(src))) out.add(m[1].slice(1, -1));
+    return out;
+  };
+  const blockedMsgs = grab('blocked');
+  const others = new Set([...grab('happened'), ...grab('ok')]);
+
+  // ★ **이 검사가 헛도는지도 잰다.** 하나도 못 찾으면 「겹침 0」이 그냥 나온다.
+  assert.ok(blockedMsgs.size > 0, '막힘 문장을 하나도 못 찾았습니다 — 이 검사가 헛돌고 있습니다');
+  assert.ok(others.size > 5, `견줄 문장이 ${others.size}개뿐입니다 — 이 검사가 헛돌고 있습니다`);
+
+  const clash = [...blockedMsgs].filter((m) => others.has(m));
+  assert.deepEqual(clash, [],
+    `막힘 문장이 다른 문장과 글자가 같습니다 — 화면에서 삼켜집니다:\n  ${clash.join('\n  ')}`);
+});

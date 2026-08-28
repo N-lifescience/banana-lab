@@ -56,15 +56,6 @@ export function createToastQueue(root, getLevel) {
   let showingTag = null;
   /** 지금 화면에 떠 있는 **글자**(꾸민 뒤). 같은 말을 겹쳐 띄우지 않으려고 기억한다. */
   let showingShown = null;
-  /**
-   * 지금 떠 있는 것이 **막힘인가.**
-   *
-   * 글자만으로는 두 자리를 못 가른다:
-   *   막힘 위에 **같은 막힘**        → 그대로 둔다   (깜빡임을 막는다)
-   *   다른 것 위에 **같은 글자 막힘** → 반드시 내보낸다 (삼킴을 막는다)
-   * (웨이브 2 의 catalase 세션이 자기 저장소에서 깜빡임을 고치다 삼킴을 되살렸다)
-   */
-  let showingBlocked = false;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
 
@@ -75,10 +66,9 @@ export function createToastQueue(root, getLevel) {
   function showNext() {
     if (showing || queue.length === 0) return;
     showing = true;
-    const { message, shown, good, tag, blocked } = queue.shift();
+    const { message, shown, good, tag } = queue.shift();
     showingTag = tag ?? null;
     showingShown = shown ?? message;
-    showingBlocked = Boolean(blocked);
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -95,7 +85,6 @@ export function createToastQueue(root, getLevel) {
       showing = false;
       showingTag = null;
       showingShown = null;
-      showingBlocked = false;
       showNext();
     };
   }
@@ -133,28 +122,18 @@ export function createToastQueue(root, getLevel) {
          * (웨이브 3 의 centrifuge 세션이 짚었다)
          */
         /*
-         * **막힘 위의 같은 막힘**만 그대로 둔다. 다른 것 위에 같은 글자로 오는 막힘은
-         * 반드시 내보낸다 — 그건 깜빡임이 아니라 삼킴이다.
+         * **같은 막힘이 이미 떠 있으면 그대로 둔다.** 학생이 같은 곳을 계속 만지면
+         * 갈아 끼워서 깜빡이기만 한다 — 열 번 만지면 열 번 붙고 아홉 번 떨어진다.
          *
-         * ── 왜 갈래를 남기는가 (지금은 안 걸리는데도) ──────────────────
-         * 지금 이 저장소의 막힘 문장은 **하나뿐**이고 다른 어떤 문장과도 안 겹친다
-         * (rules.js 를 훑어 확인: happened 30 · ok 14 · blocked 1 · 겹치는 것 0).
-         * 그래서 아랫줄의 `showingBlocked` 갈래는 **오늘은 걸릴 일이 없다.**
-         *
-         * 그래도 남긴다. 막힘 문장이 하나만 늘어도 그날 걸리고, 그때 증상은
-         * **「막혔는데 아무 말도 없다」** 라 아무도 여기를 안 본다.
-         * 웨이브 2 의 catalase 세션은 이 갈래 없이 고쳤다가 **한 시간 전에 고친 삼킴을
-         * 되살렸다.** 반대로 웨이브 3 의 fermentation 세션은 막힘 문장이 안 겹쳐서
-         * 갈래 없이 더 작게 풀었다 — **저장소마다 답이 다르다.**
-         * 새 막힘 문장을 더할 때 이 줄을 함께 보라.
-         *
-         * 줄에 있는 막힘까지 훑지는 **않는다.** 막힘은 바로 아래에서 `unshift` 한 뒤
-         * 곧장 꺼내지므로 **줄에 머물 수가 없다** — 훑는 줄을 넣어 보고 빼 봤더니
-         * 아무 검사도 안 깨졌다. **빼도 안 깨지면 넣지 않는다.**
-         * (웨이브 2 의 osmosis 세션이 자기 저장소에서 같은 죽은 갈래를 걷어내고 알려 주었다)
+         * 「떠 있는 것이 막힘인가」를 따로 기억하지 **않는다.** 이 저장소의 막힘 문장은
+         * 다른 어떤 문장과도 글자가 같지 않아서(그 전제를 `rules.test.js` 가 붙든다),
+         * 글자가 같으면 그것은 **언제나 같은 막힘**이다.
+         * 겹치는 문장이 생기는 날 그 검사가 사람을 부른다 — 갈래는 조용히 일할 뿐이다.
+         * (웨이브 3 의 fermentation 세션이 낸 길. 웨이브 2 의 catalase 는 겹침이 있어서
+         *  갈래가 맞았다 — **저장소마다 답이 다르다**)
          */
-        if (showingBlocked && showingShown === shown) return;
-        queue.unshift({ message: shown, shown, good: false, tag, blocked: true });
+        if (showingShown === shown) return;
+        queue.unshift({ message: shown, shown, good: false, tag });
         if (showing) dismiss?.();      // 지우면 showNext 가 이어서 불린다
         else showNext();
         return;
