@@ -54,8 +54,35 @@
   /* 실험실 벽. 애셋(실험대)은 아래쪽만 채우므로, 바탕을 깔지 않으면 위쪽이 페이지 배경이 된다 —
      다크 모드에서는 검은 허공에 선반이 떠 있는 것처럼 보인다.
      물건은 테마를 타지 않는 색으로 그려져 있으므로 벽도 두 테마에서 같은 색으로 둔다. */
+  /*
+   * ★ **아이폰에서 실험대를 길게 누르면 돋보기가 뜨고 글자가 선택됐다.**
+   *
+   * 사장님 지시 (2026-08-29, 아이폰에서 직접 해 보시고):
+   * 「아무래도 **<실험대>에서 길게 누르게 될 확률이 존재**하는데, 그렇게 했을 때
+   *  **확대되고, 글자 복사되려고** 하는 경향이 존재하네」
+   *
+   * 실험대는 **끌어 옮기는 화면**이라 길게 누르는 일이 자연히 생긴다. 물건(`.token`)에는
+   * 이미 걸어 두었는데 **무대 바탕과 이름표에는 없었다** — 물건을 살짝 빗맞히면
+   * 바탕을 누른 것이 되어 사파리가 확대·선택 메뉴를 띄운다.
+   *
+   * 셋을 건다:
+   *   `-webkit-touch-callout`  길게 누르기 메뉴
+   *   `user-select`            글자 선택
+   *   `touch-action:manipulation`  **두 번 탭 확대만** 끈다
+   *
+   * ★ **`touch-action:none` 이 아니다.** 무대 전체에 `none` 을 걸었다가 그 위에 손을
+   *   대고 밀면 **쪽이 안 넘어가** 되돌린 적이 있다(아래 확대 뷰 주석에 그 기록이 있다).
+   *   `manipulation` 은 밀기를 살려 두고 두 번 탭 확대만 끈다.
+   *
+   * ★ **탐구 노트에는 절대 걸지 않는다.** 글칸에서 붙여넣기·글자 고르기가 죽는다.
+   *   그래서 범위를 `.bench-stage` 안으로만 한정한다 — 노트는 다른 패널이다.
+   *   (사장님 지시를 germination 세션이 전해 오면서 이 주의점을 함께 짚었다)
+   */
   .bench-stage{position:relative;width:100%;aspect-ratio:4/3;
-    background:#DDE3DA;border-radius:6px}
+    background:#DDE3DA;border-radius:6px;
+    touch-action:manipulation;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .bench-stage *{-webkit-touch-callout:none}
   .bench-bg{position:absolute;inset:0}
   .bench-bg svg{width:100%;height:100%;display:block}
   .bench-tokens{position:absolute;inset:0}
@@ -364,6 +391,25 @@
     animation:toast-in .22s ease-out both, toast-flash .5s ease-out .22s 1}
   .toast--done{background:#1B7048}
   .toast--warn{background:#A82920}
+  /*
+   * 다 읽은 사람이 치우는 X. **머무는 시간은 그대로다** — 느리게 읽는 학생이 문장을
+   * 잃지 않게. (사장님 지시 2026-08-29: 「긴 시간은 그대로 두고 … X표시를 만들어서」)
+   *
+   * ★ 말풍선 자리(`#toast-region`)는 `pointer-events:none` 이라 손가락이 **통과**한다 —
+   *   밑의 실험대를 가리지 않으려고 그렇게 두었다. 그래서 **X 에만** 되돌려 준다.
+   *   여기에 안 주면 눌러도 아무 일이 안 일어난다.
+   */
+  .toast{display:flex;align-items:flex-start;gap:10px}
+  .toast-text{flex:1;min-width:0}
+  .toast-x{pointer-events:auto;flex:0 0 auto;position:relative;
+    width:26px;height:26px;border:0;border-radius:6px;cursor:pointer;
+    background:rgba(255,255,255,.16);color:#fff;font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;padding:0}
+  .toast-x:hover{background:rgba(255,255,255,.3)}
+  .toast-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  /* 보이는 크기는 26 px 인데 **닿는 자리는 44 px** 로 넓힌다 — 말풍선을 키우지 않으면서
+     손가락이 빗나가지 않게. 폰에서 26 px 짜리는 두 번에 한 번 빗나간다. */
+  .toast-x::after{content:'';position:absolute;inset:-9px}
   /* 움직임을 줄여 달라고 한 기기에서는 애니메이션만 뺀다. 머무는 시간은 그대로다 —
      읽는 데 걸리는 시간은 움직임 설정과 상관이 없다. */
   .toast--still{animation:none}

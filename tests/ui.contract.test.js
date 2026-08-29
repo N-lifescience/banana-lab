@@ -381,3 +381,48 @@ test('손이 글칸에 있는 동안 노트를 다시 그리지 않는다 (얇�
   assert.ok(/const typing = [^;]*activeElement/s.test(src),
     '`typing` 이 `document.activeElement` 를 안 봅니다 — 손이 어디 있는지 모르는 채 미룹니다');
 });
+
+/*
+ * 아이폰에서 실험대를 **길게 눌렀을 때** 돋보기·글자 선택이 안 뜨는가 — 얇은 눈금.
+ *
+ * 사장님 지시 (2026-08-29, 아이폰에서 직접 해 보시고):
+ * 「**<실험대>에서 길게 누르게 될 확률이 존재**하는데, 그렇게 했을 때
+ *  **확대되고, 글자 복사되려고** 하는 경향이 존재하네」
+ *
+ * ★ **크로뮴으로는 `-webkit-touch-callout` 을 잴 수 없다.**
+ *   계산값에도 안 나오고 CSSOM 에도 안 들어간다 — **파싱 단계에서 버린다.**
+ *   그래서 브라우저 검사가 「걸린 규칙 없음」을 내는데, 그건 **안 걸린 것이 아니라
+ *   못 재는 것**이다. 헷갈리면 멀쩡한 CSS 를 지우러 간다.
+ *   잴 수 있는 것(`touch-action` · `user-select`)은 `check-bench` 가 실기 흉내로 재고,
+ *   **못 재는 것은 여기서 소스로** 지킨다. 실제 확인은 아이폰 실기가 있어야 한다.
+ */
+test('실험대에는 길게 누르기 메뉴를 끄고, 탐구 노트에는 걸지 않는다', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');   // 주석에 적어 둔 설명이 규칙으로 세어지면 안 된다
+
+  const block = html.match(/\.bench-stage\s*\{[^}]*\}/);
+  assert.ok(block, '`.bench-stage` 규칙을 못 찾았습니다 — 이름이 바뀌었다면 이 검사도 함께 보세요');
+  for (const [prop, why] of [
+    ['-webkit-touch-callout:none', '길게 누르면 「복사」 메뉴가 뜹니다'],
+    ['user-select:none', '끌다가 글자가 선택됩니다'],
+    ['touch-action:manipulation', '두 번 탭하면 화면이 확대됩니다'],
+  ]) {
+    assert.ok(block[0].replace(/\s/g, '').includes(prop.replace(/\s/g, '')),
+      `\`.bench-stage\` 에 \`${prop}\` 이 없습니다 — 아이폰에서 ${why}`);
+  }
+  // ★ `touch-action:none` 이면 안 된다 — 무대 위에 손을 대고 밀 때 쪽이 안 넘어간다(되돌린 적 있음)
+  assert.ok(!/touch-action\s*:\s*none/.test(block[0]),
+    '`.bench-stage` 가 `touch-action:none` 입니다 — 그 위에서 밀면 쪽이 안 넘어갑니다');
+
+  /*
+   * ★ **탐구 노트에 걸면 붙여넣기와 글자 고르기가 죽는다.**
+   *   글칸은 학생이 길게 눌러 「붙여넣기」를 쓰는 자리다. 넓게 걸다가 여기까지
+   *   덮으면 **고치려던 것보다 나쁜 것**이 된다.
+   */
+  const noteBlocks = html.match(/(#note-panel|\[data-note\])[^{]*\{[^}]*\}/g) ?? [];
+  assert.ok(noteBlocks.length > 0, '노트 규칙을 못 찾았습니다 — 아래가 무엇을 지키는지 알 수 없습니다');
+  for (const b of noteBlocks) {
+    assert.ok(!/-webkit-touch-callout\s*:\s*none|user-select\s*:\s*none/.test(b),
+      `탐구 노트에 길게 누르기·글자 선택을 막는 규칙이 걸렸습니다 — 붙여넣기가 죽습니다:\n${b}`);
+  }
+});

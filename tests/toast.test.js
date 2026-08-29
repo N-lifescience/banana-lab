@@ -13,23 +13,44 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-/** 붙은 순서를 그대로 남기는 가짜 root. */
+/**
+ * 붙은 순서를 그대로 남기는 가짜 root.
+ *
+ * ★ **말풍선이 이제 한 덩이가 아니라 「글 + 닫기 단추」다.** 그래서 무엇이 떴는지는
+ *   `el.textContent` 가 아니라 **글 조각**에서 읽는다. 앞서는 덩이 하나였고, 그때 쓰던
+ *   방식을 그대로 두면 `shown` 이 전부 빈 문자열이 되어 **아무 말도 안 뜬 것처럼**
+ *   보인다 — 그러면 이 파일의 검사가 통째로 헛돈다.
+ *
+ * 닫기 단추를 눌러 보는 검사가 있으므로 `handlers` 로 붙은 것을 남긴다.
+ */
 function fakeDom() {
   const shown = [];
+  const nodes = [];
+  const mk = () => {
+    const el = {
+      textContent: '', className: '', type: '', attrs: {}, kids: [],
+      handlers: {},
+      classList: { add() {} },
+      setAttribute(k, v) { el.attrs[k] = v; },
+      addEventListener(type, fn) { el.handlers[type] = fn; },
+      append(...cs) { el.kids.push(...cs); },
+      remove() { root.children = root.children.filter((c) => c !== el); },
+      /** 화면에 실제로 뜬 글 — 글 조각이 있으면 그것이 답이다. */
+      get shownText() { return el.kids[0]?.textContent ?? el.textContent; },
+      /** 닫기 단추 (없으면 undefined). */
+      get closeBtn() { return el.kids.find((c) => c.className === 'toast-x'); },
+    };
+    nodes.push(el);
+    return el;
+  };
   const root = {
     children: [],
     setAttribute() {},
-    appendChild(el) { root.children.push(el); shown.push(el.textContent); },
+    appendChild(el) { root.children.push(el); shown.push(el.shownText ?? el.textContent); },
   };
-  globalThis.document = {
-    createElement: () => ({
-      textContent: '', className: '',
-      classList: { add() {} },
-      remove() { root.children.pop(); },
-    }),
-  };
+  globalThis.document = { createElement: mk };
   globalThis.window = { matchMedia: () => ({ matches: true }) };
-  return { root, shown };
+  return { root, shown, nodes };
 }
 
 const { createToastQueue } = await import('../src/ui/toast.js');
@@ -228,3 +249,59 @@ test('같은 막힘이 이미 떠 있으면 갈아 끼우지 않는다 — 깜�
  * (웨이브 3 의 fermentation 세션이 낸 길)
  */
 
+
+/*
+ * ── 닫기 단추 ──────────────────────────────────────────────────────
+ *
+ * 사장님 지시 (2026-08-29, 아이폰에서 직접 해 보시고):
+ * 「지속시간이 꽤 긴 것 같은데, **긴 시간은 그대로 두고** X표시를 만들어서 거기를
+ *  터치하면 사라질 수 있도록 — **팝업같은 느낌이지만, 토스트로!**」
+ *
+ * **시간을 줄이는 것이 아니다.** 여기서 지키는 것은 셋이다:
+ *   ① 단추가 실제로 붙는가 — 키보드로 닿으려면 진짜 `<button>` 이어야 한다
+ *   ② 누르면 **큐의 다음 것이 바로 뜨는가** — 안 그러면 밀려 있던 말이 통째로 사라진다
+ *   ③ **머무는 시간은 그대로인가** — 줄이면 느리게 읽는 학생이 문장을 잃는다
+ */
+test('말풍선에 닫기 단추가 붙는다 — 키보드로도 닿게 진짜 단추로', () => {
+  const { root } = fakeDom();
+  const q = createToastQueue(root, () => 1);
+  q.push('바나나 껍질을 벗겼습니다.', 'ok', 'peel');
+
+  const el = root.children[0];
+  assert.ok(el, '말풍선이 안 떴습니다');           // 앞 조건 — 아무것도 안 떴으면 아래가 헛돈다
+  const x = el.closeBtn;
+  assert.ok(x, '닫기 단추가 없습니다');
+  assert.equal(x.type, 'button', '진짜 <button> 이어야 Tab 으로 닿습니다');
+  assert.ok(x.attrs['aria-label'], '읽어 줄 이름이 없습니다 — 화면 읽기 프로그램이 「버튼」 이라고만 말합니다');
+  assert.equal(typeof x.handlers.click, 'function', '누를 수 있는 자리가 없습니다');
+});
+
+test('닫기를 누르면 큐의 다음 말이 바로 뜬다 (밀려 있던 말이 사라지면 안 된다)', () => {
+  const { root, shown } = fakeDom();
+  const q = createToastQueue(root, () => 1);
+  q.push('첫째 말입니다.', 'happened', 'a');
+  q.push('둘째 말입니다.', 'happened', 'b');
+
+  assert.equal(shown.length, 1, '앞 조건 — 말풍선은 한 번에 하나만 뜬다');
+  assert.equal(root.children.length, 1);
+
+  root.children[0].closeBtn.handlers.click();
+
+  assert.equal(shown.length, 2, '닫았는데 다음 말이 안 떴습니다 — 밀려 있던 말이 사라집니다');
+  assert.equal(shown[1], '둘째 말입니다.');
+  assert.equal(root.children.length, 1, '닫은 것이 화면에 남아 있습니다');
+});
+
+test('닫기 단추가 생겨도 머무는 시간은 그대로다 (읽는 시간을 뺏지 않는다)', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const q = createToastQueue(root, () => 1);
+  const long = '스포이트에 다른 용액이 남아 있는 채로 채웠습니다. 개수대에 대어 씻고 다시 담으세요.';
+  q.push(long, 'happened', 'x');
+
+  t.mock.timers.tick(3000);
+  assert.equal(root.children.length, 1, '3초 만에 사라졌습니다 — 긴 문장을 읽을 시간이 없습니다');
+  t.mock.timers.tick(6000);
+  assert.equal(root.children.length, 0, '9초가 지나도 안 사라집니다 — 시간 제한이 죽었습니다');
+  assert.equal(shown.length, 1);
+});

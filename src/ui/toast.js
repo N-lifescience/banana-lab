@@ -74,7 +74,36 @@ export function createToastQueue(root, getLevel) {
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
     el.className = `toast toast--${good ? 'done' : 'warn'}`;
     if (reducedMotion()) el.classList.add('toast--still');
-    el.textContent = message;
+
+    /*
+     * ★ **다 읽은 사람은 치울 수 있어야 한다 — 머무는 시간은 그대로 둔다.**
+     *
+     * 사장님 지시 (2026-08-29, 아이폰에서 직접 해 보시고):
+     * 「토스트가 지속시간이 꽤 긴 것 같은데, **긴 시간은 그대로 두고** 토스트에 X표시를
+     *  만들어서 거기를 터치하면 사라질 수 있도록 해줄래? **팝업같은 느낌이지만, 토스트로!**」
+     *
+     * **시간을 줄이는 것이 아니다.** 읽을 사람은 오래 읽고, 다 읽은 사람은 치운다.
+     * 시간을 줄이면 느리게 읽는 학생이 문장을 잃는다 — 그래서 `holdFor` 는 손대지 않는다.
+     *
+     * 세 가지를 지킨다:
+     *   · **키보드로도 닿는다** — 진짜 `<button>` 이라 Tab 으로 간다. 폰만 보고
+     *     만들면 손가락으로만 닿는 단추가 생긴다.
+     *   · 지우면 **큐의 다음 것이 바로 뜬다** — `dismiss()` 가 `showNext()` 를 부른다.
+     *     안 그러면 뒤에 밀려 있던 말이 통째로 사라진다.
+     *   · 말풍선 자리는 `pointer-events:none` 이라 손가락이 **통과**한다(밑의 실험대를
+     *     가리지 않으려고 그렇게 두었다). 그래서 **X 에만** `pointer-events:auto` 를 준다.
+     * (사장님 지시를 germination 세션이 그대로 전해 왔다)
+     */
+    const text = document.createElement('span');
+    text.className = 'toast-text';
+    text.textContent = message;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'toast-x';
+    close.setAttribute('aria-label', UI.toast.close);
+    close.textContent = '\u2715';
+    close.addEventListener('click', () => { dismiss?.(); });
+    el.append(text, close);
     root.appendChild(el);
 
     const timer = setTimeout(() => { dismiss?.(); }, holdFor(message));
