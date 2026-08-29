@@ -282,3 +282,26 @@ test('문서에 적힌 되돌리기 횟수가 UNDO_LIMITS 와 같다', () => {
   assert.equal(Number(phrase[1]), UNDO_LIMITS[Number(phrase[2])],
     `docs/03 의 설명이 낡았습니다 — 문서 ${phrase[1]}회 / 상수 ${UNDO_LIMITS[Number(phrase[2])]}회`);
 });
+
+/*
+ * 편집 모드 안내가 **지금 하는 일**을 말하는가.
+ *
+ * ★ **걷어낸 기능을 설명하는 문장은 기능보다 오래 산다.**
+ *   배치를 `placeFreely`(놓은 자리에 그대로) 로 바꾼 뒤에도 안내문은 「선반 또는 작업면에
+ *   **자동으로 붙습니다**」라고 배포된 화면에서 말하고 있었다. 사장님 지시가
+ *   **「가능한 포지션을 정해 두지 마라」**였으니 화면이 지시와 정반대를 말한 셈이다.
+ *   기능이 사라져도 문장은 남고, **사장님은 그 문장을 보고 안 붙는 것을 버그로 여기신다.**
+ *   (germination 이 자기 문서에서 같은 얼굴을 찾아 알려 주었다)
+ */
+test('편집 모드 안내가 「자동으로 붙는다」고 말하지 않는다 (놓은 자리에 그대로 둔다)', () => {
+  const bench = readFileSync(new URL('../src/ui/bench.js', import.meta.url), 'utf8');
+  // 앞 조건 — 자유 배치가 실제로 있는가. 없으면 이 검사는 엉뚱한 것을 지킨다
+  assert.ok(/function placeFreely\(/.test(bench),
+    'placeFreely 가 없습니다 — 배치 방식이 바뀌었다면 이 검사와 안내문을 함께 다시 보세요');
+  assert.ok(!/자동으로 붙습니다|선반에 붙습니다|자동 정렬/.test(UI.edit.note),
+    `편집 안내가 걷어낸 기능을 설명하고 있습니다: "${UI.edit.note}"\n`
+    + '  ★ 지금 코드는 placeFreely — **놓은 자리에 그대로** 둡니다.\n'
+    + '  고칠 것은 코드가 아니라 이 문장입니다.');
+  assert.ok(/그대로|자동으로 붙지 않/.test(UI.edit.note),
+    `편집 안내가 「그대로 남는다」를 말하지 않습니다: "${UI.edit.note}"`);
+});
