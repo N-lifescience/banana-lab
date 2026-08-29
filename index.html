@@ -413,15 +413,23 @@
    */
   .toast{display:flex;align-items:flex-start;gap:10px}
   .toast-text{flex:1;min-width:0}
+  /*
+   * ★ **단추가 말풍선 키를 올리지 않게 한다.**
+   *   26px 짜리는 글 한 줄(21px)보다 커서, 한 줄짜리 말풍선도 **43 → 50px** 로 부풀었다.
+   *   부탁하신 것은 **닫기 단추**이지 **더 큰 말풍선**이 아니다. 글줄에 맞춰 21px 로 둔다.
+   *   (chromatography 가 자기 저장소에서 「가로 36px 을 먹어 320px 에서 글이 한 줄 더
+   *    접히고, 세로도 26 > 21 이라 넓은 화면에서까지 키가 오른다」로 짚었다)
+   */
   .toast-x{pointer-events:auto;flex:0 0 auto;position:relative;
-    width:26px;height:26px;border:0;border-radius:6px;cursor:pointer;
-    background:rgba(255,255,255,.16);color:#fff;font-size:14px;line-height:1;
+    width:21px;height:21px;border:0;border-radius:5px;cursor:pointer;
+    background:rgba(255,255,255,.16);color:#fff;font-size:12px;line-height:1;
     display:flex;align-items:center;justify-content:center;padding:0}
   .toast-x:hover{background:rgba(255,255,255,.3)}
   .toast-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
-  /* 보이는 크기는 26 px 인데 **닿는 자리는 44 px** 로 넓힌다 — 말풍선을 키우지 않으면서
-     손가락이 빗나가지 않게. 폰에서 26 px 짜리는 두 번에 한 번 빗나간다. */
-  .toast-x::after{content:'';position:absolute;inset:-9px}
+  /* 보이는 크기는 21 px 인데 **닿는 자리는 45 px** 로 넓힌다 — 말풍선을 키우지 않으면서
+     손가락이 빗나가지 않게. 폰에서 작은 단추는 두 번에 한 번 빗나간다.
+     보이는 것을 줄여도 **닿는 자리는 그대로**여야 한다. */
+  .toast-x::after{content:'';position:absolute;inset:-12px}
   /* 움직임을 줄여 달라고 한 기기에서는 애니메이션만 뺀다. 머무는 시간은 그대로다 —
      읽는 데 걸리는 시간은 움직임 설정과 상관이 없다. */
   .toast--still{animation:none}
