@@ -16,16 +16,16 @@
  * 통과하지 못하면 종료 코드 1. CI와 에이전트가 이 값을 본다.
  */
 
-import { ASSETS, PENDING, SAMPLE_STATES } from '../src/assets/index.js';
-import { CONTRACT, requiredNodes } from '../src/assets/contract.js';
-import { ALLOWED_FILLS, ALLOWED_STROKE_WIDTHS, INK } from '../src/style/tokens.js';
+import { ASSETS, PENDING, SAMPLE_STATES } from '../experiments/banana/src/assets/index.js';
+import { CONTRACT, requiredNodes } from '../experiments/banana/src/assets/contract.js';
+import { ALLOWED_FILLS, ALLOWED_STROKE_WIDTHS, INK } from '../experiments/banana/src/style/tokens.js';
 
 // 이 실험 고유의 시약색·반응색은 tokens.js 가 아니라 palette.experiment.js 에 둔다.
 // (NEW-EXPERIMENT.md §4 · MERGE-AND-DEPLOY.md §3.1). tokens.js 는 실험마다 diff 0 이어야 한다.
 // 파일이 없거나 EXP_PALETTE 를 내보내지 않아도 검사는 그대로 돈다 — 그때는 공용 색만 허용된다.
 let EXP_PALETTE = {};
 try {
-  ({ EXP_PALETTE = {} } = await import('../src/style/palette.experiment.js'));
+  ({ EXP_PALETTE = {} } = await import('../experiments/banana/src/style/palette.experiment.js'));
 } catch {
   // palette.experiment.js 가 없는 실험(반응색을 안 쓰는 실험)은 이대로 지나간다.
 }

@@ -25,7 +25,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { initialState } from '../src/sim/state.js';
 import { payloadOf } from '../src/ui/report.js';
 
-const html = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
 
 /** 이 실험에 **없는** 말. 다른 실험 방침이 흘러 들어왔는지 본다. */
 const OTHER_WORDS = ['원형질', '적양파', '카탈레이스', '과산화수소', '크로마토그래피',

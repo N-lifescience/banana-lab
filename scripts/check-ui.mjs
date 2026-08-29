@@ -18,7 +18,7 @@
  *   5. 되돌리기 표시에 Infinity 가 새지 않는가
  *   6. 라이트/다크 스크린샷
  */
-import { devUrl } from '../dev-port.js';
+import { devUrl, expUrl } from '../dev-port.js';
 
 import { mkdirSync, readFileSync } from 'node:fs';
 
@@ -34,7 +34,7 @@ mkdirSync('shots', { recursive: true });
 
 // 난이도를 주소로 정하면 시작 화면을 건너뛴다. 이 스크립트가 볼 것은 그 뒤의 조작이라
 // 매번 시작 화면을 클릭해 넘길 이유가 없다 (시작 화면 자체는 check-bench.mjs 가 본다).
-const URL_BASE = process.env.SHOT_URL ?? devUrl('/?level=1');
+const URL_BASE = process.env.SHOT_URL ?? expUrl('banana', '?level=1');
 const results = [];
 const record = (ok, label, detail = '') => {
   results.push({ ok, label, detail });
@@ -207,7 +207,7 @@ for (const w of [320, 375, 390]) {
   // ★ `URL_BASE` 는 `?level=1` 이라 **시작 화면을 건너뛴다.** 그러면 `.start-go` 가
   //   없어서 「못 찾음」 이 나오고, 그것은 「단추가 화면 밖」 과 구별이 안 된다.
   //   재려는 화면으로 곧장 간다.
-  await phone.goto(devUrl('/'), { waitUntil: 'networkidle' });
+  await phone.goto(expUrl('banana'), { waitUntil: 'networkidle' });
   await phone.waitForTimeout(350);
   const flat = await phone.evaluate(() => {
     const d = document.documentElement;
@@ -254,7 +254,7 @@ for (const w of [320, 375, 390]) {
 const measured = new Map();   // 아래 5.7 에서 PLAYTEST 의 표와 맞댄다
 for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700], [768, 700], [1280, 800]]) {
   const t = await browser.newPage({ viewport: { width: w, height: h } });
-  await t.goto(devUrl(`/?level=1`), { waitUntil: 'networkidle' });
+  await t.goto(expUrl('banana', '?level=1'), { waitUntil: 'networkidle' });
   await t.evaluate(() => { for (const s of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage: s }); });
   await t.evaluate(() => {
     const s = window.__store;

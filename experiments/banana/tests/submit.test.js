@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { enabled, SUPABASE_URL, SUPABASE_ANON_KEY } from '../src/net/supabase.js';
 
-const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const schema = readFileSync(new URL('../../../supabase/schema.sql', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/net/supabase.js', import.meta.url), 'utf8');
 
 test('설정이 없으면 제출 기능은 꺼진 것으로 본다', () => {
@@ -83,7 +83,7 @@ test('개인정보 칸은 둘뿐이다', () => {
 
 test('개인정보처리방침이 제출 기능을 실제로 설명한다', () => {
   // 화면이 하는 일과 방침이 어긋나면, 그건 화면이 거짓말을 하는 것이다.
-  const policy = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
+  const policy = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
   for (const must of ['선생님께 제출', '학번', '자동으로 삭제', '법정대리인', 'Supabase']) {
     assert.ok(policy.includes(must), `방침에 "${must}" 설명이 없습니다`);
   }

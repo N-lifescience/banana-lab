@@ -20,3 +20,18 @@ export const PREVIEW_PORT = DEV_PORT + 1000;
 /** 검사 스크립트의 기본 주소. `BASE` / `SHOT_URL` 로 여전히 덮을 수 있다. */
 export const devUrl = (path = '') => `http://localhost:${DEV_PORT}${path}`;
 export const previewUrl = (path = '') => `http://localhost:${PREVIEW_PORT}${path}`;
+
+/*
+ * **실험 하나가 사는 자리.**
+ *
+ * 합치기 전에는 실험이 뿌리에 있어서 `devUrl('/?level=1')` 이면 됐다. 이제 실험은
+ * `experiments/<id>/` 아래 있고, 뿌리는 **실험을 고르는 첫 화면**이다.
+ *
+ * ★ **검사 스크립트가 저마다 그 경로를 적어 두면 실험을 옮길 때 네 곳을 고치게 된다.**
+ *   한 곳에서 만든다 — 「사본이 셋이면 하나는 떠 있다」(PLAYBOOK).
+ *   그리고 옮긴 것을 깜빡하면 **검사가 첫 화면에 대고 실험을 찾다가 멎는다.**
+ *   실제로 그랬고, 바닥 관문이 「0/3 까지 통과한 뒤 멎었습니다」로 잡았다.
+ */
+export const expPath = (id) => `/experiments/${id}/`;
+export const expUrl = (id, query = '') => devUrl(`${expPath(id)}${query}`);
+export const expPreviewUrl = (id, query = '') => previewUrl(`${expPath(id)}${query}`);

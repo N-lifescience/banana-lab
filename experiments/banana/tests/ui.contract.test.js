@@ -264,7 +264,7 @@ test('절차 그룹 수에 상한을 박아 두지 않는다', async () => {
 test('문서에 적힌 되돌리기 횟수가 UNDO_LIMITS 와 같다', () => {
   const say = (n) => (n === Infinity ? '무제한' : `${n}회`);
 
-  const playbook = readFileSync(new URL('../PLAYBOOK.md', import.meta.url), 'utf8');
+  const playbook = readFileSync(new URL('../../../PLAYBOOK.md', import.meta.url), 'utf8');
   const row = playbook.match(/^\|\s*되돌리기\s*\|([^|]+)\|([^|]+)\|([^|]+)\|/m);
   // 표를 못 읽었으면 초록불이 아니라 빨간불이다 — 「0줄 중 0줄이 맞다」를 막는다
   assert.ok(row, 'PLAYBOOK 의 난이도 표에서 「되돌리기」 줄을 못 찾았습니다 — 표 모양이 바뀌었습니다');
@@ -276,7 +276,7 @@ test('문서에 적힌 되돌리기 횟수가 UNDO_LIMITS 와 같다', () => {
     + `  일부러 고친 것이면 그 줄을 이렇게 바꾸세요:\n`
     + `    | 되돌리기 | ${want.join(' | ')} |`);
 
-  const model = readFileSync(new URL('../docs/03-state-model.md', import.meta.url), 'utf8');
+  const model = readFileSync(new URL('../../../docs/03-state-model.md', import.meta.url), 'utf8');
   const phrase = model.match(/되돌리기가\s*(\d+)회뿐인\s*(\d+)단계/);
   assert.ok(phrase, 'docs/03 에서 「되돌리기가 N회뿐인 M단계」를 못 찾았습니다 — 문장 모양이 바뀌었습니다');
   assert.equal(Number(phrase[1]), UNDO_LIMITS[Number(phrase[2])],
@@ -463,7 +463,7 @@ test('걸음표가 시키는 그릇을 앱이 실제로 받는다 (스포이트�
   assert.ok(!/\bsink:/.test(table[0]),
     '스포이트가 `sink`(개수대)도 받게 됐습니다 — 걸음표를 그에 맞게 고치세요');
 
-  const play = readFileSync(new URL('../PLAYTEST.md', import.meta.url), 'utf8');
+  const play = readFileSync(new URL('../../../PLAYTEST.md', import.meta.url), 'utf8');
   const step = play.split('\n').find((l) => /^\|\s*6\s*\|/.test(l));
   assert.ok(step, '걸음표 6번 줄을 못 찾았습니다 — 표 모양이 바뀌었습니다');
   assert.ok(/폐액통/.test(step),
@@ -484,7 +484,7 @@ test('걸음표가 시키는 그릇을 앱이 실제로 받는다 (스포이트�
  *   화면 단추는 총배율이라 숫자가 달랐다). 코드는 고쳤는데 **걸음표만 옛 틀로 남았다.**
  */
 test('걸음표의 배율이 화면 단추의 총배율과 같다 (40 은 저배율, 400 이 고배율)', () => {
-  const play = readFileSync(new URL('../PLAYTEST.md', import.meta.url), 'utf8');
+  const play = readFileSync(new URL('../../../PLAYTEST.md', import.meta.url), 'utf8');
   const step = play.split('\n').find((l) => /^\|\s*11\s*\|/.test(l));
   assert.ok(step, '걸음표 11번 줄을 못 찾았습니다 — 표 모양이 바뀌었습니다');
   assert.ok(/고배율\D{0,4}400/.test(step),

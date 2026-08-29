@@ -13,9 +13,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DEV_PORT, PREVIEW_PORT, devUrl, previewUrl } from '../dev-port.js';
+import { DEV_PORT, PREVIEW_PORT, devUrl, previewUrl } from '../../../dev-port.js';
 
-const SCRIPTS = fileURLToPath(new URL('../scripts/', import.meta.url));
+const SCRIPTS = fileURLToPath(new URL('../../../scripts/', import.meta.url));
 
 test('개발 포트와 미리보기 포트가 겹치지 않는다', () => {
   assert.notEqual(DEV_PORT, PREVIEW_PORT);

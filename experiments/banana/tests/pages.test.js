@@ -48,7 +48,15 @@ const EXPERIMENT_IDS = [
   'chromatography', 'fermentation', 'centrifuge', 'germination',
 ].filter((id) => id !== manifest.id);
 
-const read = (name) => readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+/*
+ * ★ **실험 것과 사이트 것이 서로 다른 자리에 있다.**
+ *   `index.html`·`teacher.html` 은 이 실험 폴더에 있고, **개인정보처리방침은 사이트 전체
+ *   것**이라 뿌리에 있다. 실험이 여덟이어도 방침은 하나다 — 실험마다 복제하면
+ *   고칠 때 여덟 번 고치게 된다. (합치기 2단계, 2026-08-29)
+ */
+const SITE_WIDE = new Set(['privacy.html']);
+const read = (name) => readFileSync(
+  new URL(SITE_WIDE.has(name) ? `../../../${name}` : `../${name}`, import.meta.url), 'utf8');
 
 /**
  * 사람 눈에 닿는 부분만 남긴다 — `<style>` · `<script>` · 주석을 걷어낸다.
@@ -84,7 +92,7 @@ test('점검 설정이 자기 앱을 가리킨다 — 남의 배포본을 보고
    *
    * **이름만 갈고 주소를 안 간 상태**도 잡아야 한다. 복제 도중 한쪽만 고치면 실제로 그 꼴이 된다.
    */
-  const cfgPath = new URL('../dorms-check.config.json', import.meta.url);
+  const cfgPath = new URL('../../../dorms-check.config.json', import.meta.url);
   if (!existsSync(cfgPath)) return;   // 이 저장소가 점검 대상이 아니면 잴 것이 없다
   const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
 
@@ -102,7 +110,7 @@ test('이 저장소가 자기 이름을 알고 있다', () => {
   // 주소 검사는 `manifest.id` 를 「자기 주소」로 보고 뺀다. 복제한 뒤 id 를 안 갈면
   // 그 값이 `'banana'` 인 채라, **하필 가장 남아 있기 쉬운 바나나랩 주소를 못 본다.**
   // package.json 의 이름은 복제 절차 첫머리에서 갈리므로, 둘이 어긋나면 여기서 잡힌다.
-  const name = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name;
+  const name = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).name;
   assert.equal(name, `${manifest.id}-lab`,
     `package.json 의 이름과 manifest.id 가 어긋납니다:\n`
     + `  package.json  "${name}"\n  manifest.id   "${manifest.id}"\n`

@@ -19,14 +19,22 @@
  * (웨이브 3 의 centrifuge 세션이 짚었다)
  */
 
-import { previewUrl } from '../dev-port.js';
-import { benchLayout } from '../src/ui/bench.js';
-import { UI } from '../src/ui/strings.js';   // 개수는 손으로 적지 않고 여기서 세어 온다
+import { previewUrl, expPreviewUrl } from '../dev-port.js';
+
+/*
+ * ★ **사이트 것과 실험 것은 주소가 다르다.**
+ *   `BASE` 는 이 실험(`/experiments/banana/`)이고, 개인정보처리방침은 **사이트 전체 것**이라
+ *   뿌리에 있다. 실험 주소로 찾으면 못 찾고, 그런데 되쓰기 때문에 **HTTP 200 이 온다** —
+ *   상태 코드만 보면 통과로 읽힌다. 제목까지 봐야 갈린다.
+ */
+const SITE = process.env.BASE ?? previewUrl();
+import { benchLayout } from '../experiments/banana/src/ui/bench.js';
+import { UI } from '../experiments/banana/src/ui/strings.js';   // 개수는 손으로 적지 않고 여기서 세어 온다
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
 
-const BASE = process.env.BASE ?? previewUrl();
+const BASE = process.env.BASE ?? expPreviewUrl('banana');
 const out = [];
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
 
@@ -290,7 +298,7 @@ ok(!/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(await page.content()),
 const homeHtml = await (await fetch(BASE)).text();
 ok(/href=["']\/privacy["']/.test(homeHtml),
    '개인정보처리방침 링크가 정적 HTML 에 있다');
-const privacyRes = await page.goto(`${BASE}/privacy`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+const privacyRes = await page.goto(`${SITE}/privacy`, { waitUntil: 'domcontentloaded' }).catch(() => null);
 ok(privacyRes && privacyRes.status() === 200 && /개인정보처리방침/.test(await page.title()),
    '/privacy 가 열린다', privacyRes ? `HTTP ${privacyRes.status()}` : '응답 없음');
 ok(/수집하지 않습니다/.test(await page.content()), '방침이 무엇을 수집하는지 밝힌다');

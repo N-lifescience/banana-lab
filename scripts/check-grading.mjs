@@ -16,7 +16,7 @@
 
 let grading;
 try {
-  grading = await import('../src/ui/grading.js');
+  grading = await import('../experiments/banana/src/ui/grading.js');
 } catch (e) {
   console.log('src/ui/grading.js 를 아직 불러올 수 없습니다 — ' + e.message);
   process.exit(0);

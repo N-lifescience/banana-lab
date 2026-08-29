@@ -15,7 +15,7 @@
  */
 
 import { devUrl } from '../dev-port.js';
-import { renderFOV } from '../src/render/fov.js';
+import { renderFOV } from '../experiments/banana/src/render/fov.js';
 
 const BASE = {
   reagent: 'IKI', coverage: 1, excess: 0, floating: false, tooThick: false,

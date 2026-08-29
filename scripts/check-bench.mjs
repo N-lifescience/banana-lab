@@ -1,7 +1,7 @@
 ﻿/** T08 브라우저 검증 — 어포던스가 실제로 화면에 나타나는지. */
-import { devUrl } from '../dev-port.js';
+import { devUrl, expUrl, expPath } from '../dev-port.js';
 import { chromium } from 'playwright';
-import { benchLayout } from '../src/ui/bench.js';
+import { benchLayout } from '../experiments/banana/src/ui/bench.js';
 /*
  * ★ **개수는 손으로 적지 않고 출처에서 세어 온다.**
  *   `=== 3` 으로 박아 두면, 단계를 하나 늘리는 **옳은 변경**에도 빨간불이 난다.
@@ -9,12 +9,12 @@ import { benchLayout } from '../src/ui/bench.js';
  *   (chromatography 가 놓을 자리를 하나 늘리자 「놓을 곳 3개」가 울어서 겪었다.
  *    「손으로 적은 숫자」는 문서에만 있는 것이 아니라 **검사 안에도** 있다)
  */
-import { UI } from '../src/ui/strings.js';
+import { UI } from '../experiments/banana/src/ui/strings.js';
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 여기에 숫자를 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
 
-const BASE = process.env.BASE ?? devUrl();
+const BASE = process.env.BASE ?? expUrl('banana');
 
 /**
  * 브라우저가 중간에 죽었을 때 **앱을 의심하지 않게** 한다.
@@ -995,9 +995,12 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
   // 그림을 다시 그리면 값이 어긋나는데, 화면만 보면 멀쩡해 보인다. 여기서 잡는다.
   const cb = await browser.newPage();
   await cb.goto(`${BASE}/harness.html`, { waitUntil: 'networkidle' });
-  const drift = await cb.evaluate(async () => {
-    const { ASSETS, SAMPLE_STATES } = await import('/src/assets/index.js');
-    const { CONTENT_BOX, CONTRACT } = await import('/src/assets/contract.js');
+  const drift = await cb.evaluate(async (base) => {
+    // ★ **브라우저 안에서 부르는 절대 경로**라 `expPath` 로 만들어 넣는다.
+    //   여기만 손으로 적어 두면 실험을 옮길 때 이 줄만 남아 **125번째에서 멎는다** —
+    //   실제로 그랬고, 바닥 관문이 「125/125 까지 통과한 뒤 멎었습니다」로 잡았다.
+    const { ASSETS, SAMPLE_STATES } = await import(`${base}src/assets/index.js`);
+    const { CONTENT_BOX, CONTRACT } = await import(`${base}src/assets/contract.js`);
     const host = document.createElement('div');
     host.style.cssText = 'position:fixed;left:-9999px;top:0;width:400px';
     document.body.appendChild(host);
@@ -1032,7 +1035,7 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
     }
     host.remove();
     return { bad, seen };
-  });
+  }, expPath('banana'));
   // ★ **0을 세었을 때 무슨 색인지** — 애셋을 하나도 못 그리면 「어긋남 0건」이 그냥 나온다.
   ok(drift.seen > 0, '   (앞 조건) 애셋을 실제로 그려서 쟀다', `${drift.seen}종`);
   ok(drift.bad.length === 0, '적어 둔 그려진 범위가 실제 그림과 맞는다',

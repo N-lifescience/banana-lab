@@ -23,11 +23,18 @@
  * 새 의존성을 쓰지 않는다 — Node 20 의 fetch 와 표준 라이브러리뿐이다 (AGENTS.md §3.3).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const PAGE = join(ROOT, 'main-page.html');
+/*
+ * ★ **이 이름을 고칠 때 이 파일도 함께 본다.**
+ *   합치기 2단계에서 `main-page.html` 이 사이트 첫 화면(`index.html`)이 됐다.
+ *   그때 여기를 안 고쳐서 **「페이지가 없습니다」로 조용히 통과**했다 —
+ *   글꼴이 덮이는지 아무도 안 재는 채로 초록불이었다. 아래 관문이 그것을 막는다.
+ */
+const PAGE_NAMES = ['index.html', 'main-page.html'];
+const PAGE = PAGE_NAMES.map((n) => join(ROOT, n)).find((f) => existsSync(f)) ?? join(ROOT, PAGE_NAMES[0]);
 const OUT_DIR = join(ROOT, 'public', 'fonts');
 const CHECK_ONLY = process.argv.includes('--check');
 
@@ -93,7 +100,21 @@ const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 // 메인 페이지가 없는 클론(실험 하나짜리 앱)에서는 검사할 것이 없다.
 // `npm run check` 가 여기서 걸리면 실험 세션이 남의 사정으로 빨간불을 보게 된다.
 if (!existsSync(PAGE)) {
-  console.log('main-page.html 이 없습니다 — 이 저장소에는 직접 호스팅할 글꼴이 없습니다.');
+  /*
+   * ★ **「없어서 할 일이 없다」와 「있어야 하는데 못 찾았다」를 가른다.**
+   *   굽어 둔 글꼴이 `public/fonts/` 에 있는데 그것을 쓰는 페이지가 없다면, 페이지가
+   *   없는 게 아니라 **이름이 바뀐 것**이다. 그때 조용히 통과하면 문구를 고쳐도
+   *   아무도 안 재고, 새 글자가 시스템 글꼴로 떨어진 채 배포된다.
+   */
+  const baked = existsSync(OUT_DIR)
+    && readdirSync(OUT_DIR).some((f) => f.endsWith('.woff2'));
+  if (baked) {
+    console.error(`★ 굽어 둔 글꼴이 있는데 그것을 쓰는 페이지를 못 찾았습니다.`);
+    console.error(`   찾아본 이름: ${PAGE_NAMES.join(' · ')}`);
+    console.error('   페이지 이름을 바꿨다면 이 파일의 `PAGE_NAMES` 도 함께 고치세요.');
+    process.exit(1);
+  }
+  console.log(`${PAGE_NAMES[0]} 이 없습니다 — 이 저장소에는 직접 호스팅할 글꼴이 없습니다.`);
   process.exit(0);
 }
 
