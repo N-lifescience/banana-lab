@@ -21,6 +21,7 @@
 
 import { previewUrl } from '../dev-port.js';
 import { benchLayout } from '../src/ui/bench.js';
+import { UI } from '../src/ui/strings.js';   // 개수는 손으로 적지 않고 여기서 세어 온다
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
@@ -46,7 +47,8 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(BASE, { waitUntil: 'networkidle' });
 
 /* ---------- 시작 화면 ---------- */
-ok(await page.locator('.start-level[data-level]').count() === 3, '시작 화면에 단계 셋이 있다');
+ok(await page.locator('.start-level[data-level]').count() === UI.start.levels.length,
+   `시작 화면에 단계 ${UI.start.levels.length}개가 있다 (개수는 strings.js 에서 세어 온다)`);
 await page.locator('.start-level[data-level="1"]').click();
 await page.locator('#start-go').click();
 await page.waitForTimeout(300);

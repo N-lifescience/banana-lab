@@ -2,6 +2,14 @@
 import { devUrl } from '../dev-port.js';
 import { chromium } from 'playwright';
 import { benchLayout } from '../src/ui/bench.js';
+/*
+ * ★ **개수는 손으로 적지 않고 출처에서 세어 온다.**
+ *   `=== 3` 으로 박아 두면, 단계를 하나 늘리는 **옳은 변경**에도 빨간불이 난다.
+ *   그런 검사는 **고치기 싫게 만든다** — 늘릴 때마다 우니까 사람이 늘리기를 그만둔다.
+ *   (chromatography 가 놓을 자리를 하나 늘리자 「놓을 곳 3개」가 울어서 겪었다.
+ *    「손으로 적은 숫자」는 문서에만 있는 것이 아니라 **검사 안에도** 있다)
+ */
+import { UI } from '../src/ui/strings.js';
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 여기에 숫자를 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
@@ -116,7 +124,8 @@ async function drag(from, to) {
 await page.goto(BASE, { waitUntil: 'networkidle' });
 
 ok(await page.locator('#start .start-card').isVisible(), '시작 화면이 먼저 뜬다');
-ok(await page.locator('.start-level[data-level]').count() === 3, '난이도 세 단계를 고를 수 있다');
+ok(await page.locator('.start-level[data-level]').count() === UI.start.levels.length,
+   `난이도 ${UI.start.levels.length}단계를 고를 수 있다 (개수는 strings.js 에서 세어 온다)`);
 ok(await page.locator('.start-level[data-mode]').count() === 2, '혼자/모둠을 고를 수 있다');
 const startText = await page.locator('#start').innerText();
 ok(!/[A-Za-z]{4,}/.test(startText.replace(/level=\d/g, '')), '시작 화면이 한글이다',
