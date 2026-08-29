@@ -17,6 +17,7 @@ export default defineConfig({
         main: 'index.html',                                   // 실험 고르는 첫 화면
         privacy: 'privacy.html',                              // 사이트 전체 것
         banana: 'experiments/banana/index.html',
+        micrometer: 'experiments/micrometer/index.html',
         // 선생님이 수업을 열고 제출물을 받는 화면. **아직 바나나에 얽혀 있다** —
         // 엔진을 뽑을 때(§4 4단계) 뿌리로 올린다.
         teacher: 'experiments/banana/teacher.html',

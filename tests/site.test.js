@@ -1,0 +1,102 @@
+/**
+ * **사이트 전체에 대한 검사.** 실험 하나가 아니라 이 저장소 자체를 본다.
+ *
+ * ── 왜 실험 폴더 밖으로 나왔는가 ────────────────────────────────────
+ * 합치기 전에는 「저장소 하나 = 실험 하나」였고, 그래서 실험의 테스트가
+ * `dorms-check.config.json` 이나 `package.json` 같은 **사이트 것**을 검사했다.
+ *
+ * 합치고 나서 그 검사들이 **서로 모순**이 됐다 — banana 는 「이 설정은 banana 를
+ * 가리켜야 한다」고 하고 micrometer 는 「micrometer 를 가리켜야 한다」고 한다.
+ * **둘 다 옳을 수 없다.** 중복이 아니라 모순이라, 지우거나 합치는 것으로는 안 되고
+ * **주인을 하나로** 정해야 했다. 사이트 것이므로 사이트가 갖는다.
+ * (합치기 3단계, 2026-08-30 — micrometer 를 들이자마자 드러났다)
+ *
+ * ── 잃지 말아야 할 것 ──────────────────────────────────────────────
+ * 이 검사들이 잡던 사고는 진짜였다. 복제한 저장소 여섯이 `dorms-check.config.json` 을
+ * 안 갈아서 **바나나랩의 배포본을 열어 보고 자기 판정을 내놓고 있었다** —
+ * 다섯이 한 사이트를 다섯 번 검사한 셈이었다. **못 잡는 것보다 나쁘다:
+ * 잡았다고 착각하게 만든다.** 그 값을 그대로 옮겨 온다.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+
+const at = (p) => new URL(`../${p}`, import.meta.url);
+const read = (p) => readFileSync(at(p), 'utf8');
+const titleOf = (html) => html.match(/<title>([^<]*)<\/title>/)?.[1]?.trim() ?? '';
+
+/** 이 저장소에 들어 있는 실험들 — 폴더가 곧 목록이다. 손으로 적지 않는다. */
+const EXPERIMENTS = readdirSync(at('experiments'), { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name);
+
+test('실험이 하나 이상 있다 (앞 조건 — 없으면 아래가 아무것도 안 잰다)', () => {
+  assert.ok(EXPERIMENTS.length > 0, 'experiments/ 아래에 실험이 없습니다');
+});
+
+test('실험마다 자기 이름을 아는 manifest 가 있다 (id = 폴더 이름)', async () => {
+  for (const id of EXPERIMENTS) {
+    const { manifest } = await import(at(`experiments/${id}/src/manifest.js`).href);
+    assert.equal(manifest.id, id,
+      `폴더 이름과 manifest.id 가 어긋납니다 — 폴더 "${id}" · id "${manifest.id}"\n`
+      + '  → 주소가 폴더에서 나오므로 어긋나면 그 실험이 안 열립니다.');
+  }
+});
+
+test('저장소 이름이 사이트 이름이다 (실험 하나의 이름이 아니다)', () => {
+  const name = JSON.parse(read('package.json')).name;
+  assert.ok(!EXPERIMENTS.includes(name.replace(/-lab$/, '')),
+    `package.json 의 이름이 실험 하나를 가리킵니다: "${name}"\n`
+    + '  → 이 저장소는 실험 여럿을 담습니다. 사이트 이름을 쓰세요.');
+});
+
+/*
+ * ── /dorms 점검 설정 ────────────────────────────────────────────────
+ * `/dorms` 는 이 설정의 주소를 **열어 보고** 판정한다. 남의 주소면 남의 사이트를
+ * 검사한 결과를 이 저장소의 판정으로 내놓는다.
+ */
+test('점검 설정이 사이트 이름을 쓴다', () => {
+  if (!existsSync(at('dorms-check.config.json'))) return;   // 점검 대상이 아니면 잴 것이 없다
+  const cfg = JSON.parse(read('dorms-check.config.json'));
+  const siteTitle = titleOf(read('index.html'));
+  assert.ok(siteTitle, '사이트 첫 화면에 <title> 이 없습니다');
+  assert.equal(cfg.app?.name, siteTitle,
+    `점검 설정의 이름이 사이트 이름과 다릅니다 — "${cfg.app?.name}" 이 아니라 "${siteTitle}" 이어야 합니다`);
+});
+
+test('점검 설정이 남의 배포본을 가리키지 않는다', () => {
+  if (!existsSync(at('dorms-check.config.json'))) return;
+  const url = JSON.parse(read('dorms-check.config.json')).app?.url;
+  /*
+   * **아직 배포 안 됐으면 `null` 이 맞다.** 남의 주소를 적어 두느니 비워 둔다 —
+   * 비어 있으면 사람이 알고, 남의 주소면 아무도 모른다.
+   * (centrifuge 세션이 먼저 이 모양으로 두었고 여덟이 그것을 따랐다)
+   */
+  if (url === null || url === undefined || url === '') return;
+  assert.equal(typeof url, 'string', `주소는 문자열이거나 null 이어야 합니다: ${JSON.stringify(url)}`);
+  // 아직 따로 서 있는 실험 저장소들의 배포 주소를 가리키면 안 된다
+  const other = EXPERIMENTS.find((id) => url.includes(`${id}-virtual-lab`) || url.includes(`${id}-lab.`));
+  assert.ok(!other,
+    `점검 설정이 **${other}** 의 따로 선 배포본을 가리킵니다: ${url}\n`
+    + '  → /dorms 가 남의 사이트를 열어 보고 이 저장소의 판정을 내놓습니다.');
+});
+
+/*
+ * ── 개인정보처리방침 ────────────────────────────────────────────────
+ * **사이트에 하나뿐인 문서다.** 실험마다 복제하면 고칠 때 여덟 번 고치게 되고,
+ * 그중 하나를 빠뜨리면 **학생이 보는 방침과 실제가 달라진다.**
+ *
+ * 합치기 전에는 이 문서의 제목이 「개인정보처리방침 — 바나나에서 …」였다.
+ * 실험이 하나였을 때는 맞는 말이었는데, 합친 뒤로는 **다른 실험을 하는 학생이
+ * 남의 실험 이름이 적힌 방침**을 보게 됐다. 사이트 이름을 쓴다.
+ * (합치기 3단계, 2026-08-30 — micrometer 를 들이자마자 드러났다)
+ */
+test('방침 제목이 사이트를 말한다 (실험 하나를 말하지 않는다)', () => {
+  const title = titleOf(read('privacy.html'));
+  const siteTitle = titleOf(read('index.html'));
+  assert.ok(title.includes(siteTitle),
+    `방침 제목이 사이트 이름을 안 담습니다:\n  방침  "${title}"\n  사이트 "${siteTitle}"`);
+  const named = EXPERIMENTS.find((id) => title.includes(id));
+  assert.ok(!named, `방침 제목이 실험 하나(${named})를 가리킵니다: "${title}"`);
+});

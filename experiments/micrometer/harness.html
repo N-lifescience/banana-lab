@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바나나 탐구 시뮬레이터 — 개발 하네스</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 28px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  .stage{background:var(--sunk);border-radius:5px;padding:10px;display:flex;justify-content:center}
+  .stage svg{width:100%;max-width:320px;height:auto;display:block}
+  .ctrl{display:flex;flex-direction:column;gap:5px}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;font-weight:600;
+    letter-spacing:.04em;color:var(--ink-mute)}
+  .ctrl .lab span{font-family:ui-monospace,monospace;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--indigo)}
+  input[type=range]:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .seg{display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .seg button{flex:1;border:none;background:var(--surface);color:var(--ink-mute);
+    font:inherit;font-size:13px;padding:6px 4px;cursor:pointer;border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  .seg button[aria-pressed="true"]{background:var(--indigo);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .meter{display:flex;flex-direction:column;gap:5px}
+  .meter .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .meter .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
+  .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
+  .hint{font-size:12.5px;color:var(--ink-mute)}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet{margin-top:18px}
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:760px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:6px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>마이크로미터 탐구 시뮬레이터 — 개발 하네스</h1>
+  <p class="note" id="harness-note"></p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>접안렌즈 — <b>렌즈 안</b>에 있는 것</h2>
+      <div class="stage" id="ocular-slot"></div>
+
+      <div class="ctrl">
+        <div class="lab"><span>접안 눈금자</span></div>
+        <div class="seg" id="reticle" role="group" aria-label="접안 눈금자">
+          <button type="button" data-value="none">없음</button>
+          <button type="button" data-value="in" aria-pressed="true">끼움</button>
+          <button type="button" data-value="flipped">뒤집어 끼움</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="eyeAngle">접안렌즈를 돌린 각</label><span id="v-eyeAngle"></span></div>
+        <input type="range" id="eyeAngle" min="-90" max="90" step="1" value="0">
+      </div>
+
+      <p class="note">배율을 올려도 <b>이 눈금은 한 치도 안 변합니다.</b> 변하면 이 실험은 아무것도 가르치지 않습니다.</p>
+    </div>
+
+    <div class="panel">
+      <h2>현미경 시야</h2>
+      <div class="stage" id="fov-slot"></div>
+
+      <div class="ctrl">
+        <div class="lab"><span>재물대 위</span></div>
+        <div class="seg" id="stage-item" role="group" aria-label="재물대에 올린 것">
+          <button type="button" data-value="none">비었음</button>
+          <button type="button" data-value="stageMic" aria-pressed="true">대물 마이크로미터</button>
+          <button type="button" data-value="specimen">표본</button>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><label for="itemAngle">재물대 위의 것이 놓인 각</label><span id="v-itemAngle"></span></div>
+        <input type="range" id="itemAngle" min="-90" max="90" step="1" value="6">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="objective">대물렌즈</label><span id="v-objective"></span></div>
+        <input type="range" id="objective" min="0" max="2" step="1" value="2">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="focus">초점 (미동나사)</label><span id="v-focus"></span></div>
+        <input type="range" id="focus" min="-200" max="200" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="diaphragm">조리개</label><span id="v-diaphragm"></span></div>
+        <input type="range" id="diaphragm" min="0" max="100" value="55">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="pan">재물대 좌우</label><span id="v-pan"></span></div>
+        <input type="range" id="pan" min="-240" max="240" step="1" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span>유리 상태</span></div>
+        <div class="seg" id="flags" role="group" aria-label="유리 상태">
+          <button type="button" data-flag="cracked">금 감</button>
+        </div>
+      </div>
+
+      <div class="meter">
+        <div class="bar"><div class="fill" id="q-fill"></div></div>
+        <div class="cap"><span>관찰 가능성</span><b id="q-value"></b></div>
+        <div class="hint" id="q-hint"></div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><span>두 눈금자가 어긋난 각</span><b id="v-gap"></b></div>
+        <div class="lab"><span>접안 한 칸의 참값</span><b id="v-um"></b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel sheet" id="sheet-panel">
+    <h2>애셋 시트 — 전 종 대조</h2>
+    <div class="sheet-grid" id="sheet"></div>
+  </div>
+</div>
+<script type="module" src="/experiments/micrometer/src/harness.js"></script>
+</body>
+</html>

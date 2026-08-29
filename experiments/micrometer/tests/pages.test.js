@@ -19,20 +19,29 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { UI } from '../src/ui/strings.js';
 import { manifest } from '../src/manifest.js';
 
 /** 배포본에 실제로 실리는 페이지. 하네스(harness.html)는 빌드에 안 들어간다. */
-const PAGES = ['index.html', 'teacher.html'];   // 방침은 사이트 것 — tests/site.test.js 가 본다
+/*
+ * ★ **실험 것과 사이트 것이 서로 다른 자리에 있다.**
+ *   `index.html` 은 이 실험 폴더에, **개인정보처리방침은 사이트 전체 것**이라 뿌리에 있다.
+ *
+ * ★ **선생님 화면은 여기 없다.** `teacher.js` 가 banana 것과 **바이트까지 같아서**
+ *   복제하지 않았다 — 사이트에 하나면 된다. 세 번째 실험을 들인 뒤 뿌리로 올린다
+ *   (`MERGE-AND-DEPLOY.md` §4 4단계: 세 번 똑같이 생긴 것만 공용으로).
+ *   그때 이 목록에 `teacher.html` 을 되살리지 말고 **사이트 검사**로 옮긴다.
+ */
+const SITE_WIDE = new Set(['privacy.html']);
+const PAGES = ['index.html'];   // 방침은 사이트 것 — tests/site.test.js 가 본다
 
 /**
  * **이 실험에 없는** 재료·현상 낱말. 복제하면 여기만 갈아 끼운다.
  * 바나나랩에는 바나나·녹말·지질이 있으므로, 여기 적는 것은 다른 실험들의 것이다.
  */
 const OTHER_MATERIALS =
-  /삼투|원형질|적양파|카탈레이스|과산화수소|크로마토그래피|엽록소|잔토필|효모|발효|맹관부|원심분리|적혈구|버피코트|접안 마이크로미터|대물 마이크로미터/;
+  /바나나|녹말|전분|지질|지방|아이오딘|수단\s*Ⅲ|청람|삼투|원형질|적양파|카탈레이스|과산화수소|크로마토그래피|엽록소|잔토필|효모|발효|맹관부|원심분리|적혈구|버피코트/;
 
 /**
  * 다른 실험의 저장소 이름. 자기 id 는 뺀다 — 자기 주소를 가리키는 것은 옳다.
@@ -49,13 +58,6 @@ const EXPERIMENT_IDS = [
   'chromatography', 'fermentation', 'centrifuge', 'germination',
 ].filter((id) => id !== manifest.id);
 
-/*
- * ★ **실험 것과 사이트 것이 서로 다른 자리에 있다.**
- *   `index.html`·`teacher.html` 은 이 실험 폴더에 있고, **개인정보처리방침은 사이트 전체
- *   것**이라 뿌리에 있다. 실험이 여덟이어도 방침은 하나다 — 실험마다 복제하면
- *   고칠 때 여덟 번 고치게 된다. (합치기 2단계, 2026-08-29)
- */
-const SITE_WIDE = new Set(['privacy.html']);
 const read = (name) => readFileSync(
   new URL(SITE_WIDE.has(name) ? `../../../${name}` : `../${name}`, import.meta.url), 'utf8');
 
@@ -75,7 +77,6 @@ function visible(src) {
 const titleOf = (src) => (src.match(/<title>([\s\S]*?)<\/title>/i) ?? [])[1]?.trim();
 const metaOf = (src, key) =>
   (src.match(new RegExp(`<meta[^>]+(?:name|property)="${key}"[^>]+content="([^"]*)"`, 'i')) ?? [])[1];
-
 
 
 test('모든 페이지의 <title> 이 이 실험의 이름을 말한다', () => {
