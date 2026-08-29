@@ -22,7 +22,7 @@
 
 | 공용으로 올라가는 것 (엔진) | 실험마다 새로 만드는 것 |
 |---|---|
-| 실험대 드래그·스냅·이름표·히트박스 | 규칙표 (`sim/rules.js`) |
+| 실험대 드래그·자유 배치·이름표·히트박스 | 규칙표 (`sim/rules.js`) |
 | 배치 편집 모드 | 상태 스키마 (`sim/state.js`) |
 | 확대 뷰 뼈대 | 품질 계산 (`sim/quality.js`) |
 | 탐구 노트 7단계 뼈대 | 결과 화면 (`render/`) |
@@ -43,7 +43,7 @@ lab/
   packages/lab-kit/          공용 엔진
     style/tokens.js
     assets/contract.js       CONTRACT · CONTENT_BOX · drawnBoxMm · setAttr
-    ui/bench.js              드래그·스냅·이름표·편집 모드 (표는 실험이 준다)
+    ui/bench.js              드래그·자유 배치·이름표·편집 모드 (표는 실험이 준다)
     ui/zoom.js  notebook.js  report.js  start.js  toast.js  grading.js
     sim/store.js             createStore · UNDO · SAVE_NOTE · TICK · CAPTURE
   experiments/
