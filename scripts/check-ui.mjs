@@ -298,6 +298,19 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
     };
     return {
       bar: worstOf('.bench-bar button'),
+      /*
+       * ★ **실험대 물건도 잰다 — 여기가 비어 있어서 회귀를 놓쳤다.**
+       *
+       * 닫기 단추를 달자 긴 문장에서 말풍선이 **160×171 기둥**이 되어 선반의
+       * **바나나를 100 % 덮었다.** 그런데 조작 줄 덮임은 69 % → 4 % 로 **좋아진 것처럼**
+       * 보였다 — 줄어든 게 아니라 **옮겨 간 것**이었고, 옮겨 간 쪽을 아무도 안 재고 있었다.
+       *
+       * 「덮임이 줄었다」가 좋은 소식이 아닐 수 있다. **무엇이 대신 덮였는지**를
+       * 같이 재야 그 말을 할 수 있다.
+       * (웨이브 1 의 micrometer 세션이 자기 저장소에서 먼저 겪고 짚어 주었다)
+       */
+      token: worstOf('.token'),
+      name: worstOf('.token-name'),
       note: worstOf('#note-panel button, #note-panel textarea, .note-tab'),
       // 조작 단추만 보면 바닥 링크를 놓친다 — centrifuge 가 아래로 내린 뒤 잡은 자리다.
       foot: worstOf('.site-foot a, a[href], .site-foot button'),
@@ -324,7 +337,16 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
    * (웨이브 1 의 micrometer 세션이 「그 처방으로는 안 된다」고 되돌려 잰 것을 받았다)
    */
   record(true, `토스트 ${w}×${h} — 무엇을 얼마나 가리는지 (숫자로 남긴다)`,
-    `조작 줄 ${cover.bar?.pct ?? 0}% ${cover.bar?.who ?? ''} · 노트 ${cover.note?.pct ?? 0}% · 바닥 ${cover.foot?.pct ?? 0}%`);
+    `조작 줄 ${cover.bar?.pct ?? 0}% ${cover.bar?.who ?? ''} · 물건 ${cover.token?.pct ?? 0}% ${cover.token?.who ?? ''}`
+    + ` · 이름표 ${cover.name?.pct ?? 0}% · 노트 ${cover.note?.pct ?? 0}% · 바닥 ${cover.foot?.pct ?? 0}%`);
+  /*
+   * ★ **물건을 통째로 덮으면 그것만은 막는다.**
+   * 조작 줄은 가려도 손가락이 닿지만(`pointer-events:none`), 물건이 통째로 덮이면
+   * **거기 무엇이 있는지조차 모른다.** 절반까지는 남기고, 그 위는 빨간불로 둔다.
+   */
+  record((cover.token?.pct ?? 0) <= 60,
+    `토스트 ${w}×${h} — **실험대 물건을 통째로 덮지 않는다**`,
+    `${cover.token?.pct ?? 0}% ${cover.token?.who ?? ''}`);
   record((cover.note?.pct ?? 0) <= 20,
     `토스트 ${w}×${h} — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
     `${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
