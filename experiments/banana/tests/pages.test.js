@@ -20,6 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { UI } from '../src/ui/strings.js';
 import { manifest } from '../src/manifest.js';
 
@@ -105,17 +106,27 @@ test('점검 설정이 자기 앱을 가리킨다 — 남의 배포본을 보고
     + '  → 배포 전에는 null 이 정직합니다. **비어 있으면 사람이 알고, 남의 주소면 아무도 모릅니다.**');
 });
 
-test('이 저장소가 자기 이름을 알고 있다', () => {
-  // **아래 주소 검사가 눈이 멀지 않게 지키는 검사다.**
-  // 주소 검사는 `manifest.id` 를 「자기 주소」로 보고 뺀다. 복제한 뒤 id 를 안 갈면
-  // 그 값이 `'banana'` 인 채라, **하필 가장 남아 있기 쉬운 바나나랩 주소를 못 본다.**
-  // package.json 의 이름은 복제 절차 첫머리에서 갈리므로, 둘이 어긋나면 여기서 잡힌다.
-  const name = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).name;
-  assert.equal(name, `${manifest.id}-lab`,
-    `package.json 의 이름과 manifest.id 가 어긋납니다:\n`
-    + `  package.json  "${name}"\n  manifest.id   "${manifest.id}"\n`
-    + '  → 복제한 저장소라면 src/manifest.js 의 id 를 이 실험 것으로 가세요.\n'
-    + '    그 전까지는 「다른 실험의 배포 주소를 가리키지 않는다」 검사가 바나나랩 주소를 못 봅니다.');
+test('이 실험이 자기 이름을 알고 있다 (id = 폴더 이름)', () => {
+  /*
+   * **아래 주소 검사가 눈이 멀지 않게 지키는 검사다.**
+   * 주소 검사는 `manifest.id` 를 「자기 주소」로 보고 뺀다. 복제한 뒤 id 를 안 갈면
+   * 그 값이 `'banana'` 인 채라, **하필 가장 남아 있기 쉬운 바나나랩 주소를 못 본다.**
+   *
+   * ★ **앞서는 `package.json` 의 이름과 맞댔다. 그 전제가 깨졌다.**
+   *   「저장소 하나 = 실험 하나」일 때는 저장소 이름이 곧 실험 이름이었다. 합친 뒤로는
+   *   저장소가 `virtual-biolab` 이고 실험이 여럿이라, 그 맞댐이 **늘 빨간불**이 된다.
+   *   (합치기 2단계, 2026-08-30 — 이름을 바꾸자마자 이 검사가 울어서 알았다)
+   *
+   *   이제 **폴더 이름**과 맞댄다. 실험이 사는 자리가 곧 주소이므로
+   *   (`/experiments/<id>/` · `/cell-metabolism/<id>`), 둘이 어긋나면 **주소가 깨진다** —
+   *   `package.json` 보다 튼튼한 기준이고, 실험이 몇 개가 되든 그대로 선다.
+   */
+  const here = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '').split('/').pop();
+  assert.equal(manifest.id, here,
+    `실험 폴더 이름과 manifest.id 가 어긋납니다:\n`
+    + `  폴더        "${here}"\n  manifest.id "${manifest.id}"\n`
+    + '  → 주소가 폴더에서 나오므로 어긋나면 그 실험이 안 열립니다.\n'
+    + '    복제한 실험이라면 src/manifest.js 의 id 를 폴더 이름과 같게 가세요.');
 });
 
 test('모든 페이지의 <title> 이 이 실험의 이름을 말한다', () => {

@@ -52,7 +52,7 @@
 **빈 폴더에서 시작하지 마세요.** 바나나랩은 참조 구현입니다. 복제한 뒤 갈아 끼웁니다.
 
 ```bash
-git clone https://github.com/N-lifescience/banana-lab.git onion-lab
+git clone https://github.com/N-lifescience/virtual-biolab.git onion-lab
 cd onion-lab
 rm -rf .git && git init          # 새 실험은 새 역사로 시작합니다
 
@@ -487,7 +487,7 @@ T10  매니페스트 채우기 (5분)                          (node --test test
 ```
 «양파 표피세포 관찰» 을 웹 가상실험으로 만든다.
 
-바나나랩(https://github.com/N-lifescience/banana-lab)을 복제해서 시작한다.
+바나나랩(https://github.com/N-lifescience/virtual-biolab)을 복제해서 시작한다.
 복제한 뒤 NEW-EXPERIMENT.md 와 PLAYBOOK.md 를 먼저 끝까지 읽고,
 AGENTS.md 의 규칙을 그대로 따른다.
 복제 직후 PROGRESS.md 를 docs/banana-progress.md 로 옮기고
