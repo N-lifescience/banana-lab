@@ -478,6 +478,23 @@ record(true, '라이트/다크 스크린샷 저장', 'shots/ui-light.png · shot
 
 await browser.close();
 
+/*
+ * ★ **한 항목도 안 돌았는데 「전부 통과」가 나오던 자리.**
+ *
+ *   `results` 가 비면 `failed.length` 는 0 이고, 그러면 **「전부 통과」에 exit 0** 이다.
+ *   중간에 브라우저가 죽거나 앞쪽에서 터져도 **거기까지만 세고 초록불**이 난다.
+ *   오늘 밤 내내 검사 **안**의 「0개 중 0건」을 막았는데, **검사 자신**이 그 모양이었다.
+ *   (웨이브 1 의 micrometer 세션이 셋 다 뚫려 있는 것을 찾아 알려 주었다)
+ *
+ *   바닥은 **지금 세는 것보다 넉넉히 낮게** 둔다 — 항목이 조금 줄었다고 울면
+ *   사람이 바닥을 낮추기만 하게 된다. 통째로 안 돈 것만 잡으면 된다.
+ */
+const FLOOR = 40;   // 지금 54항목. 이보다 크게 줄면 중간에 끊긴 것이다
 const failed = results.filter((r) => !r.ok);
-console.log(failed.length ? `\n${failed.length}건 미달\n` : '\n전부 통과\n');
+if (results.length < FLOOR) {
+  console.log(`\n★ ${results.length}항목밖에 못 봤습니다 (바닥 ${FLOOR}) — 중간에 끊긴 것입니다.`);
+  console.log('  「전부 통과」가 아닙니다. 위 출력에서 어디서 멈췄는지 보세요.\n');
+  process.exit(1);
+}
+console.log(failed.length ? `\n${failed.length}건 미달\n` : `\n전부 통과 (${results.length}항목)\n`);
 process.exit(failed.length ? 1 : 0);

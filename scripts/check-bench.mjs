@@ -2645,6 +2645,12 @@ if (fail) {
   console.log('\n다시 모은 실패:');
   for (const r of failed) console.log(`실패  ${r.name}${r.detail ? `  — ${r.detail}` : ''}`);
 }
+/* ★ 통째로 안 돈 것을 잡는 바닥 — 자세한 까닭은 `check-ui.mjs` 끝에 적어 두었다. */
+const FLOOR = 200;   // 지금 268항목
+if (out.length < FLOOR) {
+  console.log(`\n★ ${out.length}항목밖에 못 봤습니다 (바닥 ${FLOOR}) — 중간에 끊긴 것입니다.`);
+  process.exit(1);
+}
 console.log(`\n${out.length - fail}/${out.length} 통과`);
 process.exit(fail ? 1 : 0);
 
