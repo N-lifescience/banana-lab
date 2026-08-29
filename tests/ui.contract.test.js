@@ -246,3 +246,39 @@ test('절차 그룹 수에 상한을 박아 두지 않는다', async () => {
       `src/ui/${name} 에 절차 그룹 수 상한이 박혀 있습니다`);
   }
 });
+
+/*
+ * 문서에 손으로 적어 둔 **되돌리기 횟수**가 아직 상수와 맞는가.
+ *
+ * ★ **사본이 셋이면 하나는 떠 있다.**
+ *   `UNDO_LIMITS` 와 위의 검사들은 **상수를 import** 해서 서로 물려 있다. 그런데
+ *   문서 둘(`PLAYBOOK` 의 난이도 표 · `docs/03` 의 설명)은 **손으로 적은 숫자**라
+ *   아무 데도 안 물려 있다. 그러면 이렇게 샌다:
+ *
+ *       상수를 고침 → 검사가 운다 → 그 사람은 **검사만 고치고 지나간다**
+ *       → 문서만 옛 값으로 남고, 그 문서를 믿는 다음 사람이 없는 버그를 찾는다
+ *
+ *   숫자가 적힌 자리를 **세어** 본다 — 둘이면 물려 있고, **셋이면 하나는 떠 있다.**
+ *   (웨이브 3 의 germination 세션이 자기 저장소에서 같은 세 겹을 찾아 알려 주었다)
+ */
+test('문서에 적힌 되돌리기 횟수가 UNDO_LIMITS 와 같다', () => {
+  const say = (n) => (n === Infinity ? '무제한' : `${n}회`);
+
+  const playbook = readFileSync(new URL('../PLAYBOOK.md', import.meta.url), 'utf8');
+  const row = playbook.match(/^\|\s*되돌리기\s*\|([^|]+)\|([^|]+)\|([^|]+)\|/m);
+  // 표를 못 읽었으면 초록불이 아니라 빨간불이다 — 「0줄 중 0줄이 맞다」를 막는다
+  assert.ok(row, 'PLAYBOOK 의 난이도 표에서 「되돌리기」 줄을 못 찾았습니다 — 표 모양이 바뀌었습니다');
+  const want = [1, 2, 3].map((lv) => say(UNDO_LIMITS[lv]));
+  const got = [row[1], row[2], row[3]].map((c) => c.trim());
+  assert.deepEqual(got, want,
+    `PLAYBOOK 의 난이도 표가 낡았습니다.\n`
+    + `  ★ 먼저 **왜 바뀌었는지** 보세요. UNDO_LIMITS 를 일부러 고친 것이 아니면 그쪽이 회귀입니다.\n`
+    + `  일부러 고친 것이면 그 줄을 이렇게 바꾸세요:\n`
+    + `    | 되돌리기 | ${want.join(' | ')} |`);
+
+  const model = readFileSync(new URL('../docs/03-state-model.md', import.meta.url), 'utf8');
+  const phrase = model.match(/되돌리기가\s*(\d+)회뿐인\s*(\d+)단계/);
+  assert.ok(phrase, 'docs/03 에서 「되돌리기가 N회뿐인 M단계」를 못 찾았습니다 — 문장 모양이 바뀌었습니다');
+  assert.equal(Number(phrase[1]), UNDO_LIMITS[Number(phrase[2])],
+    `docs/03 의 설명이 낡았습니다 — 문서 ${phrase[1]}회 / 상수 ${UNDO_LIMITS[Number(phrase[2])]}회`);
+});

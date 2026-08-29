@@ -94,14 +94,32 @@ ok(await page.evaluate(() => window.__layoutCode === undefined),
 {
   const html = await (await fetch(`${BASE}/`)).text();
   const srcs = [...new Set([...html.matchAll(/\/assets\/[A-Za-z0-9._-]+\.js/g)].map((m) => m[0]))];
-  ok(srcs.length > 0, '   (앞 조건) 배포본에서 번들 주소를 찾았다', `${srcs.length}개`);
+  /*
+   * ★ **`> 0` 은 「덜 받았다」를 못 잡는다.** 덩어리가 둘인데 하나만 받아도 참이다.
+   *   그리고 **덜 받은 것과 안 새는 것은 같은 얼굴이다** — 안 받은 파일에서는
+   *   `VITE_VERCEL_` 이 당연히 0건이라 **초록불이 더 짙어진다.**
+   *
+   *   여기 주소 긁기는 `<script src>` 뿐 아니라 `<link rel=modulepreload href>` 까지
+   *   집는다(HTML 전체에 정규식을 건다). 큰 덩어리가 preload 쪽으로 불리는 저장소가
+   *   있어서, `<script src>` 만 보면 **제일 큰 번들을 안 보고** 있을 수 있다.
+   *   (germination 이 자기 검사에서 그 자리를 찾아 알려 주었다)
+   *
+   *   ★ 받은 뒤에는 **하나하나 빈 본문이 아닌지** 본다. 리디렉션을 안 따라가면
+   *   200 인데 본문이 비어 오고, 그러면 「없음」이 「안 샌다」로 읽힌다.
+   *   (micrometer 가 `cleanUrls` 308 에서 `-L` 없이 빈 본문을 받고 겪었다)
+   */
+  ok(srcs.length > 0, '   (앞 조건) 배포본에서 번들 주소를 찾았다', `${srcs.length}개 — ${srcs.join(' ')}`);
   let hits = 0;
   let bytes = 0;
+  const empty = [];
   for (const src of srcs) {
     const code = await (await fetch(`${BASE}${src}`)).text();
+    if (code.length < 100) empty.push(`${src}=${code.length}자`);
     bytes += code.length;
     hits += (code.match(/VITE_VERCEL_/g) ?? []).length;
   }
+  ok(empty.length === 0, '   (앞 조건) 찾은 덩어리를 **하나도 빠짐없이** 받았다',
+     empty.length ? `★ 빈 본문: ${empty.join(' / ')}` : `${srcs.length}개 모두 받음`);
   ok(hits === 0,
      '번들에 Vercel 시스템 환경변수가 안 실린다 (커밋한 사람의 실명·커밋 메시지)',
      `${srcs.length}개 덩어리 ${bytes} bytes 중 VITE_VERCEL_ ${hits}건`);
