@@ -136,8 +136,8 @@ function decodeQR({ size, version, modules }) {
 /* ------------------------------------------------------------------ */
 
 const SAMPLES = [
-  'https://banana-inquiry-based-virtual-lab.vercel.app/?code=482013',
-  'https://banana-inquiry-based-virtual-lab.vercel.app/?exp=banana&code=100000&level=1',
+  'https://virtual-biolab.vercel.app/cell-metabolism/banana?code=482013',
+  'https://virtual-biolab.vercel.app/cell-metabolism/banana?code=100000&level=1',
   'HELLO',
   'https://example.com/?code=999999&mode=solo',
 ];

@@ -97,12 +97,34 @@ test('점검 설정이 자기 앱을 가리킨다 — 남의 배포본을 보고
   if (!existsSync(cfgPath)) return;   // 이 저장소가 점검 대상이 아니면 잴 것이 없다
   const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
 
-  assert.equal(cfg.app?.name, UI.appTitle,
-    `점검 설정의 이름이 이 앱과 다릅니다 — "${cfg.app?.name}" 이 아니라 "${UI.appTitle}" 이어야 합니다`);
+  /*
+   * ★ **점검 설정은 「사이트」 것이지 실험 하나의 것이 아니다.**
+   *
+   *   앞서는 `cfg.app.name` 을 **이 실험의 제목**과, `cfg.app.url` 을 **이 실험의 id** 와
+   *   맞댔다. 「저장소 하나 = 실험 하나」였기 때문이다. 합친 뒤로는 한 저장소에 실험이
+   *   여덟이고 개인정보 점검은 **사이트 단위**라, 그 맞댐이 늘 빨간불이 된다.
+   *   (합치기 2단계, 2026-08-30 — 배포 주소를 갈자마자 이 검사가 울어서 알았다)
+   *
+   *   이제 **사이트 첫 화면의 제목**과 맞댄다. 두 곳에 적으면 언젠가 달라지므로
+   *   기준은 하나뿐이다.
+   */
+  const siteTitle = titleOf(readFileSync(new URL('../../../index.html', import.meta.url), 'utf8'));
+  assert.ok(siteTitle, '사이트 첫 화면에 <title> 이 없습니다');
+  assert.equal(cfg.app?.name, siteTitle,
+    `점검 설정의 이름이 사이트 이름과 다릅니다 — "${cfg.app?.name}" 이 아니라 "${siteTitle}" 이어야 합니다`);
 
+  /*
+   * 주소는 **남의 배포본을 가리키지 않는가**로 본다.
+   *   앞서는 「자기 id 를 담았는가」였는데, 사이트 주소에는 실험 이름이 안 들어간다
+   *   (`virtual-biolab.vercel.app`). 그래서 반대로 **남의 것이 아닌지**를 본다 —
+   *   이 파일이 이미 들고 있는 `EXPERIMENT_IDS`(자기를 뺀 나머지)를 그대로 쓴다.
+   *   갓 복제한 저장소가 바나나랩 주소를 그대로 둔 채 초록불을 받던 그 사고가
+   *   여기서 다시 잡힌다.
+   */
   const url = cfg.app?.url;
-  assert.ok(url === null || url === undefined || url === '' || String(url).includes(manifest.id),
-    `점검 설정이 남의 주소를 가리킵니다: ${url}\n`
+  const other = EXPERIMENT_IDS.find((id) => String(url ?? '').includes(id));
+  assert.ok(!other,
+    `점검 설정이 **${other}** 의 배포본을 가리킵니다: ${url}\n`
     + '  → 배포 전에는 null 이 정직합니다. **비어 있으면 사람이 알고, 남의 주소면 아무도 모릅니다.**');
 });
 
