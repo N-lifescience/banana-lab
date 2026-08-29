@@ -321,6 +321,29 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
       token: worstOf('.token'),
       name: worstOf('.token-name'),
       note: worstOf('#note-panel button, #note-panel textarea, .note-tab'),
+      /*
+       * ★ **넓이 % 가 아니라 「손댈 것을 몇 개나 가리는가」로 잰다.**
+       *
+       *   앞서는 「노트 덮임 20 % 이하」였다. 그런데 닫기 단추가 붙자 0 % 가 4 % 가 됐고,
+       *   그때 **4 를 5 로 늘리는 것은 문턱을 지어내는 것**이다. 지어낸 문턱은 맞는지
+       *   아무도 모르는 채 굳고, 다음에 또 넘으면 또 늘리게 된다.
+       *
+       *   재는 것 자체를 바꾼다 — **가운데가 말풍선에 막힌 것이 몇 개인가.**
+       *   여기서 **0 은 「그때 마침 그랬던 값」이 아니라 뜻을 갖는다**:
+       *   학생이 손댈 것 중 못 누르는 것이 하나도 없다는 뜻이다.
+       *   넓이 숫자는 판정 없이 옆에 그대로 남긴다.
+       *   (chromatography 가 자기 저장소에서 같은 자리를 만나 이렇게 바꾸었다)
+       */
+      blocked: [...document.querySelectorAll('#note-panel button, #note-panel textarea, .note-tab')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width < 4 || r.height < 4) return false;
+          if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return false;
+          const cx = Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1);
+          const cy = Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1);
+          return Boolean(document.elementFromPoint(cx, cy)?.closest('#toast-region'));
+        })
+        .map((el) => (el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 12)),
       // 조작 단추만 보면 바닥 링크를 놓친다 — centrifuge 가 아래로 내린 뒤 잡은 자리다.
       foot: worstOf('.site-foot a, a[href], .site-foot button'),
       /*
@@ -356,9 +379,11 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
   record((cover.token?.pct ?? 0) <= 60,
     `토스트 ${w}×${h} — **실험대 물건을 통째로 덮지 않는다**`,
     `${cover.token?.pct ?? 0}% ${cover.token?.who ?? ''}`);
-  record((cover.note?.pct ?? 0) <= 20,
-    `토스트 ${w}×${h} — **탐구 노트를 가리지 않는다** (조작 결과가 노트 이야기로 읽히면 안 된다)`,
-    `${cover.note?.pct ?? 0}% ${cover.note?.who ?? ''}`);
+  record((cover.blocked ?? []).length === 0,
+    `토스트 ${w}×${h} — **탐구 노트에서 손댈 것을 하나도 막지 않는다**`,
+    (cover.blocked ?? []).length
+      ? `★ 막힌 것 ${cover.blocked.length}개: ${cover.blocked.join(' / ')}`
+      : `막힌 것 0개 (넓이로는 ${cover.note?.pct ?? 0}% — 판정에는 안 씁니다)`);
   measured.set(`${w}×${h}`, { bar: cover.bar?.pct ?? 0, note: cover.note?.pct ?? 0 });
   await t.close();
 }
