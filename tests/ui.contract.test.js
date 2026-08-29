@@ -405,14 +405,27 @@ test('실험대에는 길게 누르기 메뉴를 끄고, 탐구 노트에는 걸
   for (const [prop, why] of [
     ['-webkit-touch-callout:none', '길게 누르면 「복사」 메뉴가 뜹니다'],
     ['user-select:none', '끌다가 글자가 선택됩니다'],
-    ['touch-action:manipulation', '두 번 탭하면 화면이 확대됩니다'],
   ]) {
     assert.ok(block[0].replace(/\s/g, '').includes(prop.replace(/\s/g, '')),
       `\`.bench-stage\` 에 \`${prop}\` 이 없습니다 — 아이폰에서 ${why}`);
   }
-  // ★ `touch-action:none` 이면 안 된다 — 무대 위에 손을 대고 밀 때 쪽이 안 넘어간다(되돌린 적 있음)
-  assert.ok(!/touch-action\s*:\s*none/.test(block[0]),
-    '`.bench-stage` 가 `touch-action:none` 입니다 — 그 위에서 밀면 쪽이 안 넘어갑니다');
+
+  /*
+   * ★ **「있나」와 「그 값이 아닌가」를 두 줄로 나누면 뒤엣줄이 영영 안 돈다.**
+   *
+   *   앞서는 이랬다:
+   *       ① `touch-action:manipulation` 이 있나
+   *       ② `touch-action:none` 은 아닌가        ← **한 번도 안 돎**
+   *   `none` 으로 바꾸면 ①이 먼저 운다. ②는 **둘 다 적힌 경우**에만 도는데 그런 일은 없다.
+   *   **안 도는 눈금은 장식이고, 장식이 늘면 다음 사람이 검사를 안 믿는다.**
+   *   그래서 **값을 뽑아 한 줄로** 본다.
+   *   (fermentation 이 자기 소스 검사에서 이 갈래를 찾아 알려 주었다)
+   */
+  const ta = block[0].match(/touch-action\s*:\s*([a-z-]+)/)?.[1];
+  assert.equal(ta, 'manipulation',
+    `\`.bench-stage\` 의 touch-action 이 \`${ta ?? '(없음)'}\` 입니다 — \`manipulation\` 이어야 합니다.\n`
+    + '  없으면: 아이폰에서 두 번 탭하면 화면이 확대됩니다.\n'
+    + '  `none` 이면: 그 위에 손을 대고 밀 때 **쪽이 안 넘어갑니다** (되돌린 적 있는 자리입니다).');
 
   /*
    * ★ **탐구 노트에 걸면 붙여넣기와 글자 고르기가 죽는다.**

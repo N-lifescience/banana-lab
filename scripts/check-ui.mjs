@@ -285,6 +285,15 @@ for (const [w, h] of [[320, 568], [375, 667], [390, 664], [430, 568], [600, 700]
     const worstOf = (sel) => {
       let pct = 0; let who = '';
       for (const el of document.querySelectorAll(sel)) {
+        /*
+         * ★ **자기 자신은 안 센다.** 닫기 단추(✕)는 말풍선 **안**에 있으니 늘 100 %
+         *   겹친다. 그것을 세면 「무엇을 가리는가」가 **자기 단추**로 채워져,
+         *   바깥을 무엇을 가리는지 물으려던 검사가 자기 답을 보고 만다.
+         *   `a[href]` 처럼 범위가 안 잡힌 선택자가 하나라도 있으면 언젠가 걸린다.
+         *   (웨이브 3 의 fermentation 세션이 자기 검사에서 여섯 폭이 한꺼번에
+         *    「✕ 100 %」로 빨간불이 나면서 찾았다)
+         */
+        if (el.closest('#toast-region')) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 4 || r.height < 4) continue;
         if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
