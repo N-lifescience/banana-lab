@@ -207,9 +207,19 @@ lab/
 
 교과마다 한 줄이고 실험은 폴더만 만들면 붙는다:
 
-    { "source": "/cell-metabolism/:exp", "destination": "/experiments/:exp/index.html" }
+    { "source": "/cell-metabolism/:exp", "destination": "/experiments/:exp" }
 
 같은 실험이 여러 교과에 걸리면 줄이 여럿이지만 **폴더는 하나**다.
+
+★ **목적지에 `.html` 을 쓰면 안 된다 — `cleanUrls: true` 가 그것을 308 로 되돌린다.**
+처음에 `/experiments/:exp/index.html` 로 적었더니 **404** 가 났다. 재 보니 갈렸다:
+
+    /experiments/banana/index.html   **308**   ← cleanUrls 가 되돌린다
+    /experiments/banana              200
+    /cell-metabolism/banana          404       ← 되쓰기가 308 짜리를 가리키고 있었다
+
+**로컬에서는 이 셋이 전부 200 이다.** `vite preview` 는 `cleanUrls` 도 `rewrites` 도
+안 읽는다 — 그래서 이 자리는 **배포한 뒤 세 주소를 다 두드려 보는 것** 말고 방법이 없다.
 
 ### 합치기 전 체크리스트 (실험마다)
 

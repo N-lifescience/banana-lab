@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/cell-metabolism/:exp",
-      "destination": "/experiments/:exp/index.html"
+      "destination": "/experiments/:exp"
     }
   ],
   "headers": [
