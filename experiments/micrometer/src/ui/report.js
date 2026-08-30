@@ -397,18 +397,39 @@ function fileTag(who) {
  *
  * 보고서를 **그대로 다시 그릴 수 있는 값 한 벌**이다. 그림이 아니라 시드와 파라미터라
  * 몇 KB 밖에 안 되고, 선생님 화면이 같은 그림을 다시 그린다.
+ * 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
  *
- * 되돌리기 기록(history)은 뺀다 — 세션 안에서만 쓰는 값이고, 통째로 보내면 꾸러미가
- * 몇 배로 커진다. 이름·학번은 여기 넣지 않는다. 그 둘은 표의 제 칸으로 따로 간다.
+ * ── **「뺄 것을 뺀다」가 아니라 「보낼 것만 적는다」다** ────────────────
+ * 앞서 여기는 `{ ...st, session }` 이었다 — 되돌리기 기록(`history`) **하나만** 빼고
+ * 상태를 통째로 보냈다. 그래서 실제로 나가고 있던 것이 이랬다:
+ *
+ *     session.log         조작 기록 — 무엇을 어떤 차례로 눌렀는지
+ *     session.undosLeft   남은 되돌리기 횟수
+ *     session.readStages  탐구 노트를 읽었다고 표시한 쪽
+ *     eyepiece · items · microscope · picks   기구의 마지막 상태
+ *
+ * **`privacy.html` 제2조는 이 넷을 「기기 안에만 있고 전송하지 않습니다」로 적어 두었다.**
+ * 즉 학생이 읽는 고지가 이 실험에 대해 **거짓**이었다. 방침은 사이트에 하나뿐인 문서라
+ * banana 것을 그대로 물려받았는데, 이 실험만 꾸러미 만드는 자리가 달랐다.
+ * (합치기 4단계, 2026-08-30 — 셋째 실험을 들이며 세 payloadOf 를 나란히 놓고서야 보였다)
+ *
+ * 빼는 목록은 새 값이 생길 때마다 조용히 새는데, **보낼 목록은 새 값이 생겨도 안 샌다.**
+ * banana·osmosis 와 같은 모양으로 맞춘다. `tests/privacy.test.js` 가 이 목록과 방침의
+ * `data-sends` 를 맞대므로, 값을 늘리려면 방침을 함께 고쳐야 초록불이 된다.
  */
-function payloadOf(st, who, kind) {
-  const { history, ...session } = st.session;
-  void history;
+export const SUBMIT_TOP_KEYS = [];                                 // 종이가 최상위 상태를 안 읽는다
+export const SUBMIT_SESSION_KEYS = ['level', 'notes', 'captures']; // 종이가 실제로 읽는 셋
+
+export function payloadOf(st, who, kind) {
+  const state = {};
+  for (const key of SUBMIT_TOP_KEYS) state[key] = st[key];
+  const session = {};
+  for (const key of SUBMIT_SESSION_KEYS) session[key] = st.session[key];
   return {
     kind,
     school: String(who.school ?? '').trim(),
     team: String(who.team ?? '').trim(),
-    state: { ...st, session },
+    state: { ...state, session },
     app: UI.appTitle,
   };
 }
