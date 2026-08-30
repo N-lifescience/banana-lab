@@ -76,7 +76,7 @@ centrifuge 는 27×7px 자에서 같은 일을 찾았습니다.
 **`pointermove` 도 들어야** 합니다 — 겹친 자리 **안에서** 조금 움직이면 겨눈 것이 바뀌는데
 들어올 때 한 번만 재면 이름이 굳습니다.
 
-본: `/Volumes/T7/Projects/banana-lab/src/ui/bench.js` 의 `distTo` · `aimedAt` · `hoverTip`.
+본: `/Volumes/T7/Projects/virtual-biolab/src/ui/bench.js` 의 `distTo` · `aimedAt` · `hoverTip`.
 검사: 같은 저장소 `scripts/check-bench.mjs` 의 「큰 그림의 가장자리를 짚어도」·「말풍선이 집힐」.
 
 **재는 법이 중요합니다.** 3×3 격자는 안쪽만 봅니다 — 새는 것은 **가장자리 띠**입니다.
@@ -149,7 +149,7 @@ centrifuge 는 27×7px 자에서 같은 일을 찾았습니다.
 받은 쪽이 재 보면 **대개 더 컸습니다.** 전부 바나나랩에서 물려받은 것이라
 「내 저장소에는 없겠지」 하지 말고 **직접 재 보세요.**
 
-원본은 전부 `/Volumes/T7/Projects/banana-lab` 에 있습니다.
+원본은 전부 `/Volumes/T7/Projects/virtual-biolab` 에 있습니다.
 
 ### 규칙 — 이것부터
 

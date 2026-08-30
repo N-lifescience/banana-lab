@@ -98,7 +98,7 @@ micrometer-lab 은 이때 기록칸을 **17칸 → 7칸**으로 줄였습니다.
 **Esc → 말풍선 치우기**. Esc 로 치운 것은 **`showTip` 한 곳에서** 막으세요 —
 부르는 자리마다 따로 막으면 반드시 한 곳이 샙니다.
 
-전부 `/Volumes/T7/Projects/banana-lab/src/ui/bench.js` 와 `src/main.js`·`src/ui/toast.js` 에
+전부 `/Volumes/T7/Projects/virtual-biolab/src/ui/bench.js` 와 `src/main.js`·`src/ui/toast.js` 에
 주석과 함께 있습니다. 검사는 `scripts/check-bench.mjs` 의 「폰 —」·「키보드 —」·「잘된 조작도」.
 
 ────────────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ micrometer-lab 은 이때 기록칸을 **17칸 → 7칸**으로 줄였습니다.
 받은 쪽이 재 보면 **대개 더 컸습니다.** 전부 바나나랩에서 물려받은 것이라
 「내 저장소에는 없겠지」 하지 말고 **직접 재 보세요.**
 
-원본은 전부 `/Volumes/T7/Projects/banana-lab` 에 있습니다.
+원본은 전부 `/Volumes/T7/Projects/virtual-biolab` 에 있습니다.
 
 ### 규칙 — 이것부터
 

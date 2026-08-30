@@ -73,7 +73,7 @@ micrometer-lab 은 이때 기록칸을 **17칸 → 7칸**으로 줄였습니다.
 겹친 자리 **안에서** 조금 움직이면 겨눈 것이 바뀌는데, 들어올 때 한 번만 재면 이름이 굳습니다.
 끄는 중에는 말풍선을 안 쓰므로 그때는 넘깁니다.
 
-본: `/Volumes/T7/Projects/banana-lab/src/ui/bench.js` 의 `hoverTip`.
+본: `/Volumes/T7/Projects/virtual-biolab/src/ui/bench.js` 의 `hoverTip`.
 검사: 같은 저장소 `scripts/check-bench.mjs` 의 「말풍선이 집힐 물건의 이름을 말한다」.
 자(27×7px)처럼 긴 그림에서 특히 갈립니다.
 
@@ -144,7 +144,7 @@ micrometer-lab 은 이때 기록칸을 **17칸 → 7칸**으로 줄였습니다.
 받은 쪽이 재 보면 **대개 더 컸습니다.** 전부 바나나랩에서 물려받은 것이라
 「내 저장소에는 없겠지」 하지 말고 **직접 재 보세요.**
 
-원본은 전부 `/Volumes/T7/Projects/banana-lab` 에 있습니다.
+원본은 전부 `/Volumes/T7/Projects/virtual-biolab` 에 있습니다.
 
 ### 규칙 — 이것부터
 
