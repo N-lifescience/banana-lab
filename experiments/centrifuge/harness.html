@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개발 하네스 — 간이 원심분리기</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 28px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  .stage{background:var(--sunk);border-radius:5px;padding:10px;display:flex;justify-content:center}
+  .stage svg{width:100%;max-width:320px;height:auto;display:block}
+  .ctrl{display:flex;flex-direction:column;gap:5px}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;font-weight:600;
+    letter-spacing:.04em;color:var(--ink-mute)}
+  .ctrl .lab span{font-family:ui-monospace,monospace;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--indigo)}
+  input[type=range]:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .seg{display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .seg button{flex:1;border:none;background:var(--surface);color:var(--ink-mute);
+    font:inherit;font-size:13px;padding:6px 4px;cursor:pointer;border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  .seg button[aria-pressed="true"]{background:var(--indigo);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .meter{display:flex;flex-direction:column;gap:5px}
+  .meter .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .meter .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
+  .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
+  .hint{font-size:12.5px;color:var(--ink-mute)}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet{margin-top:18px}
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:760px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:6px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>간이 원심분리기 — 개발 하네스</h1>
+  <p class="note" id="harness-note"></p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>애셋 — 회전판</h2>
+      <div class="stage" id="rotor-slot"></div>
+      <div class="ctrl">
+        <div class="lab"><label for="speed">회전 빠르기</label><span id="v-speed"></span></div>
+        <input type="range" id="speed" min="0" max="100" value="60">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span>회전판에 물린 것</span></div>
+        <div class="seg" id="slots" role="group" aria-label="회전판에 물린 것">
+          <button type="button" data-value="none">비었음</button>
+          <button type="button" data-value="one">한쪽만</button>
+          <button type="button" data-value="both" aria-pressed="true">양쪽</button>
+        </div>
+      </div>
+      <h2>애셋 — 모세관</h2>
+      <div class="stage" id="capillary-slot"></div>
+    </div>
+
+    <div class="panel">
+      <h2>결과 렌더러 — 모세관의 층</h2>
+      <div class="stage" id="tube-slot"></div>
+
+      <div class="ctrl">
+        <div class="lab"><label for="column">혈액 기둥</label><span id="v-column"></span></div>
+        <input type="range" id="column" min="0" max="100" value="70">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="separation">층이 갈린 정도</label><span id="v-separation"></span></div>
+        <input type="range" id="separation" min="0" max="100" value="95">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="mixed">흔들려 섞인 정도</label><span id="v-mixed"></span></div>
+        <input type="range" id="mixed" min="0" max="100" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="clot">응고</label><span id="v-clot"></span></div>
+        <input type="range" id="clot" min="0" max="100" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="bubbles">기포</label><span id="v-bubbles"></span></div>
+        <input type="range" id="bubbles" min="0" max="100" value="0">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span>그리기</span></div>
+        <div class="seg" id="flags" role="group" aria-label="그리기 선택">
+          <button type="button" data-flag="ruler">자</button>
+          <button type="button" data-flag="labels" aria-pressed="true">이름표</button>
+          <button type="button" data-flag="female">여성 시료</button>
+        </div>
+      </div>
+
+      <div class="meter">
+        <div class="bar"><div class="fill" id="q-fill"></div></div>
+        <div class="cap"><span>결과의 읽을 만함</span><b id="q-value"></b></div>
+        <div class="hint" id="q-hint"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel sheet" id="sheet-panel">
+    <h2>애셋 시트 — 전 종 대조</h2>
+    <div class="sheet-grid" id="sheet"></div>
+  </div>
+</div>
+<script type="module" src="/experiments/centrifuge/src/harness.js"></script>
+</body>
+</html>
