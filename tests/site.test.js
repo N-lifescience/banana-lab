@@ -100,3 +100,61 @@ test('방침 제목이 사이트를 말한다 (실험 하나를 말하지 않는
   const named = EXPERIMENTS.find((id) => title.includes(id));
   assert.ok(!named, `방침 제목이 실험 하나(${named})를 가리킵니다: "${title}"`);
 });
+
+/*
+ * ── 방침이 받는다는 것을 정말 누군가 보내는가 ───────────────────────
+ *
+ * 실험마다 「방침에 안 적힌 것을 보내지 않는가」를 본다. 그 반대 방향 —
+ * **「방침이 받는다는데 아무도 안 보내는가」** — 는 실험이 볼 수 없다.
+ *
+ * 방침은 **사이트에 하나뿐인 문서**라 실험 여덟이 보내는 것의 **합집합**을 적는다.
+ * `slides` 는 banana 만 보내는데, osmosis 의 검사가 「나는 안 보내니 방침에서 지워라」고
+ * 말하면 **banana 의 고지를 지우게 된다.** 실험 검사에 두면 실험이 늘 때마다
+ * 고지가 깎여 나간다 — 정확히 반대로 움직인다.
+ *
+ * 그래서 합집합을 아는 자리, 즉 사이트가 갖는다. 여기서 재는 것은 하나다:
+ * **적어 둔 항목마다 그것을 실제로 보내는 실험이 하나는 있는가.**
+ * 안 받는 것을 받는다고 적은 것도 틀린 고지다 — 현미경을 안 쓰는 실험이
+ * 「초점」을 받는다고 적고 있던 적이 있다.
+ * (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
+ */
+test('방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다', async () => {
+  const said = new Set();
+  for (const [, list] of read('privacy.html').matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
+    for (const k of list.split(',')) said.add(k.trim());
+  }
+  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
+
+  /** 꾸러미 밖으로 나가는 표의 칸들. `payloadOf()` 가 만들지 않으므로 따로 안다. */
+  const COLUMNS = new Set(['student_no', 'student_name', 'submitted_at']);
+
+  const sent = new Set();
+  const skipped = [];
+  for (const id of EXPERIMENTS) {
+    const report = await import(at(`experiments/${id}/src/ui/report.js`).href);
+    if (typeof report.payloadOf !== 'function') { skipped.push(id); continue; }
+    const { initialState } = await import(at(`experiments/${id}/src/sim/state.js`).href);
+    const p = report.payloadOf(initialState(1, 1), { school: '', team: '' }, 'individual');
+    for (const k of Object.keys(p)) if (k !== 'state') sent.add(k);
+    for (const [k, v] of Object.entries(p.state)) {
+      if (k !== 'session') { sent.add(k); continue; }
+      for (const sub of Object.keys(v)) sent.add(`session.${sub}`);
+    }
+  }
+  /*
+   * **앞 조건.** `payloadOf` 를 안 내보내는 실험이 생기면 그 실험이 보내는 것이
+   * 합집합에서 빠지고, 그러면 아래가 **「아무도 안 보낸다」로 오판**한다.
+   * 조용히 건너뛰지 않고 여기서 말한다.
+   */
+  assert.deepEqual(skipped, [],
+    `payloadOf 를 내보내지 않는 실험이 있습니다: ${skipped.join(', ')}\n`
+    + '  → 그 실험이 보내는 것이 합집합에서 빠져 아래 판정이 틀립니다.\n'
+    + '    src/ui/report.js 에서 payloadOf 를 export 하세요.');
+  assert.ok(sent.size > 0, '어느 실험도 꾸러미를 만들지 않았습니다 — 검사가 헛돌고 있습니다');
+
+  const phantom = [...said].filter((k) => !sent.has(k) && !COLUMNS.has(k));
+  assert.deepEqual(phantom, [],
+    `방침이 받는다는데 어느 실험도 안 보냅니다: ${phantom.join(', ')}\n`
+    + '  → 안 받는 것을 받는다고 적은 것도 틀린 고지입니다. privacy.html 에서 그 줄을 지우거나,\n'
+    + '    정말 보내야 하는 값이면 그 실험의 SUBMIT_* 목록에 넣으세요.');
+});

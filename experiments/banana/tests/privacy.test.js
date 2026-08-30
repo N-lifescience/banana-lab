@@ -68,10 +68,15 @@ test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', (
     `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')}\n`
     + '  → privacy.html 제2조를 고치세요. **받는 것을 안 적은 것도 틀린 고지입니다.**');
 
-  const notSent = [...said].filter((k) => !sent.has(k)
-    && !['student_no', 'student_name', 'submitted_at'].includes(k));
-  assert.deepEqual(notSent, [],
-    `보내지도 않는 것을 방침이 받는다고 적고 있습니다: ${notSent.join(', ')}`);
+
+  /*
+   * ★ **반대 방향(「방침이 받는다는데 안 보낸다」)은 여기서 재지 않는다.**
+   *   방침은 **사이트에 하나뿐인 문서**라, 실험 여덟이 보내는 것의 **합집합**을 적는다.
+   *   banana 만 `slides` 를 보내는데 여기서 「osmosis 가 안 보내니 방침에서 지워라」고
+   *   말하면 **banana 의 고지를 지우게 된다.** 그래서 그 방향은 사이트가 갖는다 —
+   *   `tests/site.test.js` 의 「방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다」.
+   *   (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
+   */
 });
 
 test('방침의 조 번호가 이어지고, 본문이 가리키는 조가 맞는 조다', () => {
