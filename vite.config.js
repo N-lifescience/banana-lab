@@ -19,6 +19,7 @@ export default defineConfig({
         banana: 'experiments/banana/index.html',
         micrometer: 'experiments/micrometer/index.html',
         osmosis: 'experiments/osmosis/index.html',
+        catalase: 'experiments/catalase/index.html',
         /*
          * 선생님이 수업을 열고 제출물을 받는 화면. **사이트에 하나뿐이다** —
          * 어느 실험의 수업인지는 주소(`?exp=`)로 정한다. 실험이 늘어도 이 줄은 안 는다.

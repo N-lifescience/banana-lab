@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>카탈레이스 탐구 시뮬레이터 — 개발 하네스</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 28px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  .stage{background:var(--sunk);border-radius:5px;padding:10px;display:flex;justify-content:center}
+  .stage svg{width:100%;max-width:260px;height:auto;display:block}
+  .ctrl{display:flex;flex-direction:column;gap:5px}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;font-weight:600;
+    letter-spacing:.04em;color:var(--ink-mute)}
+  .ctrl .lab span{font-family:ui-monospace,monospace;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--indigo)}
+  input[type=range]:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .seg{display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .seg button{flex:1;border:none;background:var(--surface);color:var(--ink-mute);
+    font:inherit;font-size:13px;padding:6px 4px;cursor:pointer;border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  /* 글자색을 #fff 로 박으면 다크 모드에서 밝은 바탕에 흰 글씨가 된다 (index.html 참조) */
+  .seg button[aria-pressed="true"]{background:var(--indigo);color:var(--ground)}
+  .seg button:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .meter{display:flex;flex-direction:column;gap:5px}
+  .meter .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .meter .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
+  .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
+  .hint{font-size:12.5px;color:var(--ink-mute)}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet{margin-top:18px}
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:760px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:6px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute)}
+  /* 계열 대조 — 조건마다 막대 하나. 길수록 오래 걸린다 */
+  .series{display:flex;flex-direction:column;gap:14px}
+  .series h3{font-size:12px;letter-spacing:.04em;color:var(--ink-mute);margin:0 0 6px;font-weight:600}
+  .row{display:grid;grid-template-columns:66px 1fr 64px;align-items:center;gap:8px;
+    font-size:12px;margin-bottom:3px}
+  .row .k{color:var(--ink-mute);font-family:ui-monospace,monospace;text-align:right}
+  .row .t{font-family:ui-monospace,monospace;color:var(--ink)}
+  .row .b{height:9px;border-radius:99px;background:var(--good);min-width:2px}
+  .row.none .b{background:var(--rule)}
+  .row.none .t{color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>카탈레이스 탐구 시뮬레이터 — 개발 하네스</h1>
+  <p class="note" id="harness-note"></p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2 id="h-conditions"></h2>
+
+      <div class="ctrl">
+        <div class="lab"><label for="tempC" id="l-tempC"></label><span id="v-tempC"></span></div>
+        <input type="range" id="tempC" min="0" max="100" step="1" value="20">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="ph" id="l-ph"></label><span id="v-ph"></span></div>
+        <input type="range" id="ph" min="30" max="130" step="1" value="70">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="h2o2Pct" id="l-h2o2Pct"></label><span id="v-h2o2Pct"></span></div>
+        <input type="range" id="h2o2Pct" min="5" max="30" step="1" value="30">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="extractPct" id="l-extractPct"></label><span id="v-extractPct"></span></div>
+        <input type="range" id="extractPct" min="0" max="100" step="5" value="100">
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><span id="l-buffered"></span></div>
+        <div class="seg" id="buffered" role="group"></div>
+      </div>
+      <div class="ctrl">
+        <div class="lab"><span id="l-extractBoiled"></span></div>
+        <div class="seg" id="extractBoiled" role="group"></div>
+      </div>
+
+      <div class="meter">
+        <div class="bar"><div class="fill" id="q-fill"></div></div>
+        <div class="cap"><span id="l-riseTime"></span><b id="q-value"></b></div>
+        <div class="hint" id="q-hint"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 id="h-series"></h2>
+      <p class="hint" id="series-note"></p>
+      <div id="series"></div>
+      <div class="stage" id="result-slot"></div>
+      <div class="ctrl">
+        <div class="lab"><label for="elapsed" id="l-elapsed"></label><span id="v-elapsed"></span></div>
+        <input type="range" id="elapsed" min="0" max="300" step="1" value="0">
+      </div>
+      <p class="hint" id="obs-state"></p>
+    </div>
+  </div>
+
+  <div class="panel sheet" id="sheet-panel">
+    <h2>애셋 시트 — 전 종 대조</h2>
+    <div class="sheet-grid" id="sheet"></div>
+  </div>
+</div>
+<script type="module" src="/experiments/catalase/src/harness.js"></script>
+</body>
+</html>
