@@ -10,13 +10,17 @@
 
 | | |
 |---|---|
-| **끝난 것** | 1·2·3·4단계 — 껍데기 · `banana` · `micrometer` · **`osmosis` + 공용 올리기 첫 벌** |
-| **다음** | **5단계** — 남은 다섯을 옮긴다 (`catalase` · `centrifuge` · `chromatography` · `fermentation` · `germination`) |
+| **합친 것 4 / 8** | `banana` · `micrometer` · `osmosis` · `catalase` — **넷 다 배포돼 열립니다** |
+| **남은 넷** | `centrifuge` · `chromatography` · `fermentation` · `germination` |
+| **다음** | 5단계 계속 — 아래 「실험 하나 옮기는 차례」를 그대로 밟습니다 |
 | 공용으로 올라간 것 | `packages/lab-kit/` — `teacher.js` · `ui/start.js` · `ui/qr.js` · `net/supabase.js` · `style/tokens.js` |
 | 살아 있는 주소 | `virtual-biolab.vercel.app` · `/cell-metabolism/<실험>` · `/teacher?exp=<실험>` |
 | 아직 안 만든 것 | **교과 고르기 층** (첫 화면이 아직 교과 하나만 보여 줍니다) · 실험에서 **첫 화면으로 돌아가는 길** |
 
-옮길 실험 다섯은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
+옮길 실험 넷은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
+**아직 안 옮긴 것은 첫 화면에서 「준비 중」으로 보입니다** — 링크를 주지 않습니다.
+합칠 때 그 카드를 `<a class="card live" href="/cell-metabolism/<실험>">` 로 되돌리세요
+(`tests/site.test.js` 가 없는 실험으로 데려가는 링크를 잡습니다).
 
 ### ★ 다음 사람이 먼저 알아야 할 것 둘
 
@@ -267,7 +271,19 @@ rm -rf experiments/$E/docs/banana-progress.md experiments/$E/docs/banana-tasks
 ⑧ **사이트 쪽 세 곳** — `vite.config.js` 진입점 한 줄 · `src/teacher.js` 의
    `EXPERIMENTS` 배열 · `index.html` 카드(이미 여덟 장 다 있다). 셋 다 검사가 잡는다
 
-그다음 `npm run check` → `npm run build` → `npm run preview` → `EXP=$E node scripts/check-build.mjs`.
+그다음 `npm run check` → `npm run build` → `npm run preview` → `node scripts/check-build.mjs`.
+
+#### catalase 에서 **여덟 자리 밖으로** 더 걸린 것 셋 (2026-08-30)
+
+- **검사가 `walk('src')` 처럼 「명령을 어디서 쳤는가」로 폴더를 훑는가.** 뿌리의 `src/` 는
+  이제 **사이트 것**이라 남의 폴더를 훑는다. 합치기 직전에는 뿌리에 `src/` 가 없어 터졌을
+  자리인데, 지금은 **있는 채로 틀린다.** 옮기기 전에 `grep -n "('src'\|\"src\"" tests/` 로 찾으세요
+- **방침의 `data-sends` 를 맨 앞 하나만 읽는 검사.** 따로 서 있던 시절 방침은 목록이
+  한 줄이었다. 사이트 방침은 항목마다 `<dt>` 가 따로다 — `matchAll` 로 다 읽게 고치세요.
+  고치고 나면 **진짜 빠진 것**이 드러납니다 (catalase 는 `design`·`trials` 가 고지에 없었습니다)
+- **「내 것은 봐준다」로 재는 검사.** 「이 실험에 **없는** 낱말이 방침에 있나」·「**다른** 실험의
+  주소를 가리키나」 — 자기 것을 목록에서 빼므로 **자기가 틀린 것을 못 봅니다.** 그리고
+  실험이 늘면 서로 정반대를 요구합니다. 보이면 사이트로 넘기세요
 
 ### 2단계에서 실제로 걸린 것 (2026-08-29, banana)
 
