@@ -10,14 +10,14 @@
 
 | | |
 |---|---|
-| **합친 것 4 / 8** | `banana` · `micrometer` · `osmosis` · `catalase` — **넷 다 배포돼 열립니다** |
-| **남은 넷** | `centrifuge` · `chromatography` · `fermentation` · `germination` |
+| **합친 것 5 / 8** | `banana` · `micrometer` · `osmosis` · `catalase` · `centrifuge` — **다섯 다 배포돼 열립니다** |
+| **남은 셋** | `chromatography` · `fermentation` · `germination` |
 | **다음** | 5단계 계속 — 아래 「실험 하나 옮기는 차례」를 그대로 밟습니다 |
 | 공용으로 올라간 것 | `packages/lab-kit/` — `teacher.js` · `ui/start.js` · `ui/qr.js` · `net/supabase.js` · `style/tokens.js` |
 | 살아 있는 주소 | `virtual-biolab.vercel.app` · `/cell-metabolism/<실험>` · `/teacher?exp=<실험>` |
 | 아직 안 만든 것 | **교과 고르기 층** (첫 화면이 아직 교과 하나만 보여 줍니다) · 실험에서 **첫 화면으로 돌아가는 길** |
 
-옮길 실험 넷은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
+옮길 실험 셋은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
 **아직 안 옮긴 것은 첫 화면에서 「준비 중」으로 보입니다** — 링크를 주지 않습니다.
 합칠 때 그 카드를 `<a class="card live" href="/cell-metabolism/<실험>">` 로 되돌리세요
 (`tests/site.test.js` 가 없는 실험으로 데려가는 링크를 잡습니다).
@@ -219,7 +219,7 @@ virtual-biolab/
 2. banana 를 experiments/banana/ 로 통째로  ✔ 끝남
 3. 둘째(micrometer)  ✔ 끝남 — 여기서 「중복이 아니라 모순」이 드러났다
 4. 셋째(osmosis) + 공용으로 올리기 첫 벌  ✔ 끝남
-5. 나머지 다섯을 옮긴다  ← 지금 여기
+5. 나머지 다섯을 옮긴다  ← 지금 여기 (catalase · centrifuge 끝남, 셋 남음)
    - 틀이 정해졌으므로 빨라진다. 아래 「실험 하나 옮기는 차례」를 그대로 따른다
 ```
 
@@ -230,7 +230,7 @@ virtual-biolab/
 바꿀 것은 **파일 여덟 자리뿐**입니다. 그 밖을 고치고 있다면 뭔가 어긋난 것입니다.
 
 ```bash
-E=catalase                       # 옮길 실험
+E=chromatography                 # 옮길 실험
 
 # ① 실험 것을 통째로. teacher.js 는 **안** 가져온다 (공용으로 올라가 있다)
 rsync -a --exclude='.*' /Volumes/T7/Projects/$E-lab/src/   experiments/$E/src/
@@ -284,6 +284,40 @@ rm -rf experiments/$E/docs/banana-progress.md experiments/$E/docs/banana-tasks
 - **「내 것은 봐준다」로 재는 검사.** 「이 실험에 **없는** 낱말이 방침에 있나」·「**다른** 실험의
   주소를 가리키나」 — 자기 것을 목록에서 빼므로 **자기가 틀린 것을 못 봅니다.** 그리고
   실험이 늘면 서로 정반대를 요구합니다. 보이면 사이트로 넘기세요
+
+#### centrifuge 에서 걸린 것 — **전부 앞에서 본 모양이었다** (2026-08-30)
+
+다섯째에서 처음으로 **여덟 자리 밖으로 새 것이 안 나왔다.** 빨간불 다섯이 났는데
+다섯 다 앞 실험에서 이미 이름이 붙은 모양이라, 고치는 데 판단이 필요 없었다.
+**조리법이 완성됐다는 신호다.** 다음 셋은 이 표만 보고 가면 된다.
+
+| 운 검사 | 어느 모양인가 | 어떻게 |
+|---|---|---|
+| `방침에 적힌 항목이 …` | 「반대 방향은 실험이 판정할 수 없다」(4단계) | 그 방향만 지운다 |
+| `개인정보처리방침에 다른 실험의 말이 없다` | 「자기 것은 뺀다」(4단계) | 통째로 지운다 |
+| `이 저장소가 자기 이름을 알고 있다` | 「중복이 아니라 모순」(3단계) | 통째로 지운다 |
+| `되돌리기 기록은 …` · `학생이 무엇을 …` | **새 모양 하나** — 아래 | 약속을 보게 고친다 |
+| `difficulty.test.js` 가 멎음 | 공용으로 올라간 파일을 읽는다 | `packages/lab-kit/` 로 |
+
+**새 모양 하나 — 낱말을 찾는 검사는 방침이 사이트 것이 되는 순간 헛발질한다.**
+
+    assert.ok(html.includes('history'), '방침이 history 를 빼고 보낸다고 말하지 않습니다');
+
+따로 서 있던 시절 방침에는 `<code>history</code>` 가 적혀 있었다. 사이트 방침은
+**한국어로** 적혀 있다 — 「되돌리기 기록 — 이전 상태를 쌓아 둔 것이라…」. 고지의 내용은
+똑같은데 검사만 운다. banana 가 같은 자리에서 먼저 겪고 **약속을 보는 쪽**으로 갔다:
+
+    const notSentBlock = html.slice(html.indexOf('전송하지 않습니다'));
+    assert.ok(notSentBlock.includes('되돌리기 기록'));
+
+문장을 다듬어도 안 울고, 약속을 지우면 운다. **낱말이 아니라 약속을 보게 하세요** —
+합칠 때 `html.includes('<영문 키>')` 를 먼저 찾으면 이 자리를 미리 없앨 수 있습니다.
+
+★ **공용으로 올라간 파일을 읽는 실험 검사는 지우지 말고 경로만 돌리세요.**
+`difficulty.test.js` 는 `start.js` 를 읽어 「단계를 고를 수 있는가」를 본다. 공용이 됐다고
+지우면, **공용을 고쳐 길이 끊길 때 아무도 안 웁니다.** 이 실험이 2·3단계를 못 쓰게 되는
+것은 여전히 이 실험의 일이다. 실험 여럿이 같은 것을 보게 되면 그때 사이트로 올리면 된다
+(그때는 **중복**이라 하나만 남기면 되고, 모순이 아니라서 쉽다).
 
 ### 2단계에서 실제로 걸린 것 (2026-08-29, banana)
 
