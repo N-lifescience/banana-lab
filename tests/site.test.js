@@ -289,3 +289,30 @@ test('실험마다 빌드 진입점이 있다', () => {
     `vite.config.js 의 input 에 없는 실험이 있습니다: ${missing.join(', ')}\n`
     + '  → 그 실험은 배포본에 안 실립니다. 개발 서버에서는 멀쩡히 열려서 배포 뒤에야 압니다.');
 });
+
+/*
+ * ── 기구 색은 공용이다. 실험이 늘리지 않는다 ────────────────────────
+ *
+ * `MERGE-AND-DEPLOY.md` §3.1: 기구 색(`glass`·`metal`·`paper`·`bodyDark`·`rubber`·`bench`)과
+ * 선 두께·광원은 **공용**이고, 시약색·반응색만 그 실험의 `palette.experiment.js` 로 간다.
+ * 규칙은 「이 파일이 실험 여덟에서 diff 0 이어야 한다」였는데 **사람이 지키는 규칙**이었다.
+ *
+ * 4단계에서 값을 `packages/lab-kit/style/tokens.js` 하나로 모으고, 실험의 자리에는
+ * **다시-내보내기 한 줄만** 남겼다 — 애셋 예순 곳과 복제 절차가 그 자리를 알기 때문이다.
+ * 한 줄뿐인지를 여기서 지킨다. 줄이 늘면 그 순간 사본이 되고, 사본은 갈라진다.
+ * (합치기 4단계, 2026-08-30)
+ */
+test('실험의 tokens.js 는 공용을 다시 내보내기만 한다', () => {
+  const RE_EXPORT = /^export \* from '(\.\.\/)+packages\/lab-kit\/style\/tokens\.js';$/;
+  for (const id of EXPERIMENTS) {
+    const lines = read(`experiments/${id}/src/style/tokens.js`)
+      .replace(/\/\*[\s\S]*?\*\//g, '')      // 주석은 얼마든지 적어도 된다
+      .split('\n').map((l) => l.trim()).filter(Boolean);
+    assert.deepEqual(lines.filter((l) => !RE_EXPORT.test(l)), [],
+      `experiments/${id}/src/style/tokens.js 에 다시-내보내기 말고 다른 줄이 있습니다:\n`
+      + lines.map((l) => `    ${l}`).join('\n') + '\n'
+      + '  → 이 실험만의 색은 palette.experiment.js 로 가세요.\n'
+      + '    여기에 넣으면 여덟 실험 전부의 허용 색이 됩니다.');
+    assert.equal(lines.length, 1, `${id}: 다시-내보내기가 한 줄이 아닙니다 (${lines.length}줄)`);
+  }
+});

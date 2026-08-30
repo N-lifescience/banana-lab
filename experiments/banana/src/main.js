@@ -11,7 +11,7 @@ import { createToastQueue } from './ui/toast.js';
 import { createBench } from './ui/bench.js';
 import { createZoom } from './ui/zoom.js';
 import { createNotebook } from './ui/notebook.js';
-import { createStart } from './ui/start.js';
+import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createReport } from './ui/report.js';
 import { UI } from './ui/strings.js';
 
@@ -218,4 +218,4 @@ bindEditShortcut();
 const fromUrl = levelFromUrl();
 const modeUrl = modeFromUrl();
 if (fromUrl) boot(fromUrl, modeUrl ?? MODES.GROUP);
-else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP);
+else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP, UI);

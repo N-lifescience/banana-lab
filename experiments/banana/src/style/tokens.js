@@ -1,89 +1,18 @@
 /**
- * 아트 디렉션 토큰 — 라인 + 플랫 (확정)
+ * 기구 색 · 선 두께 · 광원 — **여기에는 아무것도 적지 않는다.**
  *
- * 이 파일은 기구 애셋(src/assets/)에만 적용된다.
- * 현미경 시야(src/render/fov.js)는 광학 시뮬레이션이라 별도 규칙을 따른다.
- * docs/01-art-direction.md 참조.
+ * 값은 `packages/lab-kit/style/tokens.js` 에 있다. 이 파일은 그것을 그대로 내보내기만 한다.
  *
- * 여기 없는 색을 애셋에 쓰면 `npm run check:art`가 실패한다.
- * 새 색이 필요하면 반드시 이 파일에 먼저 추가하고, 왜 필요한지 주석을 남긴다.
+ * ── 왜 이렇게 두는가 (합치기 4단계, 2026-08-30) ───────────────────────
+ * 이 파일은 **실험 여덟에서 diff 0** 이어야 한다는 규칙이 있었다
+ * (`MERGE-AND-DEPLOY.md` §3.1 — 기구 색은 공용, 시약색·반응색만 실험 것).
+ * 규칙은 사람이 지키는 것이라 언젠가 어긋난다. 사본을 없애 **어긋날 자리 자체를 없앴다.**
+ *
+ * 그런데 애셋 예순 곳이 `../style/tokens.js` 를 보고 있고, `NEW-EXPERIMENT.md` 의 복제
+ * 절차와 아트 디렉션 린터도 그 자리를 안다. 그 자리는 그대로 두는 편이 싸다.
+ *
+ * **이 파일에 줄을 늘리지 마세요.** 이 실험만의 색은 `palette.experiment.js` 로 갑니다 —
+ * 여기에 넣으면 여덟 실험 전부의 허용 색이 됩니다.
+ * `tests/site.test.js` 가 이 파일이 다시-내보내기 한 줄뿐인지 봅니다.
  */
-
-/** 모든 애셋의 외곽선은 이 한 가지 색을 쓴다. 물체마다 다른 선색을 쓰면 세트가 흩어진다. */
-export const INK = '#2F2A20';
-
-/**
- * 물체마다 [기본, 음영] 두 단계만 갖는다.
- * 음영은 항상 형태의 우하단에 온다 — 광원이 좌상단 45°이기 때문이다.
- */
-export const PALETTE = {
-  ink: [INK, INK],
-
-  // 바나나
-  peelUnripe:   ['#CFE08C', '#A6C059'],
-  peelRipe:     ['#F3D25B', '#D9A93A'],
-  peelOverripe: ['#DCC084', '#B08A48'],
-  peelSpot:     ['#8A6A2A', '#6E5420'],
-  flesh:        ['#FAF4E0', '#E5DAB8'],
-  stem:         ['#8A7538', '#6B5A28'],
-  tip:          ['#4A3818', '#3A2C12'],
-
-  // 기구
-  glass:        ['#E4EFEE', '#C3D9D8'],
-  rubber:       ['#E39B9B', '#C06E6E'],
-  metal:        ['#A8B2BE', '#78838F'],
-  bodyDark:     ['#6E7784', '#4B535E'],
-  lamp:         ['#FFDF8A', '#E8BE55'],
-  paper:        ['#FBF8EE', '#E5DFCB'],
-  bench:        ['#C8CFC4', '#A8B1A4'],
-
-  // 시약 원액
-  iodine:       ['#A8701F', '#7C4E12'],
-  sudan:        ['#C94A38', '#96311F'],
-
-  // 염색 반응색. 시야 렌더러와 슬라이드 애셋이 공유한다.
-  // pale은 용액이 가장자리까지만 닿은 전이 구간에 쓴다 — 연속 보간 대신 3단계로 양자화한다.
-  stainStarch:     ['#2C3A8C', '#1B2566'],
-  stainStarchPale: ['#7C87C4', '#5A67AE'],
-  stainLipid:      ['#D6394F', '#9C2033'],
-  stainLipidPale:  ['#E68C9A', '#C96878'],
-};
-
-/** 선 두께는 셋뿐이다. 그 사이 값을 쓰면 세트가 흐트러진다. */
-export const STROKE = {
-  outline: 3,   // 물체의 바깥 윤곽
-  detail: 2,    // 내부 구획선
-  hair: 1.5,    // 눈금, 이음매 같은 잔 디테일
-};
-
-/** 접지 그림자. 애셋에서 허용되는 유일한 반투명 요소다. */
-export const GROUND_SHADOW = { fill: INK, opacity: 0.12 };
-
-/** 광원 방향. 음영 도형을 어느 쪽에 둘지 판단할 때 쓴다. */
-export const LIGHT = { angleDeg: 315, from: 'upper-left' };
-
-/** 애셋의 기준 viewBox. 모든 기구 애셋이 같은 좌표계를 쓴다. */
-export const VIEWBOX = { w: 400, h: 300 };
-
-/** 린터가 쓰는 파생 목록 — 직접 수정하지 말 것. */
-export const ALLOWED_FILLS = new Set(
-  Object.values(PALETTE).flat().concat(['none', 'transparent'])
-);
-export const ALLOWED_STROKE_WIDTHS = new Set(
-  Object.values(STROKE).map(String)
-);
-
-/** 공통 패스 속성. 모든 도형에 뿌린다. */
-export const PATH_ATTRS = 'stroke-linejoin="round" stroke-linecap="round"';
-
-/**
- * 애셋에서 도형 하나를 그릴 때 쓰는 헬퍼.
- * 토큰 밖 값이 들어오면 개발 중에 바로 터지도록 막아 둔다.
- */
-export function paint(tone, { shade = false, stroke = 'outline' } = {}) {
-  const pair = PALETTE[tone];
-  if (!pair) throw new Error(`팔레트에 없는 색: ${tone} — src/style/tokens.js에 먼저 추가하세요`);
-  const w = STROKE[stroke];
-  if (w === undefined) throw new Error(`허용되지 않은 선 두께: ${stroke}`);
-  return `fill="${pair[shade ? 1 : 0]}" stroke="${INK}" stroke-width="${w}" ${PATH_ATTRS}`;
-}
+export * from '../../../../packages/lab-kit/style/tokens.js';
