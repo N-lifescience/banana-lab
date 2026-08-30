@@ -10,13 +10,30 @@
 
 | | |
 |---|---|
-| **끝난 것** | 1·2·3단계 — 껍데기 · `experiments/banana/` · `experiments/micrometer/` |
-| **다음** | **4단계** — 셋째를 들이고(`osmosis` 권장) 공용으로 올린다 |
-| **가장 먼저 올릴 것** | `src/teacher.js` — **여덟 저장소 전부 바이트까지 같음이 확인됨** (§4 참고) |
-| 살아 있는 주소 | `virtual-biolab.vercel.app` · `/cell-metabolism/<실험>` · 옛 여덟 주소는 307 로 넘어감 |
+| **끝난 것** | 1·2·3·4단계 — 껍데기 · `banana` · `micrometer` · **`osmosis` + 공용 올리기 첫 벌** |
+| **다음** | **5단계** — 남은 다섯을 옮긴다 (`catalase` · `centrifuge` · `chromatography` · `fermentation` · `germination`) |
+| 공용으로 올라간 것 | `packages/lab-kit/` — `teacher.js` · `ui/start.js` · `ui/qr.js` · `net/supabase.js` · `style/tokens.js` |
+| 살아 있는 주소 | `virtual-biolab.vercel.app` · `/cell-metabolism/<실험>` · `/teacher?exp=<실험>` |
 | 아직 안 만든 것 | **교과 고르기 층** (첫 화면이 아직 교과 하나만 보여 줍니다) · 실험에서 **첫 화면으로 돌아가는 길** |
 
-옮길 실험 여섯은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
+옮길 실험 다섯은 아직 `/Volumes/T7/Projects/<이름>-lab` 에 각자 있습니다.
+
+### ★ 다음 사람이 먼저 알아야 할 것 둘
+
+**① 뿌리의 `docs/`·`PLAYTEST.md`·`tasks/` 는 banana 것입니다. 공용이 아닙니다.**
+micrometer 는 자기 것을 안 고쳐서 banana 것과 바이트까지 같았고, 그래서 아무도 몰랐습니다.
+osmosis 는 고쳤기 때문에 **자기 문서를 `experiments/osmosis/` 안에** 넣었습니다 —
+그 실험의 검사가 「PLAYTEST 에 적힌 숫자가 실제 값과 맞는가」로 자기 문서를 읽기 때문입니다.
+지금은 **자리가 둘**입니다. 다음 실험을 들일 때 그 실험의 문서를 함께 옮기고,
+언젠가 banana 것도 `experiments/banana/` 로 내리는 편이 낫습니다
+(`AGENTS.md`·`CLAUDE.md`·작업 카드 스무 곳이 `docs/…` 를 가리켜서 미뤘습니다).
+
+**② 브라우저·성능 검사 넷이 아직 banana 를 손으로 가리킵니다.**
+`check-bench.mjs` · `check-ui.mjs` · `check-grading.mjs` · `perf-fov.mjs` 가
+`experiments/banana/…` 를 박아 두고 있습니다 — **micrometer 와 osmosis 는 이 넷에
+한 번도 걸리지 않았습니다.** `check-build.mjs` 는 `EXP=<실험>` 으로 고를 수 있게 해 두었으니
+나머지 넷도 같은 모양으로 가세요. 아트 디렉션 린터는 4단계에서 폴더를 읽어 도는 것으로
+바꿨습니다 (그 전까지 「애셋 15종 위반 없음」은 **banana 만** 잰 값이었습니다).
 
 ---
 
@@ -53,39 +70,55 @@
 
 ## 2. 합친 뒤의 모양
 
+**지금 실제로 이렇게 생겼습니다** (4단계까지 온 모양. `✓` 가 이미 올라간 것):
+
 ```
-lab/
+virtual-biolab/
+  index.html                 실험 고르는 첫 화면 (카탈로그) ✓
+  privacy.html               개인정보처리방침 — **사이트에 하나** ✓
+  teacher.html               선생님 화면 — **사이트에 하나**. ?exp=<실험> 로 정한다 ✓
+  src/teacher.js             그 화면의 진입점 — 실험을 골라 실어 준다 ✓
   packages/lab-kit/          공용 엔진
-    style/tokens.js
-    assets/contract.js       CONTRACT · CONTENT_BOX · drawnBoxMm · setAttr
-    ui/bench.js              드래그·자유 배치·이름표·편집 모드 (표는 실험이 준다)
-    ui/zoom.js  notebook.js  report.js  start.js  toast.js  grading.js
-    sim/store.js             createStore · UNDO · SAVE_NOTE · TICK · CAPTURE
+    teacher.js               ✓ 수업 열기·제출물 보기 (실험 것은 주입받는다)
+    style/tokens.js          ✓ 기구 색 · 선 두께 · 광원
+    ui/start.js  ui/qr.js    ✓
+    net/supabase.js          ✓ 제출 창구
+    ui/bench.js  zoom.js  notebook.js  report.js  toast.js  grading.js   (아직)
+    assets/contract.js  sim/store.js                                     (아직)
   experiments/
     banana/                  실험 하나 = 폴더 하나
-      manifest.js            id · 제목 · 설명 · 교육과정 자리 (실험 세션이 채워 온다)
-      palette.js             이 실험의 시약색·반응색
-      sim/  render/  assets/  ui/strings.js  layout.js  tests/
-    onion/
-    catalase/
-  src/
-    main.js                  실험을 고르는 첫 화면 + 라우팅
-    registry.js              experiments/*/manifest.js 를 모아 놓은 곳
-  scripts/                   검사 스크립트 (공용)
+      index.html  harness.html
+      src/manifest.js        id · 제목 · 설명 · 교육과정 자리 (실험 세션이 채워 온다)
+      src/style/palette.experiment.js   이 실험의 시약색·반응색
+      src/style/tokens.js    ← 공용을 **다시 내보내기만** 하는 한 줄
+      src/sim/  render/  assets/  ui/   tests/
+    micrometer/
+    osmosis/                 자기 docs/ 와 PLAYTEST.md 를 함께 갖고 있다
+  tests/site.test.js         **사이트 것**을 재는 검사 (실험 것과 주인을 갈랐다)
+  tests/qr.test.js  submit.test.js      공용 파일을 재므로 여기 있다
+  scripts/                   검사 스크립트 (아트 린터는 실험 전부를 돈다)
 ```
 
-**주소:** `/?exp=onion&level=2` — 실험과 단계를 주소로 정합니다.
+`registry.js` 는 아직 없습니다 — 실험 목록이 지금은 **폴더**(`tests/site.test.js`)와
+`src/teacher.js` 의 배열, 그리고 `index.html` 의 카드에 있습니다. 교과 고르기 층을
+만들 때 한 곳으로 모으세요.
+
+**주소:** `/cell-metabolism/osmosis?level=2` — 교과·실험·단계를 주소로 정합니다.
+(계획 단계에서는 `/?exp=…` 이었는데, 사장님이 교과 주소로 정하셨습니다 — 2026-08-29.)
 교사가 반이나 모둠에 따라 다른 링크를 나눠 줄 수 있어야 합니다.
-실험을 고르는 첫 화면(`src/main.js`)의 원본은 `ROSTER.md` 와 함께 만든 메인 페이지입니다.
+반 코드를 붙인 링크는 선생님 화면이 만들어 줍니다: `/cell-metabolism/<실험>?code=482013`.
+실험을 고르는 첫 화면(`index.html`)의 원본은 `ROSTER.md` 와 함께 만든 메인 페이지입니다.
 그 페이지의 글꼴은 **직접 호스팅**합니다 — 배포 헤더의 CSP 가 `font-src 'self'` 라
 남의 서버에서 받아 오면 그대로 막힙니다. `scripts/build-fonts.mjs` 가 쓰인 글자만 잘라
 `public/fonts/` 에 굽고(250 KB — 통째로 실으면 13.1 MB), 문구를 고친 뒤 다시 굽지 않으면
 `npm run check` 가 잡습니다.
 
-`registry.js` 는 **합치는 사람만** 씁니다. 실험 세션은 건드리지 않습니다.
+`registry.js` 는 **합치는 사람만** 씁니다 (아직 안 만들었습니다 — 위 상자 참고).
 `manifest.js` 는 반대로 **실험 세션이 채워 옵니다** — 클론에 `src/manifest.js` 로 들어
 있고, `validateManifest()` 와 `tests/manifest.test.js` 가 규약을 지키게 합니다.
-합치는 사람이 할 일은 `experiments/<id>/manifest.js` 로 옮기고 `entry` 를 붙이는 것뿐입니다.
+합치는 사람이 할 일은 `src/` 를 통째로 `experiments/<id>/src/` 로 옮기는 것뿐이라,
+`manifest.js` 는 제자리에 그대로 갑니다. `tests/site.test.js` 가
+**`manifest.id` 와 폴더 이름이 같은지**를 봅니다 — 주소가 폴더에서 나오기 때문입니다.
 
 카드에 쓸 값이 이미 다 들어 있습니다 — 제목·한 문장 설명·난이도·뼈대,
 그리고 **`curriculum`(교육과정 자리 목록)**. 마지막 것이 목록 화면을 만듭니다:
@@ -169,29 +202,63 @@ lab/
 한 번에 다 옮기지 마세요. **하나 옮길 때마다 전부 초록불인지 확인합니다.**
 
 ```
-1. 껍데기부터
-   - 빈 저장소에 packages/lab-kit/ 자리만 만들고,
-     실험을 고르는 첫 화면과 registry.js 를 만든다
-   - 아직 실험은 없다. 화면이 뜨는 것만 확인한다
-
-2. 바나나랩을 experiments/banana/ 로 통째로 옮긴다
-   - 엔진으로 올리지 말고 **그대로** 옮긴다
-   - npm run check / check-bench / check-build 전부 통과할 때까지 고친다
-   - 여기까지가 "여러 실험 구조에서 실험 하나가 도는가" 다
-
-3. 두 번째 실험을 옮긴다
-   - 이때 처음으로 중복이 보인다. 그래도 **아직 올리지 않는다**
-   - 두 실험이 각자 도는 것을 먼저 확인한다
-
-4. 세 번째를 옮긴 뒤에 공용으로 올린다
-   - 세 번 똑같이 생긴 것만 packages/lab-kit/ 으로 올린다
-   - 하나 올릴 때마다 세 실험의 검사를 전부 돌린다
-
-5. 나머지를 옮긴다
-   - 이제 틀이 정해졌으므로 빨라진다
+1. 껍데기부터  ✔ 끝남
+2. banana 를 experiments/banana/ 로 통째로  ✔ 끝남
+3. 둘째(micrometer)  ✔ 끝남 — 여기서 「중복이 아니라 모순」이 드러났다
+4. 셋째(osmosis) + 공용으로 올리기 첫 벌  ✔ 끝남
+5. 나머지 다섯을 옮긴다  ← 지금 여기
+   - 틀이 정해졌으므로 빨라진다. 아래 「실험 하나 옮기는 차례」를 그대로 따른다
 ```
 
-각 단계마다 커밋하세요. 4단계에서 뭔가 어긋나면 3단계로 돌아갈 수 있어야 합니다.
+각 단계마다 커밋하세요. 뭔가 어긋나면 앞 단계로 돌아갈 수 있어야 합니다.
+
+### 실험 하나 옮기는 차례 (osmosis 를 옮기며 실제로 밟은 순서)
+
+바꿀 것은 **파일 여덟 자리뿐**입니다. 그 밖을 고치고 있다면 뭔가 어긋난 것입니다.
+
+```bash
+E=catalase                       # 옮길 실험
+
+# ① 실험 것을 통째로. teacher.js 는 **안** 가져온다 (공용으로 올라가 있다)
+rsync -a --exclude='.*' /Volumes/T7/Projects/$E-lab/src/   experiments/$E/src/
+rsync -a --exclude='.*' /Volumes/T7/Projects/$E-lab/tests/ experiments/$E/tests/
+cp /Volumes/T7/Projects/$E-lab/{index.html,harness.html,PLAYTEST.md} experiments/$E/
+rsync -a /Volumes/T7/Projects/$E-lab/docs/ experiments/$E/docs/
+rm -f experiments/$E/src/teacher.js experiments/$E/src/ui/qr.js \
+      experiments/$E/src/ui/start.js experiments/$E/src/net/supabase.js \
+      experiments/$E/src/style/tokens.js
+rm -rf experiments/$E/docs/banana-progress.md experiments/$E/docs/banana-tasks
+```
+
+② **두 페이지의 스크립트 경로** — `/src/…` → `/experiments/$E/src/…`
+   (`index.html` · `harness.html` 각 한 줄)
+
+③ **공용을 보게 한다**
+   - `src/ui/report.js` — `'../net/supabase.js'` → `'../../../../packages/lab-kit/net/supabase.js'`
+   - `src/main.js` — `'./ui/start.js'` → `'../../../packages/lab-kit/ui/start.js'`,
+     부르는 자리에 `, UI` 를 더한다
+   - `src/style/tokens.js` — 이미 있는 실험 것을 그대로 베껴 넣는다 (다시-내보내기 한 줄)
+
+④ **뿌리(사이트) 것을 읽는 검사** — `../` 를 `../../../` 로
+   `devport.test.js`(둘) · `privacy.test.js` · `submit.test.js`(공용으로 갔으면 지운다)
+
+⑤ **사이트 것을 검사하는 실험 검사를 지운다** — 있으면 반드시 모순이 된다
+   - 「점검 설정이 이 실험을 가리킨다」 · 「이 저장소가 자기 이름을 알고 있다」
+   - `pages.test.js` 의 `PAGES` 에서 `teacher.html`·`privacy.html` 을 빼고
+     `SITE_WIDE` 를 둔다 (banana·micrometer·osmosis 의 것을 그대로 베낀다)
+   - `qr.test.js` · `submit.test.js` 는 **통째로 지운다** (사이트에 하나 있다)
+
+⑥ **방침 맞대기를 `data-sends` 로** — 문구를 맞대는 표(`COVERED_BY`)가 있으면 버린다.
+   그 실험이 방침에 없는 것을 보내면 **거기서 처음 운다.** 울면 방침을 고칠 것이 아니라
+   **먼저 `payloadOf()` 를 본다** — 「뺄 것을 뺀다」로 돼 있으면 그게 원인이다
+
+⑦ **canonical·og:url·PLAYTEST 의 주소** — 따로 서 있던 시절 주소가 남아 있다.
+   `virtual-biolab.vercel.app/cell-metabolism/$E` 로. 사이트 검사가 잡는다
+
+⑧ **사이트 쪽 세 곳** — `vite.config.js` 진입점 한 줄 · `src/teacher.js` 의
+   `EXPERIMENTS` 배열 · `index.html` 카드(이미 여덟 장 다 있다). 셋 다 검사가 잡는다
+
+그다음 `npm run check` → `npm run build` → `npm run preview` → `EXP=$E node scripts/check-build.mjs`.
 
 ### 2단계에서 실제로 걸린 것 (2026-08-29, banana)
 
@@ -250,6 +317,80 @@ lab/
 **남의 앱**이었다(뿌리에서 다른 실험 제목이 떴다). 내 서버는 포트를 뺏겨 뜨지도 못했다.
 **`200` 은 아무 말도 안 한다 — 제목까지 봐야 내 것인 줄 안다.** 포트를 따로 잡고 다시 쟀다.
 
+### 4단계에서 실제로 걸린 것 (2026-08-30, osmosis)
+
+**셋째가 들어오면 드러나는 것은 「하나에 여럿이 매달린 자리」다.** 문서 하나, 검사 하나,
+파일 하나에 실험 셋이 각자 다른 요구를 건다.
+
+#### 방침은 **사이트에 하나**, 꾸러미를 만드는 코드는 **실험마다 따로**
+
+셋을 나란히 놓고서야 보였다 — micrometer 의 `payloadOf()` 가 `{ ...st, session }` 이라
+**상태를 통째로** 보내고 있었다. `session.log`(조작 기록) · `undosLeft` · `readStages` ·
+기구의 마지막 상태까지. 그런데 `privacy.html` 제2조는 **그 넷을 이름까지 짚어**
+「기기 안에만 있고 전송하지 않습니다」라고 적어 두었다. **학생이 읽는 고지가 이 실험에
+대해 거짓이었다.**
+
+banana·osmosis 는 허용 목록을 쓰는데 micrometer 만 아니었다. 빼는 목록은 새 값이 생길
+때마다 조용히 새고, **보낼 목록은 새 값이 생겨도 안 샌다.** 셋 다 후자로 맞췄다.
+
+★ **이 실험에만 그 검사가 없었다.** 검사가 있었으면 그날 울었다. 「검사가 없는 것보다
+있는 것처럼 보이는 것이 나쁘다」의 짝은 **「어떤 실험에만 없는 것」**이다 —
+전체가 초록불이니 아무도 그 실험을 따로 세어 보지 않는다.
+
+#### 문구를 맞대는 검사는 실험이 늘면 **말씨 싸움**이 된다
+
+osmosis 는 「보내는 키 → 방침의 어느 **문구**가 덮는가」 표를 손으로 들고 있었다.
+방침이 사이트에 하나뿐이 되는 순간 실험 여덟이 저마다 자기 문장을 그 한 문서에 요구한다 —
+「활동 설정」이냐 「난이도」냐. **고지가 맞는지와 아무 상관이 없는 싸움이다.**
+`<dt data-sends="키,키">` 로 **키끼리** 맞대게 바꿨다.
+
+#### 반대 방향은 실험이 판정할 수 없다 — 사이트가 가져야 한다
+
+「방침이 받는다는데 안 보낸다」를 실험 검사에 두면, `slides`(banana 만 보낸다)를 보고
+osmosis 가 「나는 안 보내니 지워라」고 말한다. **실험이 늘 때마다 고지가 깎여 나간다.**
+방침은 여덟이 보내는 것의 **합집합**이므로 합집합을 아는 자리가 갖는다 (`tests/site.test.js`).
+
+#### 「자기 것은 뺀다」는 검사는 **자기가 틀린 것**을 못 본다
+
+osmosis 의 `canonical` 이 따로 서 있던 시절 주소(`osmosis-virtual-lab.vercel.app/`)를
+그대로 달고 있었다. 「다른 실험의 배포 주소를 가리키지 않는다」는 `manifest.id` 로 자기
+주소를 빼므로 **이름에 osmosis 가 들었다는 이유로 통과**했다. micrometer 는 반대로
+`canonical` 이 **아예 없었다** — 「정해지면 넣는다」고 적어 두고 정해진 뒤에도 아무도 안 왔다.
+**비워 둔 자리는 아무 검사도 울지 않는다.** 사이트 검사로 옮겼다.
+
+#### 합치면서 조용히 깨진 것은 **꺼져 있는 기능**에 숨는다
+
+교사가 나눠 주는 두 링크가 둘 다 죽어 있었다 — 학생용은 `/?exp=…&code=…`(뿌리가
+카탈로그가 되면서 아무도 안 읽는다), 관리용은 `/teacher.html`(그 파일은 실험 폴더 안이라 404).
+**제출 기능이 꺼져 있어서(설정 없음) 아무도 못 밟았을 뿐이다.** 켜는 날 처음 밟는다.
+공용 `createClass()` 에 `exp = 'banana'` 기본값이 남아 있던 것도 같은 종류다 —
+빠뜨리면 그 반이 통째로 banana 수업이 되고, **화면은 멀쩡히 열린다.**
+
+#### 커밋 게이트 안의 검사가 실험 하나만 보고 있었다
+
+`npm run check` 가 「애셋 15종 · 위반 없음」이라고 말해 왔는데 그건 **banana 만**이었다.
+3단계에서 micrometer 를 들일 때 아무도 린터 머리의 `experiments/banana/…` 를 안 봤다.
+폴더를 읽어 도는 것으로 바꾸니 **52종 118상태**가 됐다.
+폴더를 읽는 방식의 대가는 「0종 검사하고 초록불」이라, 애셋을 한 종도 못 읽은 실험이
+있으면 빨간불이 나게 막아 두었다.
+
+#### 무엇을 올렸나 — 그리고 무엇을 **안** 올렸나
+
+| 올린 것 | 왜 |
+|---|---|
+| `teacher.js` | 저장소 **여덟**에서 바이트까지 같음 |
+| `ui/qr.js` · `ui/start.js` | 세 사본이 바이트까지 같음 |
+| `net/supabase.js` | **코드**가 셋 다 같음 (주석만 달랐다 — 합쳤다) |
+| `style/tokens.js` | 「diff 0 이어야 한다」가 **사람이 지키는 규칙**이었다 |
+
+`tokens.js` 는 값만 올리고 **실험의 자리에는 다시-내보내기 한 줄**을 남겼다 —
+애셋 예순 곳과 복제 절차가 그 자리를 안다. 한 줄인지를 사이트 검사가 지킨다.
+
+**안 올린 것:** 바이트까지 같은 애셋 아홉(`bin`·`coverbox`·`coverslip`·`forceps`·
+`microscope`·`sink`·`slidebox`·`tissue`·`waste`). `contract.js` 가 실험마다 다르고,
+애셋을 올리려면 그 아홉의 **계약 항목까지 갈라내야** 한다. 5단계에서 실험이 더 붙은 뒤에
+한 번에 하는 편이 싸다.
+
 ### 주소 되쓰기는 **로컬로 확인할 수 없다**
 
 `vercel.json` 의 `rewrites` 는 `vite preview` 가 안 읽는다. `/cell-metabolism/banana` 가
@@ -274,13 +415,27 @@ lab/
 
 ### 합치기 전 체크리스트 (실험마다)
 
+옮기기 **전에**, 그 실험 저장소에서:
+
 - [ ] `npm run check` 통과
 - [ ] `node scripts/check-bench.mjs` 통과
 - [ ] `npm run build && npm run preview` 후 `node scripts/check-build.mjs` 통과
 - [ ] 브라우저에서 처음부터 끝까지 직접 플레이했고 콘솔 에러 0건
 - [ ] 이 실험의 색이 전부 `src/style/palette.experiment.js` 에 있고 `tokens.js` 는 diff 0건
-- [ ] `PROGRESS.md` 가 **이 실험의** 기록이고, 바나나랩 기록은 `docs/banana-progress.md` 에 있음
 - [ ] 하드 게이트를 새로 추가하지 않았음
+
+옮긴 **뒤에**, 합친 저장소에서 (셋 다 4단계에서 실제로 걸렸습니다):
+
+- [ ] `npm run check` 통과 — 검사 수가 **늘었는지** 확인하세요. 안 늘었으면 글로브가
+      그 실험을 못 찾은 것이고, **0건을 검사하고 초록불**이 난 것입니다
+- [ ] `npm run check:art` 가 그 실험 이름을 **출력에 적는지** — 「실험 N종(…)」 줄을 보세요
+- [ ] `EXP=<실험> node scripts/check-build.mjs` 통과
+- [ ] **`payloadOf()` 가 허용 목록인가** — `{ ...st }` 로 담고 있으면 방침에 없는 것이
+      나갑니다. 이 실험만 검사가 없으면 아무도 모릅니다
+- [ ] **`canonical` 이 `virtual-biolab.vercel.app/cell-metabolism/<실험>` 인가** —
+      따로 서 있던 시절 주소는 「자기 이름이 들었다」는 이유로 옛 검사를 통과합니다
+- [ ] 배포한 뒤 `/cell-metabolism/<실험>` 을 **직접 두드려 보기** —
+      되쓰기는 로컬에서 아무 말도 하지 않습니다 (아래 참고)
 
 ---
 
