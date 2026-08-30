@@ -40,8 +40,27 @@ import { UI } from '../experiments/banana/src/ui/strings.js';   // 개수는 손
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
 
-/** 이 검사가 훑는 실험. 실험 하나를 처음부터 끝까지 몰아 보는 검사라 하나를 고른다. */
-const EXP = process.env.EXP ?? 'banana';
+/*
+ * 이 검사가 훑는 실험.
+ *
+ * ★ **주소만 갈린다. 걸음표는 아직 banana 것이다.** 아래 「처음부터 끝까지 해 본다」는
+ *   `predict.A` · 바나나 문지르기처럼 **그 실험에만 있는 조작**을 손으로 부른다.
+ *   다른 실험을 넣으면 그 자리에서 30초 기다렸다 죽는다 — 그러면 **왜 죽었는지**보다
+ *   「검사가 깨졌다」로 읽히므로, 여기서 먼저 말한다.
+ *
+ *   실험마다 걸음표를 갖게 하려면 각 실험이 자기 걸음표를 내보내야 한다
+ *   (`experiments/<id>/tests/walkthrough.js` 같은 자리). 5단계 일감이다.
+ */
+const WALKTHROUGH_FOR = 'banana';
+const EXP = process.env.EXP ?? WALKTHROUGH_FOR;
+if (EXP !== WALKTHROUGH_FOR) {
+  console.log(`\n이 검사의 **걸음표**는 아직 ${WALKTHROUGH_FOR} 것뿐입니다 (EXP=${EXP} 를 주셨습니다).`);
+  console.log('  주소는 갈리지만 조작이 안 갈립니다 — 그대로 돌리면 없는 단추를 30초 기다리다 죽습니다.');
+  console.log('  · 지금 잴 수 있는 것:  node scripts/check-build.mjs        (banana)');
+  console.log('  · 다른 실험을 재려면 그 실험의 걸음표를 먼저 만들어야 합니다');
+  console.log('    (`MERGE-AND-DEPLOY.md` §「지금 어디까지 왔나」 — 5단계 일감)\n');
+  process.exit(1);
+}
 const BASE = process.env.BASE ?? expPreviewUrl(EXP);
 const out = [];
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });

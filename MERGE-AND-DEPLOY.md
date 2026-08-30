@@ -28,12 +28,21 @@ osmosis 는 고쳤기 때문에 **자기 문서를 `experiments/osmosis/` 안에
 언젠가 banana 것도 `experiments/banana/` 로 내리는 편이 낫습니다
 (`AGENTS.md`·`CLAUDE.md`·작업 카드 스무 곳이 `docs/…` 를 가리켜서 미뤘습니다).
 
-**② 브라우저·성능 검사 넷이 아직 banana 를 손으로 가리킵니다.**
-`check-bench.mjs` · `check-ui.mjs` · `check-grading.mjs` · `perf-fov.mjs` 가
-`experiments/banana/…` 를 박아 두고 있습니다 — **micrometer 와 osmosis 는 이 넷에
-한 번도 걸리지 않았습니다.** `check-build.mjs` 는 `EXP=<실험>` 으로 고를 수 있게 해 두었으니
-나머지 넷도 같은 모양으로 가세요. 아트 디렉션 린터는 4단계에서 폴더를 읽어 도는 것으로
-바꿨습니다 (그 전까지 「애셋 15종 위반 없음」은 **banana 만** 잰 값이었습니다).
+**② 브라우저·성능 검사 다섯이 아직 banana 만 잽니다.**
+`check-bench.mjs` · `check-ui.mjs` · `check-grading.mjs` · `perf-fov.mjs` · `check-build.mjs` —
+**micrometer 와 osmosis 는 이 다섯에 한 번도 걸리지 않았습니다.**
+
+여기서 갈라야 하는 것이 둘입니다. **주소**를 박아 둔 것은 상수만 갈면 되지만,
+**걸음표**(무엇을 어떤 차례로 누르는가)는 그 실험에만 있는 조작을 부릅니다 —
+`check-build.mjs` 는 `predict.A` · 바나나 문지르기를 손으로 누릅니다.
+`EXP=<실험>` 을 받게 해 두었지만 **주소만 갈립니다.** 다른 실험을 주면 그 자리에서
+「걸음표는 아직 banana 것뿐입니다」라고 말하고 멎습니다 (30초 기다리다 죽는 것보다 낫습니다).
+
+실험마다 걸음표를 갖게 하려면 각 실험이 자기 걸음표를 내보내야 합니다
+(`experiments/<id>/tests/walkthrough.js` 같은 자리). **5단계 일감입니다.**
+
+아트 디렉션 린터는 4단계에서 폴더를 읽어 도는 것으로 바꿨습니다 — 그 전까지
+「애셋 15종 위반 없음」은 **banana 만** 잰 값이었습니다 (지금은 52종 118상태).
 
 ---
 
@@ -429,7 +438,8 @@ osmosis 의 `canonical` 이 따로 서 있던 시절 주소(`osmosis-virtual-lab
 - [ ] `npm run check` 통과 — 검사 수가 **늘었는지** 확인하세요. 안 늘었으면 글로브가
       그 실험을 못 찾은 것이고, **0건을 검사하고 초록불**이 난 것입니다
 - [ ] `npm run check:art` 가 그 실험 이름을 **출력에 적는지** — 「실험 N종(…)」 줄을 보세요
-- [ ] `EXP=<실험> node scripts/check-build.mjs` 통과
+- [ ] `node scripts/check-build.mjs` 통과 (**banana 걸음표**로 사이트가 성한지 확인.
+      그 실험 자체를 브라우저로 훑으려면 걸음표를 따로 만들어야 합니다 — 위 상자 ②)
 - [ ] **`payloadOf()` 가 허용 목록인가** — `{ ...st }` 로 담고 있으면 방침에 없는 것이
       나갑니다. 이 실험만 검사가 없으면 아무도 모릅니다
 - [ ] **`canonical` 이 `virtual-biolab.vercel.app/cell-metabolism/<실험>` 인가** —
