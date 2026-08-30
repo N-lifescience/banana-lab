@@ -1,5 +1,11 @@
 /**
- * Supabase 와 이야기하는 유일한 창구.
+ * Supabase 와 이야기하는 유일한 창구. **사이트에 하나뿐이다.**
+ *
+ * ── 왜 공용인가 (합치기 4단계, 2026-08-30) ───────────────────────────
+ * 실험 세 벌의 이 파일이 **코드가 한 글자도 다르지 않았다** (주석만 달랐다).
+ * 표 두 개에 넣고 빼는 일에 실험의 사정이 들어갈 자리가 없기 때문이다.
+ * 사본으로 두면 아래 「환경변수를 통째로 읽지 않는다」 같은 것을 고칠 때
+ * **여덟 번 고쳐야 하고, 그중 하나를 빠뜨리면 그 실험만 조용히 샌다.**
  *
  * ── 왜 라이브러리를 안 쓰는가 ────────────────────────────────────────
  * `@supabase/supabase-js` 는 인증·실시간·저장소까지 들고 온다. 여기서 필요한 것은
@@ -23,21 +29,24 @@
  * `const env = import.meta.env` 처럼 통째로 읽으면 Vite 가 **VITE_ 로 시작하는 환경변수를
  * 전부** 번들에 박아 넣는다. Vercel 은 시스템 값 스물몇 개를 `VITE_VERCEL_*` 로 자동
  * 노출하므로, 그 순간 **커밋한 사람의 실명과 커밋 메시지가 학생 브라우저로 그대로 나간다.**
- * 지어낸 걱정이 아니라 이 저장소의 배포본에서 직접 확인했다 (26개 · 약 2.2 KB):
+ * 실제로 그랬다. 배포본 번들을 받아서 셌다 (26개 · 약 2.2 KB):
  *
  *     VITE_VERCEL_GIT_COMMIT_AUTHOR_NAME: `조성주`
- *     VITE_VERCEL_GIT_COMMIT_MESSAGE:     `머리글이 검사와 반대말을 하고 있었다 — …`
+ *     VITE_VERCEL_GIT_COMMIT_MESSAGE:     `안내서의 낡은 줄 — …`
  *     VITE_VERCEL_PROJECT_ID · DEPLOYMENT_ID · 팀 슬러그 …
+ *     조성주  1회 · VERCEL_  19회 · GIT_COMMIT  5회 · COMMIT_AUTHOR  2회
  *
  * 비밀값은 아니지만 **아무도 그러라고 하지 않은 것**이고, 이 저장소는 사람 이름을 안 싣는다
  * (`Projects/CLAUDE.md`). 이름을 하나씩 적어 읽으면 Vite 는 **그 두 개만** 바꿔 넣는다.
  *
- * ★ **`?.` 를 쓰지 않는다.** Vite 는 `import.meta.env.VITE_X` 라는 **글자 그대로**를 찾아
- *   바꾼다. 물음표가 끼면 못 찾고 **다시 객체를 통째로 박는다** — 고침이 그 자리에서 무효다.
- *   (fermentation 세션이 짚어 허브를 거쳐 넘겨 주었다)
+ * ★ **`?.` 를 끼우면 안 된다.** Vite 는 `import.meta.env.VITE_X` 라는 **글자 그대로**를
+ *   찾아 바꾼다. 물음표가 들어가면 못 찾고 **다시 객체를 통째로 박는다** —
+ *   고침이 그 자리에서 무효가 된다. (fermentation 세션이 짚어 허브를 거쳐 넘겨 주었다)
  *
  * 순수 node(테스트)에서는 `import.meta.env` 자체가 없어서 읽는 순간 터진다.
  * 그래서 감싼다 — 모듈을 불러 보는 것만으로 죽으면 안 된다.
+ * (웨이브 1 의 micrometer 세션이 배포 번들을 열어 보고 찾았고, osmosis·fermentation 이
+ *  각자 사본에 덧붙여 둔 것을 여기로 합쳤다)
  */
 const { url: RAW_URL, key: RAW_KEY } = (() => {
   try {
@@ -132,7 +141,14 @@ function randomToken() {
  * 수업을 연다. 코드가 겹치면 몇 번 다시 뽑는다 — 90만 개 중 하나라 실제로는 거의 안 겹친다.
  * @returns {Promise<{id:string, code:string, teacherToken:string, expiresAt:string}>}
  */
-export async function createClass({ exp = 'banana', title = '', days = 30 } = {}) {
+export async function createClass({ exp, title = '', days = 30 } = {}) {
+  /*
+   * ★ **기본값을 두지 않는다.** 앞서 여기는 `exp = 'banana'` 였다. 실험이 하나였을 때는
+   *   편했지만, 공용이 된 지금 부르는 쪽이 한 번 빠뜨리면 **그 반이 통째로 banana 수업으로
+   *   기록된다** — 선생님 화면은 멀쩡히 열리고, 학생도 제출에 성공하고, 아무도 모른다.
+   *   빠뜨린 것을 조용히 메우지 말고 여기서 멎는다. (합치기 4단계, 2026-08-30)
+   */
+  if (!exp) throw new NetError('어느 실험의 수업인지(exp)를 안 넘겼습니다.');
   const teacherToken = randomToken();
   const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
 

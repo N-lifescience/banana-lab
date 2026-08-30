@@ -83,7 +83,7 @@ export const UI = {
     cancel: '취소',
 
     /* ── 선생님께 제출 ─────────────────────────────────────────────
-       제출 기능은 Supabase 가 설정돼 있을 때만 화면에 나온다 (src/net/supabase.js).
+       제출 기능은 Supabase 가 설정돼 있을 때만 화면에 나온다 (packages/lab-kit/net/supabase.js).
        설정하지 않은 학교에서는 이 문구들이 아예 안 쓰인다. */
     submit: {
       button: '선생님께 제출',

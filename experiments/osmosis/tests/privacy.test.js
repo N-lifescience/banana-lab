@@ -150,7 +150,7 @@ test('조 번호를 가리키는 본문이 실제 그 조를 가리킨다', () =
 });
 
 test('제출이 표에 채우는 칸이 방침에 다 적혀 있다', () => {
-  const src = readFileSync(new URL('../src/net/supabase.js', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../../../packages/lab-kit/net/supabase.js', import.meta.url), 'utf8');
   const fn = src.slice(src.indexOf('export async function submitReport'));
   // `body: {` **다음**부터 자른다 — 여는 자리를 포함하면 `body` 자신이 칸으로 세어진다.
   const open = fn.indexOf('body: {') + 'body: {'.length;

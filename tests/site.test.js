@@ -200,3 +200,92 @@ test('실험마다 canonical 이 이 사이트의 자기 자리를 가리킨다'
     `자기 자리가 아닌 곳을 가리키는 실험이 있습니다:\n`
     + wrong.map(([id, u]) => `  ${id}  ${u}`).join('\n'));
 });
+
+/*
+ * ── 선생님 화면은 사이트에 하나뿐이다 ────────────────────────────────
+ *
+ * `teacher.js` 는 **저장소 여덟에서 바이트까지 같았다.** 실험마다 복제하면 고칠 때
+ * 여덟 번 고치게 되고, 그중 하나를 빠뜨리면 그 실험의 선생님만 옛 화면을 본다.
+ * 4단계에서 `packages/lab-kit/teacher.js` 로 올렸고, 페이지도 뿌리로 왔다.
+ *
+ * 그래서 실험 검사가 보던 것들(제목이 남의 실험을 말하는가 …)의 주인이 여기가 됐다.
+ * (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
+ */
+test('선생님 화면이 실험 하나의 이름을 달고 있지 않다', () => {
+  const html = read('teacher.html');
+  const title = titleOf(html);
+  const siteTitle = titleOf(read('index.html'));
+  assert.ok(title.includes(siteTitle),
+    `선생님 화면의 제목이 사이트 이름을 안 담습니다:\n  화면  "${title}"\n  사이트 "${siteTitle}"`);
+  /*
+   * 실험 **이름**으로 본다. id 로만 보면 「바나나에서 …」 같은 한글 제목을 못 잡는다 —
+   * 3단계에서 방침 제목이 정확히 그 모양으로 남아 있었다.
+   */
+  for (const id of EXPERIMENTS) {
+    assert.ok(!title.includes(id), `선생님 화면의 제목이 실험 하나(${id})를 가리킵니다: "${title}"`);
+  }
+  assert.match(html, /<script type="module" src="\/src\/teacher\.js"><\/script>/,
+    'teacher.html 이 뿌리의 진입점(/src/teacher.js)을 안 부릅니다');
+});
+
+/*
+ * ★ **교사가 나눠 주는 두 링크가 맞는가.** 이 자리는 합치면서 **둘 다 조용히 깨졌다** —
+ *   학생용은 `/?exp=…&code=…` 였는데 뿌리가 카탈로그가 되면서 아무도 그 값을 안 읽고,
+ *   관리용은 `/teacher.html` 이었는데 그 파일이 실험 폴더 안에 있어 404 였다.
+ *   **교사는 그 링크를 학습지에 인쇄해 나눠 준다. 틀린 채로 나가면 되돌릴 수 없다.**
+ *   제출 기능이 아직 꺼져 있어(설정 없음) 아무도 못 밟았을 뿐이다.
+ */
+test('교사가 나눠 주는 두 링크가 이 사이트의 실제 주소를 가리킨다', () => {
+  const src = read('src/teacher.js');
+  const base = src.match(/const EXP_BASE = '([^']+)'/)?.[1];
+  assert.ok(base, 'src/teacher.js 에 EXP_BASE 가 없습니다');
+
+  // ① 실험 주소의 앞자리가 되쓰기 규칙과 같은가 — 다르면 학생 링크가 404 다
+  const rewrites = JSON.parse(read('vercel.json')).rewrites ?? [];
+  const sources = rewrites.map((r) => r.source);
+  assert.ok(sources.includes(`${base}/:exp`),
+    `EXP_BASE("${base}")를 받아 주는 되쓰기가 vercel.json 에 없습니다.\n`
+    + `  있는 것: ${sources.join(' · ') || '(없음)'}\n`
+    + '  → 학생이 여는 링크가 404 가 됩니다. 로컬에서는 이 자리가 아무 말도 하지 않습니다.');
+
+  // ② 카탈로그가 학생에게 보이는 주소와 같은가 — 두 곳이 갈라지면 하나는 죽는다
+  const catalog = [...read('index.html').matchAll(/href="(\/[a-z-]+)\/([a-z-]+)"/g)];
+  const linked = catalog.filter(([, , id]) => EXPERIMENTS.includes(id));
+  assert.ok(linked.length > 0, '카탈로그에서 실험 링크를 하나도 못 찾았습니다 — 검사가 헛돌고 있습니다');
+  const odd = [...new Set(linked.map(([, b]) => b))].filter((b) => b !== base);
+  assert.deepEqual(odd, [],
+    `카탈로그가 EXP_BASE 와 다른 앞자리를 씁니다: ${odd.join(' · ')} (EXP_BASE 는 "${base}")`);
+
+  // ③ 관리 링크가 `exp` 를 싣는가 — 없으면 링크를 다시 열었을 때 어느 실험인지 모른다
+  const admin = src.slice(src.indexOf('admin: (token)'));
+  assert.ok(/exp=\$\{encodeURIComponent\(manifest\.id\)\}/.test(admin),
+    '관리 링크가 exp 를 안 싣습니다.\n'
+    + '  → 선생님이 그 링크를 다시 열면 어느 실험의 종이로 그려야 할지 알 수 없습니다.\n'
+    + '    잃어버리면 되찾을 길이 없는 링크라, 틀린 채로 나가면 그 반이 통째로 막힙니다.');
+
+  // ④ `.html` 을 붙이지 않았는가 — cleanUrls 가 308 로 되돌린다
+  assert.ok(!/\/teacher\.html/.test(src),
+    'src/teacher.js 가 /teacher.html 을 가리킵니다 — cleanUrls 가 308 로 되돌립니다');
+});
+
+test('선생님 화면이 아는 실험 목록이 실제 폴더와 같다', () => {
+  const listed = read('src/teacher.js')
+    .match(/const EXPERIMENTS = \[([^\]]*)\]/)?.[1]
+    ?.match(/'([^']+)'/g)?.map((s) => s.slice(1, -1)) ?? [];
+  assert.deepEqual([...listed].sort(), [...EXPERIMENTS].sort(),
+    `선생님 화면의 실험 목록이 폴더와 어긋납니다:\n`
+    + `  목록  ${listed.join(' · ') || '(비었음)'}\n  폴더  ${EXPERIMENTS.join(' · ')}\n`
+    + '  → 빠진 실험은 수업을 열 수 없고, 없는 실험은 고르면 빈 화면이 뜹니다.');
+});
+
+/*
+ * **실험을 늘리고 여기를 안 늘리면 그 실험은 배포본에 아예 안 실린다.**
+ * 로컬 개발 서버에서는 멀쩡히 열리므로 **배포한 뒤에야** 안다.
+ */
+test('실험마다 빌드 진입점이 있다', () => {
+  const cfg = read('vite.config.js');
+  const missing = EXPERIMENTS.filter((id) => !cfg.includes(`experiments/${id}/index.html`));
+  assert.deepEqual(missing, [],
+    `vite.config.js 의 input 에 없는 실험이 있습니다: ${missing.join(', ')}\n`
+    + '  → 그 실험은 배포본에 안 실립니다. 개발 서버에서는 멀쩡히 열려서 배포 뒤에야 압니다.');
+});

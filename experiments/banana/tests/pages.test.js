@@ -25,7 +25,7 @@ import { UI } from '../src/ui/strings.js';
 import { manifest } from '../src/manifest.js';
 
 /** 배포본에 실제로 실리는 페이지. 하네스(harness.html)는 빌드에 안 들어간다. */
-const PAGES = ['index.html', 'teacher.html'];   // 방침은 사이트 것 — tests/site.test.js 가 본다
+const PAGES = ['index.html'];   // 방침·선생님 화면은 사이트 것 — tests/site.test.js 가 본다
 
 /**
  * **이 실험에 없는** 재료·현상 낱말. 복제하면 여기만 갈아 끼운다.
@@ -51,9 +51,14 @@ const EXPERIMENT_IDS = [
 
 /*
  * ★ **실험 것과 사이트 것이 서로 다른 자리에 있다.**
- *   `index.html`·`teacher.html` 은 이 실험 폴더에 있고, **개인정보처리방침은 사이트 전체
- *   것**이라 뿌리에 있다. 실험이 여덟이어도 방침은 하나다 — 실험마다 복제하면
- *   고칠 때 여덟 번 고치게 된다. (합치기 2단계, 2026-08-29)
+ *   `index.html` 은 이 실험 폴더에 있고, **방침과 선생님 화면은 사이트 전체 것**이라
+ *   뿌리에 있다. 실험이 여덟이어도 방침은 하나다 — 실험마다 복제하면 고칠 때
+ *   여덟 번 고치게 된다. (합치기 2단계, 2026-08-29)
+ *
+ * ★ **`teacher.html` 이 여기서 빠졌다.** `teacher.js` 가 여덟 저장소에서 바이트까지
+ *   같아 `packages/lab-kit/` 으로 올렸고, 페이지도 뿌리로 갔다. 어느 실험의 수업인지는
+ *   주소(`?exp=`)로 정한다. **이 목록에 되살리지 말고** 사이트 검사에 맡긴다.
+ *   (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
  */
 const SITE_WIDE = new Set(['privacy.html']);
 const read = (name) => readFileSync(

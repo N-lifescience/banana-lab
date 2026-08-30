@@ -19,9 +19,12 @@ export default defineConfig({
         banana: 'experiments/banana/index.html',
         micrometer: 'experiments/micrometer/index.html',
         osmosis: 'experiments/osmosis/index.html',
-        // 선생님이 수업을 열고 제출물을 받는 화면. **아직 바나나에 얽혀 있다** —
-        // 엔진을 뽑을 때(§4 4단계) 뿌리로 올린다.
-        teacher: 'experiments/banana/teacher.html',
+        /*
+         * 선생님이 수업을 열고 제출물을 받는 화면. **사이트에 하나뿐이다** —
+         * 어느 실험의 수업인지는 주소(`?exp=`)로 정한다. 실험이 늘어도 이 줄은 안 는다.
+         * (합치기 4단계, 2026-08-30 — 여덟 저장소가 바이트까지 같아 가장 먼저 올렸다)
+         */
+        teacher: 'teacher.html',
       },
       output: { manualChunks: undefined }
     }

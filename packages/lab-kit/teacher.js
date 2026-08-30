@@ -1,5 +1,5 @@
 /**
- * 선생님 화면 — 수업을 열고, 제출된 보고서를 본다.
+ * 선생님 화면 — 수업을 열고, 제출된 보고서를 본다. **사이트에 하나뿐이다.**
  *
  * ── 로그인이 없다 ──────────────────────────────────────────────────
  * 계정을 만들면 학교마다 계정 관리가 따라온다. 대신 **관리 링크**를 쓴다 — 주소 안의
@@ -9,27 +9,78 @@
  * ── 여기서 하지 않는 것 ────────────────────────────────────────────
  * 채점하지 않는다. 통계를 내지 않는다. 학생 정보를 이 화면 밖으로 내보내지 않는다.
  * 하는 일은 셋뿐이다 — 수업 열기 · 제출물 보기 · 지우기.
+ *
+ * ── 왜 공용으로 올라왔는가 (합치기 4단계, 2026-08-30) ─────────────────
+ * 이 파일은 **저장소 여덟에서 바이트까지 같았다** (`cmp` 로 여덟 번 확인).
+ * 「세 번 똑같이 생긴 것만 올린다」는 규칙은 **모르는 것을 셋으로 확인하라**는 뜻이지,
+ * 이미 여덟 번 확인한 것을 미루라는 뜻이 아니다 — 그래서 4단계에서 가장 먼저 올렸다.
+ * `teacher.html` 도 제목 한 줄만 달랐고, 그 제목은 이미 `manifest` 에 있다.
+ *
+ * ── 실험의 것은 **주입받는다** (`MERGE-AND-DEPLOY.md` §3.3) ───────────
+ * 문구·매니페스트·보고서 종이는 실험마다 다르다. 엔진이 직접 갖지 않고 받는다.
+ * 받는 것은 다섯뿐이다:
+ *
+ *     UI          이 실험의 문자열 (`UI.teacher` 를 쓴다)
+ *     manifest    이 실험의 id — 어느 실험의 수업인지 표에 적는 값
+ *     buildSheet  제출된 것을 **다시 그리는** 함수. 실험마다 종이가 다르다
+ *     escapeHtml  이 실험의 것. 한 줄짜리지만 종이와 같은 것을 써야 한다
+ *     links       학생용·관리용 주소를 만드는 두 함수. **사이트의 라우팅**이라
+ *                 엔진이 알면 안 된다 (아래 `studentUrl` 주석)
+ *
+ * 다섯 다 **어느 실험인지 정해진 뒤에야** 안다. 그래서 진입점(`src/teacher.js`)이
+ * 주소에서 실험을 읽어 그 실험 것을 실어 온다.
  */
 
-import { UI } from './ui/strings.js';
-import { manifest } from './manifest.js';
 import { qrSVG } from './ui/qr.js';
-import { buildSheet } from './ui/report.js';
-import { escapeHtml } from './ui/notebook.js';
 import {
   enabled, createClass, findClassByToken, listReports, deleteReport, closeClass,
 } from './net/supabase.js';
 
-const T = UI.teacher;
+/*
+ * 주입받은 것을 담는 자리. `mountTeacher()` 를 부르기 전에는 비어 있다 —
+ * 이 파일은 **어느 실험인지 모르는 채로** 불러도 아무 일이 없어야 한다.
+ */
+let T = null;
+let manifest = null;
+let buildSheet = null;
+let escapeHtml = null;
+let links = null;
+
+function bind(deps) {
+  const missing = ['UI', 'manifest', 'buildSheet', 'escapeHtml', 'links'].filter((k) => !deps?.[k]);
+  /*
+   * **앞 조건.** 하나라도 빠지면 화면은 「제출물 0건」 같은 **그럴듯한 빈 화면**을 그린다.
+   * 선생님은 학생이 안 냈다고 읽는다. 조용히 비지 말고 여기서 멎는다.
+   */
+  if (missing.length) {
+    throw new Error(`선생님 화면에 넘겨야 할 것이 빠졌습니다: ${missing.join(', ')}`);
+  }
+  T = deps.UI.teacher;
+  ({ manifest, buildSheet, escapeHtml, links } = deps);
+  if (!T) throw new Error('이 실험의 UI 에 teacher 문구가 없습니다 (UI.teacher)');
+  for (const k of ['student', 'admin']) {
+    if (typeof links[k] !== 'function') throw new Error(`links.${k}(…) 가 없습니다`);
+  }
+}
+
 const $ = (sel, root = document) => root.querySelector(sel);
 
 /** 관리 토큰은 주소에만 있다. 브라우저 저장소에 넣지 않는다 — 공용 컴퓨터가 많다. */
 const tokenFromUrl = () => new URLSearchParams(location.search).get('t') ?? '';
 
-const studentUrl = (code) =>
-  `${location.origin}/?exp=${encodeURIComponent(manifest.id)}&code=${encodeURIComponent(code)}`;
-const adminUrl = (token) =>
-  `${location.origin}/teacher.html?t=${encodeURIComponent(token)}`;
+/*
+ * ── 주소 만들기는 **사이트**의 일이다 (합치기 4단계, 2026-08-30) ────────
+ * 앞서 이 두 줄은 엔진 안에 있었고, 합친 뒤로 **둘 다 틀린 주소**를 냈다:
+ *
+ *     학생용   `${origin}/?exp=banana&code=…`   ← 뿌리는 이제 **카탈로그**다.
+ *                                                 `exp`·`code` 를 아무도 안 읽는다
+ *     관리용   `${origin}/teacher.html?t=…`      ← 그 파일은 실험 폴더 안에 있었다. 404
+ *
+ * 교사가 그 링크를 학습지에 인쇄해 나눠 준다. **틀린 채로 나가면 되돌릴 수 없다.**
+ * 엔진은 어느 주소 밑에 사는지 몰라야 하므로 진입점이 만들어 넘긴다.
+ */
+const studentUrl = (code) => links.student(code);
+const adminUrl = (token) => links.admin(token);
 
 const fmtDate = (iso) => {
   const d = new Date(iso);
@@ -310,18 +361,28 @@ async function renderBoard(root, token) {
 
 /* ------------------------------------------------------------------ */
 
-const app = $('#tc-app');
-$('#tc-title-h').textContent = T.title;
-$('#tc-lead').innerHTML = T.lead;
+/**
+ * 화면을 붙인다. **실험이 정해진 뒤에** 부른다.
+ *
+ * `document` 에서 세 자리를 찾는다 — `#tc-title-h` · `#tc-lead` · `#tc-app`.
+ * 그 셋은 `teacher.html` 이 갖고 있고, 실험과 무관한 껍데기다.
+ */
+export function mountTeacher(deps) {
+  bind(deps);
 
-if (!enabled()) {
-  app.innerHTML = `
-    <section class="tc-card">
-      <h2>${T.offTitle}</h2>
-      <p class="tc-hint">${T.offBody}</p>
-    </section>`;
-} else if (tokenFromUrl()) {
-  renderBoard(app, tokenFromUrl());
-} else {
-  renderCreate(app);
+  const app = $('#tc-app');
+  $('#tc-title-h').textContent = T.title;
+  $('#tc-lead').innerHTML = T.lead;
+
+  if (!enabled()) {
+    app.innerHTML = `
+      <section class="tc-card">
+        <h2>${T.offTitle}</h2>
+        <p class="tc-hint">${T.offBody}</p>
+      </section>`;
+  } else if (tokenFromUrl()) {
+    renderBoard(app, tokenFromUrl());
+  } else {
+    renderCreate(app);
+  }
 }

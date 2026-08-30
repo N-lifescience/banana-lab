@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { encodeQR, qrSVG } from '../src/ui/qr.js';
+import { encodeQR, qrSVG } from '../packages/lab-kit/ui/qr.js';
 
 /* ── 인코더와 독립적으로 다시 구현한 최소한의 되읽기 ─────────────── */
 
@@ -135,9 +135,17 @@ function decodeQR({ size, version, modules }) {
 
 /* ------------------------------------------------------------------ */
 
+/*
+ * 되읽기만 보는 표본이라 내용은 아무거나 되지만, **실제로 QR 에 실릴 모양**을 쓴다 —
+ * 교사가 나눠 주는 학생용 링크가 이 길이·문자 구성이다. 여기서 통과했다는 것이
+ * 그 링크에 대해 통과했다는 뜻이어야 한다.
+ *
+ * 실험 이름은 **긴 것**으로 하나 둔다. 짧은 것만 표본으로 두면 길이가 늘 때
+ * 판(version)이 커지는 자리를 한 번도 안 밟는다.
+ */
 const SAMPLES = [
   'https://virtual-biolab.vercel.app/cell-metabolism/banana?code=482013',
-  'https://virtual-biolab.vercel.app/cell-metabolism/banana?code=100000&level=1',
+  'https://virtual-biolab.vercel.app/cell-metabolism/chromatography?code=100000&level=1',
   'HELLO',
   'https://example.com/?code=999999&mode=solo',
 ];

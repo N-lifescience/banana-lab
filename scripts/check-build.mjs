@@ -23,18 +23,26 @@ import { previewUrl, expPreviewUrl } from '../dev-port.js';
 
 /*
  * ★ **사이트 것과 실험 것은 주소가 다르다.**
- *   `BASE` 는 이 실험(`/experiments/banana/`)이고, 개인정보처리방침은 **사이트 전체 것**이라
- *   뿌리에 있다. 실험 주소로 찾으면 못 찾고, 그런데 되쓰기 때문에 **HTTP 200 이 온다** —
- *   상태 코드만 보면 통과로 읽힌다. 제목까지 봐야 갈린다.
+ *   `BASE` 는 이 실험(`/experiments/<id>/`)이고, 개인정보처리방침과 **선생님 화면**은
+ *   사이트 전체 것이라 뿌리에 있다. 실험 주소로 찾으면 못 찾고, 그런데 되쓰기 때문에
+ *   **HTTP 200 이 온다** — 상태 코드만 보면 통과로 읽힌다. 제목까지 봐야 갈린다.
+ *
+ *   앞서 `SITE` 는 그냥 `BASE` 였다. 로컬에서는 둘이 우연히 맞았지만, 배포본을 잴 때
+ *   `BASE=…/cell-metabolism/banana` 를 주면 `SITE/privacy` 가
+ *   `…/cell-metabolism/banana/privacy` 가 된다. **뿌리는 주소의 origin 에서 뽑는다.**
+ *   (합치기 4단계, 2026-08-30)
  */
-const SITE = process.env.BASE ?? previewUrl();
+const SITE = process.env.SITE
+  ?? (process.env.BASE ? new URL(process.env.BASE).origin : previewUrl());
 import { benchLayout } from '../experiments/banana/src/ui/bench.js';
 import { UI } from '../experiments/banana/src/ui/strings.js';   // 개수는 손으로 적지 않고 여기서 세어 온다
 
 /** 실험대에 놓인 물건 수. 배치에서 세어 온다 — 적어 두면 물건을 하나 늘릴 때마다 어긋난다. */
 const ITEM_COUNT = benchLayout().length;
 
-const BASE = process.env.BASE ?? expPreviewUrl('banana');
+/** 이 검사가 훑는 실험. 실험 하나를 처음부터 끝까지 몰아 보는 검사라 하나를 고른다. */
+const EXP = process.env.EXP ?? 'banana';
+const BASE = process.env.BASE ?? expPreviewUrl(EXP);
 const out = [];
 const ok = (pass, name, detail = '') => out.push({ pass, name, detail });
 
@@ -282,15 +290,29 @@ if (ready) {
 
 /* ---------- 선생님 화면 ----------
    제출 서버를 설정하지 않은 배포본에서는 **꺼진 채로** 떠야 한다.
-   설정 안 한 학교에서 이 화면이 반쯤 도는 것이 가장 나쁘다. */
-const teacher = await page.goto(`${BASE}/teacher.html`, { waitUntil: 'networkidle' }).catch(() => null);
-ok(teacher?.status() === 200, '선생님 화면이 열린다', teacher ? `HTTP ${teacher.status()}` : '응답 없음');
+   설정 안 한 학교에서 이 화면이 반쯤 도는 것이 가장 나쁘다.
+
+   ★ **사이트 것이다.** 합치기 4단계에서 `packages/lab-kit/` 으로 올라가면서 페이지도
+     뿌리로 왔다. 앞서 여기는 `${BASE}/teacher.html`(= 실험 폴더 안)이었다. */
+const picker = await page.goto(`${SITE}/teacher`, { waitUntil: 'networkidle' }).catch(() => null);
+ok(picker?.status() === 200, '선생님 화면이 열린다', picker ? `HTTP ${picker.status()}` : '응답 없음');
+// 실험을 안 고르면 고르는 화면이 떠야 한다. 빈 화면이면 선생님이 할 수 있는 것이 없다.
+ok((await page.locator('#tc-app a[href^="?exp="]').count()) >= 1,
+   '실험을 안 골랐으면 고르는 목록이 뜬다');
+
+const teacher = await page.goto(`${SITE}/teacher?exp=${EXP}`, { waitUntil: 'networkidle' }).catch(() => null);
+ok(teacher?.status() === 200, '실험을 고르면 그 실험의 화면이 열린다',
+   teacher ? `HTTP ${teacher.status()}` : '응답 없음');
 const teacherText = await page.locator('body').innerText().catch(() => '');
 const configured = await page.locator('#tc-go').count() > 0;
 ok(configured || teacherText.includes('아직 설정되지 않았습니다'),
    '설정 여부에 따라 켜지거나 꺼진 채로 뜬다', configured ? '켜짐(수업 열기)' : '꺼짐(안내)');
 ok(!/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(await page.content()),
    '선생님 화면에 서비스 키가 새지 않는다');
+// 없는 실험을 고르면 **조용히 빈 화면**이 아니라 그렇다고 말해야 한다.
+await page.goto(`${SITE}/teacher?exp=없는실험`, { waitUntil: 'networkidle' }).catch(() => null);
+ok((await page.locator('body').innerText().catch(() => '')).includes('그런 실험이 없습니다'),
+   '없는 실험을 고르면 그렇다고 말한다');
 
 /* ---------- 개인정보처리방침 ----------
    자바스크립트가 그리는 링크는 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에 안 보인다.

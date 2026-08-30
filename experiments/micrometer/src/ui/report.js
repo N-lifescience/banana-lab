@@ -27,7 +27,7 @@ import {
 } from './notebook.js';
 import { UI } from './strings.js';
 import { manifest } from '../manifest.js';
-import { enabled as submitEnabled, findClass, submitReport } from '../net/supabase.js';
+import { enabled as submitEnabled, findClass, submitReport } from '../../../../packages/lab-kit/net/supabase.js';
 
 const R = UI.report;
 const N = UI.notebook;

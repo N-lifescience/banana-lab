@@ -13,10 +13,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { enabled, SUPABASE_URL, SUPABASE_ANON_KEY } from '../src/net/supabase.js';
+import { enabled, createClass, SUPABASE_URL, SUPABASE_ANON_KEY } from '../packages/lab-kit/net/supabase.js';
 
-const schema = readFileSync(new URL('../../../supabase/schema.sql', import.meta.url), 'utf8');
-const client = readFileSync(new URL('../src/net/supabase.js', import.meta.url), 'utf8');
+const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const client = readFileSync(new URL('../packages/lab-kit/net/supabase.js', import.meta.url), 'utf8');
 
 test('설정이 없으면 제출 기능은 꺼진 것으로 본다', () => {
   // 설정하지 않은 학교에서도 앱이 그대로 돌아야 한다. 켜지지 않은 것이 기본값이다.
@@ -83,8 +83,25 @@ test('개인정보 칸은 둘뿐이다', () => {
 
 test('개인정보처리방침이 제출 기능을 실제로 설명한다', () => {
   // 화면이 하는 일과 방침이 어긋나면, 그건 화면이 거짓말을 하는 것이다.
-  const policy = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
+  const policy = readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
   for (const must of ['선생님께 제출', '학번', '자동으로 삭제', '법정대리인', 'Supabase']) {
     assert.ok(policy.includes(must), `방침에 "${must}" 설명이 없습니다`);
   }
+});
+
+/*
+ * ── 어느 실험의 수업인지를 조용히 메우지 않는다 ─────────────────────
+ *
+ * 이 창구는 이제 **여덟 실험이 함께 쓴다.** 앞서 `createClass({ exp = 'banana' })` 로
+ * 기본값이 있었다 — 실험이 하나였을 때는 편했지만, 부르는 쪽이 한 번 빠뜨리면
+ * **그 반이 통째로 banana 수업으로 기록된다.** 화면은 멀쩡히 열리고, 학생도 제출에
+ * 성공하고, 선생님 화면에는 아무것도 안 뜬다 — 다른 실험의 수업을 보고 있으니까.
+ *
+ * **조용히 그럴듯하게 틀리는 것**이라 사람이 알아챌 길이 없다. 여기서 멎게 한다.
+ * (합치기 4단계, 2026-08-30)
+ */
+test('어느 실험인지 안 넘기면 수업을 안 만든다', async () => {
+  await assert.rejects(() => createClass({ title: '2학년 4반' }),
+    /exp/, 'exp 없이도 수업이 만들어집니다 — 기본값을 두지 마세요');
+  await assert.rejects(() => createClass(), /exp/);
 });
