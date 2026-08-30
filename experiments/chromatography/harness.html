@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>크로마토그래피 탐구 시뮬레이터 — 개발 하네스</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 28px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  .stage{background:var(--sunk);border-radius:5px;padding:10px;display:flex;justify-content:center}
+  .stage svg{width:100%;max-width:320px;height:auto;display:block}
+  #strip-slot svg{max-width:220px}
+  .ctrl{display:flex;flex-direction:column;gap:5px}
+  .ctrl .lab{display:flex;justify-content:space-between;font-size:12px;font-weight:600;
+    letter-spacing:.04em;color:var(--ink-mute)}
+  .ctrl .lab span{font-family:ui-monospace,monospace;color:var(--ink)}
+  input[type=range]{width:100%;accent-color:var(--indigo)}
+  input[type=range]:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  .seg{display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+  .seg button{flex:1;border:none;background:var(--surface);color:var(--ink-mute);
+    font:inherit;font-size:13px;padding:6px 4px;cursor:pointer;border-right:1px solid var(--rule)}
+  .seg button:last-child{border-right:none}
+  .seg button[aria-pressed="true"]{background:var(--indigo);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .meter{display:flex;flex-direction:column;gap:5px}
+  .meter .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .meter .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .meter .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute)}
+  .meter .cap b{font-family:ui-monospace,monospace;color:var(--ink);font-weight:500}
+  .hint{font-size:12.5px;color:var(--ink-mute)}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet{margin-top:18px}
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:760px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:6px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>크로마토그래피 탐구 시뮬레이터 — 개발 하네스</h1>
+  <p class="note" id="harness-note"></p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>애셋 — 거름종이 (라인 + 플랫)</h2>
+      <div class="stage" id="paper-slot"></div>
+      <div class="ctrl">
+        <div class="lab"><label for="spots">찍은 횟수</label><span id="v-spots"></span></div>
+        <input type="range" id="spots" min="0" max="20" step="1" value="14">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="spotMm">원점 지름</label><span id="v-spotMm"></span></div>
+        <input type="range" id="spotMm" min="20" max="120" step="1" value="20">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="fresh">시료 신선도</label><span id="v-fresh"></span></div>
+        <input type="range" id="fresh" min="0" max="100" value="100">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="grit">잎 부스러기</label><span id="v-grit"></span></div>
+        <input type="range" id="grit" min="0" max="100" value="0">
+      </div>
+      <p class="hint">원점을 크게 찍으면 띠가 굵어져 이웃과 겹칩니다. 말리고 다시 찍으면 커지지 않습니다.</p>
+    </div>
+
+    <div class="panel">
+      <h2>결과 — 거름종이 위의 색 띠</h2>
+      <div class="stage" id="strip-slot"></div>
+
+      <div class="ctrl">
+        <div class="lab"><label for="depth">전개액 깊이</label><span id="v-depth"></span></div>
+        <input type="range" id="depth" min="0" max="30" step="1" value="5">
+      </div>
+      <div class="ctrl">
+        <div class="lab"><label for="front">용매 전선 높이</label><span id="v-front"></span></div>
+        <input type="range" id="front" min="0" max="100" step="1" value="90">
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><span>원점을 그은 도구</span></div>
+        <div class="seg" id="marker" role="group" aria-label="원점을 그은 도구">
+          <button type="button" data-value="pencil" aria-pressed="true">연필</button>
+          <button type="button" data-value="pen">볼펜</button>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lab"><span>켜고 끄기</span></div>
+        <div class="seg" id="flags" role="group" aria-label="켜고 끄기">
+          <button type="button" data-flag="capped" aria-pressed="true">뚜껑 (차광)</button>
+          <button type="button" data-flag="markedFront" aria-pressed="true">전선 표시</button>
+          <button type="button" data-flag="rulerPlaced" aria-pressed="true">자</button>
+        </div>
+      </div>
+
+      <div class="meter">
+        <div class="bar"><div class="fill" id="q-fill"></div></div>
+        <div class="cap"><span>결과의 볼 만함</span><b id="q-value"></b></div>
+        <div class="hint" id="q-hint"></div>
+      </div>
+      <p class="hint">전개액 깊이를 원점(10 mm) 위로 올리면 띠가 통째로 사라집니다.
+        뚜껑을 끄면 청록·황록 두 띠가 먼저 옅어집니다.</p>
+    </div>
+  </div>
+
+  <div class="panel sheet" id="sheet-panel">
+    <h2>애셋 시트 — 전 종 대조</h2>
+    <div class="sheet-grid" id="asset-sheet"></div>
+  </div>
+</div>
+<script type="module" src="/experiments/chromatography/src/harness.js"></script>
+</body>
+</html>

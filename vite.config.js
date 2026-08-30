@@ -21,6 +21,9 @@ export default defineConfig({
         osmosis: 'experiments/osmosis/index.html',
         catalase: 'experiments/catalase/index.html',
         centrifuge: 'experiments/centrifuge/index.html',
+        chromatography: 'experiments/chromatography/index.html',
+        fermentation: 'experiments/fermentation/index.html',
+        germination: 'experiments/germination/index.html',
         /*
          * 선생님이 수업을 열고 제출물을 받는 화면. **사이트에 하나뿐이다** —
          * 어느 실험의 수업인지는 주소(`?exp=`)로 정한다. 실험이 늘어도 이 줄은 안 는다.

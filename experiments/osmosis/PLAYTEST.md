@@ -24,8 +24,8 @@
 npm run dev
 ```
 
-- 앱 — http://localhost:5175/
-- 애셋 손잡이 — http://localhost:5175/harness.html   ← 개발 서버에만 있습니다
+- 앱 — http://localhost:5173/experiments/osmosis/
+- 애셋 손잡이 — http://localhost:5173/experiments/osmosis/harness.html   ← 개발 서버에만 있습니다
 - 나머지는 위와 같습니다 (`?level=2` · `?edit=1` · `/teacher.html`)
 
 **「Port 5175 is already in use」가 뜨면** 남은 서버가 있는 것입니다:

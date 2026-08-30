@@ -1231,7 +1231,7 @@ B 는 그 문장으로 `tests/grading.holdout.test.js` 를 채운다. 자기 키
 | `germination` (웨이브 3) | **5180** | 6180 |
 
 `tests/devport.test.js` 가 스크립트에 주소를 다시 박는 것을 막는다. 급하면 환경변수로
-덮을 수 있다 — `BASE=http://localhost:5175 node scripts/check-bench.mjs`.
+덮을 수 있다 — `BASE=http://localhost:5173 node scripts/check-bench.mjs`.
 
 ---
 

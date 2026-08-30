@@ -32,7 +32,10 @@ const EXP_BASE = '/cell-metabolism';
  * 이 사이트에 있는 실험들. **여기 한 곳에만 적는다.**
  * 실험을 늘리면 이 줄과 `vite.config.js` 의 진입점 한 줄이 는다.
  */
-const EXPERIMENTS = ['banana', 'micrometer', 'osmosis', 'catalase', 'centrifuge'];
+const EXPERIMENTS = [
+  'banana', 'micrometer', 'osmosis', 'catalase',
+  'centrifuge', 'chromatography', 'fermentation', 'germination',
+];
 
 const params = new URLSearchParams(location.search);
 const exp = params.get('exp') ?? '';

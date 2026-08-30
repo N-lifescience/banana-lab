@@ -10,9 +10,9 @@
 npm run dev
 ```
 
-- 앱 — http://localhost:5179/
-- 애셋·결과 손잡이 — http://localhost:5179/harness.html
-- 배치 편집 — http://localhost:5179/?edit=1
+- 앱 — http://localhost:5173/experiments/centrifuge/
+- 애셋·결과 손잡이 — http://localhost:5173/experiments/centrifuge/harness.html
+- 배치 편집 — http://localhost:5173/experiments/centrifuge/?edit=1
 - 2·3단계 — `?level=2` · `?level=3`
 - 혼자/모둠 — `?mode=solo` · `?mode=group`
 
@@ -264,12 +264,12 @@ kill $(lsof -t -nP -iTCP:5179 -sTCP:LISTEN)
 
 ## 7. 손잡이(harness)와 배치 편집
 
-- http://localhost:5179/harness.html
+- http://localhost:5173/experiments/centrifuge/harness.html
   - 슬라이더를 끝에서 끝까지 흔들어 보세요. **「층이 갈린 정도」를 0 → 1 로** 올리면
     붉은 부분이 **길게 → 짧게**, **선홍 → 암적**으로 바뀌어야 합니다
   - **「응고」를 0.5 넘게** 올리면 이름표가 「혈장」 → 「혈청」으로 바뀌고 혈병이 생겨야 합니다
   - 아래 **애셋 시트**에서 열셋을 나란히 보세요 — 선 두께와 음영 방향이 한 벌로 보이는가
-- http://localhost:5179/?edit=1
+- http://localhost:5173/experiments/centrifuge/?edit=1
   - 물건을 끌어 옮겨도 **조작이 일어나지 않아야** 합니다 (소독솜을 손끝에 대도 소독 안 됨)
   - 「코드 복사」를 누르면 `defaultItems()` 에 붙여 넣을 코드가 나옵니다
 

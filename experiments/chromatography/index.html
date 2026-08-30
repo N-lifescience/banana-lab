@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>크로마토그래피로 식물의 잎에서 광합성 색소 분리하기</title>
+<!-- 보고서 "종이" 모양. 인쇄할 때만 필요하다 (teacher.html 도 같은 파일을 쓴다). -->
+<link rel="stylesheet" href="/report-sheet.css" media="print">
+<!-- 교사가 링크를 채팅방에 붙일 때 무엇인지 보이도록. 이미지는 두지 않는다 —
+     이 앱의 화면은 학생이 조작해서 만드는 것이라 대표 그림이 따로 없다. -->
+<meta name="description" content="관찰 실험을 웹에서 직접 해 보는 탐구형 가상실험. 시금치 잎에서 색소를 뽑아 종이 크로마토그래피로 나눕니다. 개인정보를 수집하지 않습니다.">
+<!-- 배포 주소가 정해져서 넣었다. 오래 비워 두었던 이유는 이렇다 —
+     복제해 온 그대로 두면 **바나나랩의 배포 주소**를 가리키는데, 그건 검색엔진에
+     「이 페이지는 저 사이트의 사본이니 저쪽을 색인하라」고 말하는 것이다.
+     그러면 이 실험이 검색에서 사라지고 링크 미리보기도 엉뚱한 주소를 단다.
+     **틀린 주소는 없는 주소보다 나쁘다** — 그래서 정해질 때까지 비워 두었다.
+     tests/pages.test.js 가 남의 배포 주소가 들어오는지 지킨다. -->
+<link rel="canonical" href="https://virtual-biolab.vercel.app/cell-metabolism/chromatography">
+<meta property="og:url" content="https://virtual-biolab.vercel.app/cell-metabolism/chromatography">
+<meta property="og:type" content="website">
+<meta property="og:title" content="크로마토그래피로 식물의 잎에서 광합성 색소 분리하기">
+<meta property="og:description" content="시금치 잎에서 색소를 뽑아 거름종이로 나누는 탐구형 가상실험. 색 띠 넷과 전개율을 직접 재어 봅니다.">
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C; --good:#2F6B4F; --warn:#9C5A12;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2; --good:#7EC6A2; --warn:#E3A868;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6}
+  /* 버튼은 배경까지 테마에서 가져온다.
+     color 만 물려받으면 브라우저 기본 배경(밝은 회색)에 밝은 글자가 얹혀
+     다크 모드에서 흰 바탕에 흰 글씨가 된다 — 버튼이 통째로 사라진다.
+     실제로 "결과 기록" 버튼이 그렇게 안 보였다. 개별 버튼마다 칠하지 말고 여기서 막는다. */
+  button{font:inherit;color:var(--ink);background:var(--sunk);
+    border:1px solid var(--rule);border-radius:5px;cursor:pointer}
+  :focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+
+  .layout{display:grid;grid-template-columns:1.5fr 1fr;gap:0;height:100vh}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;height:auto}}
+
+  /* 실험대 — 배경 애셋과 물건이 같은 4:3 무대를 쓴다.
+     따로 놀면 창 크기가 바뀔 때 물건이 선반에서 떠오른다. */
+  #bench{position:relative;overflow:auto;background:var(--sunk);display:flex;
+    flex-direction:column;gap:10px;padding:12px}
+  /* 실험대는 세로로 길어 패널을 넘칠 수 있다. 그때 도구 막대가 위로 밀려 사라지면
+     바이알에 종이가 서 있는지, 되돌릴 수 있는지를 볼 방법이 없어진다. 붙여 둔다. */
+  .bench-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    position:sticky;top:-12px;z-index:10;background:var(--sunk);padding:12px 0 8px;margin-top:-12px}
+  .bench-bar button{border:1px solid var(--rule);background:var(--surface);border-radius:5px;
+    padding:7px 12px;cursor:pointer;font-size:13px}
+  .bench-bar span{font-size:12.5px;color:var(--ink-mute);font-family:ui-monospace,monospace}
+  /* 실험실 벽. 애셋(실험대)은 아래쪽만 채우므로, 바탕을 깔지 않으면 위쪽이 페이지 배경이 된다 —
+     다크 모드에서는 검은 허공에 선반이 떠 있는 것처럼 보인다.
+     물건은 테마를 타지 않는 색으로 그려져 있으므로 벽도 두 테마에서 같은 색으로 둔다. */
+  /* **아이폰에서 실험대를 길게 누르면 돋보기와 글자 고르기가 떴다.**
+     물건(.token)에는 이미 걸어 두었는데 **무대 바탕·배경 그림에는 없었다** —
+     빈 자리를 길게 누르면 그대로 났다. 폰으로 직접 해 보고서야 알았다.
+
+     ★ `touch-action:none` 이 아니다. 그것을 걸면 **그 위에서 밀 때 쪽이 안 넘어간다** —
+       실험대는 화면 위쪽이라 거기서 미는 일이 잦다. `manipulation` 은 확대·더블탭만 막는다.
+     ★ **탐구 노트에는 절대 걸지 않는다.** `user-select:none` 이 붙으면 **붙여넣기가 죽는다.** */
+  .bench-stage{position:relative;width:100%;aspect-ratio:4/3;
+    background:#DDE3DA;border-radius:6px;touch-action:manipulation;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .bench-stage *{-webkit-touch-callout:none}
+  .bench-bg{position:absolute;inset:0}
+  .bench-bg svg{width:100%;height:100%;display:block}
+  .bench-tokens{position:absolute;inset:0}
+
+  /* 물건. width 는 realSizeMm 비율로 인라인 지정된다 — 여기서 크기를 덮어쓰지 말 것. */
+  /* 포인터는 **칠해진 곳에서만** 받는다.
+     애셋은 저마다 400×300 프레임을 채워 그리지만 실제로 칠해진 부분은 그보다 좁다 —
+     모세관은 높이 300 중 74 만 쓴다. 프레임 전체가 클릭을 받으면 눈에는 한참 떨어져 보이는
+     물건이 옆엣것을 덮어 못 잡게 되고, 작업면에 물건 일곱을 나란히 놓을 수조차 없다.
+     SVG 는 기본이 visiblePainted 라, 도형이 없는 여백은 그대로 통과한다. */
+  /* 손가락으로 끌 때 브라우저가 끼어들지 못하게 한다.
+     스마트폰에서 물건을 꾹 눌러 끌면 돋보기가 뜨고 「복사」 메뉴가 나와 끌기가 끊겼다.
+     touch-action 은 스크롤·확대만 막는다. 글자 고르기와 길게 누르기 메뉴는 아래 둘이 막는다. */
+  .token{position:absolute;background:none;border:none;padding:0;margin:0;cursor:grab;
+    touch-action:none;line-height:0;border-radius:6px;pointer-events:none;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  .token svg{width:100%;height:auto;display:block;pointer-events:auto;
+    -webkit-user-drag:none;
+    filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  /* 그림이 손가락보다 작은 물건(바이알, 거름종이)은 여백까지 잡아 준다.
+     그러지 않으면 12~28 px 짜리를 정확히 눌러야 한다. 작은 것만이므로 옆엣것을 덮지 않는다. */
+  .token[data-small="true"]::after{pointer-events:auto}
+  /* 끄는 물건은 살짝 비친다. 자(300 mm)처럼 큰 것을 끌 때 아래에 있는
+     거름종이의 강조 표시가 가려지면, 어디에 놓이는지 보이지 않는다. */
+  .token:active,.token--dragging{cursor:grabbing;z-index:5}
+  .token--dragging{opacity:.72}
+  .token:hover::after,.token:focus-visible::after{background:rgba(255,255,255,.18)}
+
+  /* 물건 이름표 — 늘 보인다. 마우스를 하나씩 올려 보기 전에는 실험대에 무엇이 있는지
+     알 수 없으면 안 된다. 겹치는 것만 --name-row 로 한 줄씩 내려간다 (bench.js layoutNames). */
+  .token-name{position:absolute;user-select:none;-webkit-user-select:none;transform:translate(-50%,calc(2px + var(--name-row,0) * 15px));
+    white-space:nowrap;pointer-events:none;font-style:normal;
+    font-size:10.5px;line-height:1.3;color:#2F2A20;
+    background:rgba(255,255,255,.82);border-radius:3px;padding:0 3px}
+
+  /* 손가락으로 집을 수 있는 최소 크기를 그림과 분리한다.
+     바이알은 실물 60 mm 라 화면에서 아주 작지만, 그렇다고 그림을 키우면
+     realSizeMm 비례가 무너진다. 그림은 그대로 두고 잡는 영역만 넓힌다. */
+  .token::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    min-width:44px;min-height:44px;width:100%;height:100%;border-radius:8px}
+  .token:focus-visible{outline:none}
+  .token:focus-visible::after{outline:2px solid var(--indigo);outline-offset:2px}
+
+  /* 끄는 동안 — 어디에 놓으면 무언가 일어나는지 보여 준다.
+     "된다/안 된다" 가 아니라 "여기에 조작이 있다" 는 표시다. 놓는 것 자체는 어디에나 된다. */
+  .token--target::after{outline:2px dashed var(--indigo);outline-offset:3px;
+    background:rgba(38,52,140,.10)}
+  .token--target-hot::after{outline-style:solid;outline-width:3px;background:rgba(38,52,140,.22)}
+  .token--inert{opacity:.45}
+
+  /* 문지르는 중 — 얼마나 발렸는지. 이게 없으면 문지르는 중인 줄을 모른다. */
+  /* 흔드는 동안 얼마나 흔들렸는지. 안 보이면 흔드는 중인 줄을 모른다. */
+  .smear-meter{position:absolute;left:50%;top:-12px;transform:translateX(-50%);
+    width:56px;height:6px;border-radius:3px;background:var(--sunk);
+    border:1px solid var(--rule);overflow:hidden;pointer-events:none;line-height:0}
+  .smear-meter i{display:block;height:100%;background:var(--indigo);width:0}
+
+  /* 안내 말풍선 — 이름과 지금 할 수 있는 조작 */
+  /* 기본은 물건 위. 선반처럼 화면 맨 위에 있는 물건은 말풍선을 아래로 내린다 —
+     위로 띄우면 실험대 밖으로 나가 잘린다. */
+  .bench-tip[data-below="true"]{transform:translate(-50%,10px)}
+  .bench-tip{position:absolute;transform:translate(-50%,calc(-100% - 10px));
+    z-index:20;pointer-events:none;max-width:min(280px,60%);
+    background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+    border-radius:7px;padding:8px 10px;box-shadow:0 4px 14px rgba(0,0,0,.18);
+    font-size:12.5px;line-height:1.45}
+  /* 포커스로 뜬 말풍선에는 놓을 곳 버튼이 함께 나온다 — 마우스 없이 놓는 길이다.
+     **포인터를 받는 것은 그 버튼들뿐이다.** 말풍선 상자 전체가 받게 두면,
+     확대 뷰를 닫아 포커스가 물건으로 돌아온 직후 말풍선이 실험대를 덮고 있어서
+     **다음에 집는 첫 동작이 통째로 먹힌다** — 실제로 그랬고, 화면에는 아무 표시도 없었다. */
+  .bench-tip{pointer-events:none}
+  .bench-tip .tip-actions{pointer-events:auto}
+  .tip-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;
+    border-top:1px solid var(--rule);padding-top:8px}
+  .tip-actions-label{flex:0 0 100%;font-size:11.5px;color:var(--ink-mute)}
+  .tip-actions button{font-size:11.5px;padding:4px 8px;border-radius:4px}
+  .bench-tip b{display:block;font-size:13px;margin-bottom:2px}
+  .bench-tip span{display:block;color:var(--ink-mute);margin-top:3px}
+  .bench-tip[hidden]{display:none}
+
+  /* 배치 편집 모드 (?edit=1, 개발 서버 전용).
+     스크린샷 한 장으로 좌표를 읽을 수 있어야 하므로 숫자를 크고 또렷하게 둔다. */
+  .edit-panel{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:12px 14px}
+  .edit-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+  .edit-head button{padding:5px 10px;font-size:12.5px}
+  .edit-note{font-size:12px;color:var(--ink-mute);margin:6px 0 10px}
+  .edit-table{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px}
+  .edit-table td{padding:2px 14px 2px 0;white-space:nowrap}
+  .edit-table .edit-x{text-align:right;font-weight:700}
+  .edit-table .edit-span{text-align:right;color:var(--ink-mute)}
+  .edit-warn{font-size:12.5px;color:var(--warn);margin:0 0 10px;line-height:1.5}
+  .edit-table .edit-bad td{color:var(--warn);font-weight:700}
+  /* 물건에 붙는 x 좌표. 물건 그림 위에 얹히므로 바탕을 깔아 읽히게 한다. */
+  .edit-x-tag{position:absolute;left:50%;top:-2px;transform:translate(-50%,-100%);
+    background:var(--indigo);color:#fff;border-radius:3px;padding:1px 4px;
+    font:700 11px/1.3 ui-monospace,monospace;font-style:normal;pointer-events:none}
+
+  /* 실험대 자물쇠 — 탐구 노트를 읽기 전.
+     조작을 막는 것이 아니라 조작이 **시작되기 전**의 자리다 (src/ui/bench.js).
+     덮개가 포인터를 받아 물건이 눌리지 않게 하고, 왜 안 열리는지를 글로 말한다. */
+  .bench-lock{position:absolute;inset:0;z-index:30;border-radius:6px;
+    background:rgba(18,20,26,.62);display:flex;align-items:center;justify-content:center;
+    padding:16px;text-align:center}
+  .bench-lock[hidden]{display:none}
+  .bench-lock-card{background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+    border-radius:9px;padding:16px 18px;max-width:380px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+  .bench-lock-card b{display:block;font-size:14.5px;margin-bottom:6px}
+  .bench-lock-card p{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;line-height:1.5}
+  .bench-lock-card ul{margin:0;padding-left:18px;text-align:left;font-size:13px}
+
+  /* 탐구 노트 */
+  #notebook{overflow-y:auto;padding:20px 22px;border-left:1px solid var(--rule);background:var(--surface)}
+  #notebook h1{font-size:17px;margin:0 0 14px}
+  #notebook h3{font-size:13.5px;margin:16px 0 8px}
+  #notebook h4{font-size:12.5px;margin:0 0 4px;color:var(--ink-mute)}
+  .note-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
+  .note-tab{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
+  /* 골라 놓은 탭·보기. 글자를 #fff 로 박아 두면 다크 모드에서 --indigo 가 밝아지면서
+     밝은 바탕에 흰 글씨가 된다 (대비 2.35). 바탕색 토큰을 쓰면 두 테마에서 함께 뒤집힌다. */
+  .note-tab[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  /* 읽은 쪽에는 표시를 남긴다 — 어디를 더 봐야 실험대가 열리는지 탭만 보고 알 수 있어야 한다. */
+  .note-tab[data-read="true"]::after{content:" ✓";color:var(--good);font-weight:700}
+
+  /* 3단계 — 무엇을 할 실험인지 먼저 말한다. 무엇이 보일지는 말하지 않는다. */
+  .predict-lead{background:var(--sunk);border-radius:8px;padding:12px 14px;margin:0 0 14px;
+    font-size:13.5px;line-height:1.65}
+  .predict-lead p{margin:0 0 8px}
+  .predict-lead p:last-child{margin:0}
+
+  /* 4단계 — 한 것과 아직 안 한 것. 안 한 칸도 막지 않는다 (AGENTS.md §2.1). */
+  .step-lead{background:var(--sunk);border-radius:8px;padding:10px 13px;margin:0 0 14px;font-size:13px}
+  .substep-title{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+  .substep-mark{font-weight:700;color:var(--rule);width:1em;flex:none;text-align:center}
+  .substep[data-done="true"] .substep-mark{color:var(--good)}
+  .substep-state{margin-left:auto;font-size:11.5px;color:var(--ink-mute);
+    border:1px solid var(--rule);border-radius:999px;padding:1px 8px;flex:none}
+  .substep[data-done="true"] .substep-state{color:var(--good);border-color:var(--good)}
+  /* 아직 안 한 칸은 조용히 둔다. 지우거나 잠그지 않는다 — 먼저 적어 두는 것도 공부다. */
+  .substep[data-done="false"] textarea{opacity:.72}
+  .substep-hint{margin:4px 0 6px;font-size:12.5px;color:var(--indigo);font-weight:600}
+  .step-done-mark{color:var(--good);font-weight:700;margin-left:6px}
+
+  /* 7단계 — 지켜본 것 셋을 다 보여 준다. 점수가 아니라 기록이다. */
+  .values-lead{font-size:13px;margin:0 0 8px}
+  .values-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+  .value-item{display:flex;align-items:baseline;gap:8px;font-size:13.5px}
+  .value-mark{font-weight:700;color:var(--good);width:1em;flex:none;text-align:center}
+  .value-item[data-missed="true"] .value-mark{color:var(--warn)}
+  .value-state{margin-left:auto;font-size:11.5px;color:var(--ink-mute);flex:none}
+  .value-item[data-missed="true"] .value-state{color:var(--warn);font-weight:600}
+  .note-tab[aria-selected="true"][data-read="true"]::after{color:var(--surface)}
+
+  /* 「읽었습니다」 — 실험대의 자물쇠를 여는 단추. 1~4 쪽 아래에만 붙는다. */
+  .read-mark{border-top:1px solid var(--rule);margin-top:18px;padding-top:12px;
+    font-size:12.5px;color:var(--ink-mute)}
+  .read-mark p{margin:0 0 8px}
+  .read-mark[data-done="true"]{color:var(--good)}
+  .read-confirm{background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+    padding:9px 14px;font-size:13.5px;font-weight:600}
+
+  /* 보고서 자리 — 다 마무리하기 전에는 남은 것을 적어 둔다 */
+  .report-slot{flex:0 0 auto;max-width:58%}
+  .report-todo{font-size:12px;color:var(--warn);border:1px solid var(--rule);
+    border-radius:6px;padding:6px 9px;background:var(--sunk)}
+  .report-todo summary{cursor:pointer;white-space:nowrap}
+  .report-todo ul{margin:6px 0 0;padding-left:16px;color:var(--ink-mute);line-height:1.5}
+  /* 4단계 STEP 아코디언 — 한 번에 하나만 펼친다.
+     **접힘은 잠금이 아니다.** disabled 도 pointer-events:none 도 쓰지 않는다 —
+     접힌 STEP 도 눌러서 열리고, 열어서 미리 보거나 먼저 해 볼 수 있다. */
+  .note-step{margin-bottom:10px;border:1px solid var(--rule);border-radius:6px;
+    background:var(--surface);overflow:hidden}
+  .note-step[data-state="now"]{border-color:var(--indigo)}
+  .note-step[data-state="later"]{background:var(--sunk)}
+  .step-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:10px 12px;cursor:pointer;list-style:none}
+  .step-summary::-webkit-details-marker{display:none}
+  /* 펼침 표시는 직접 그린다. 브라우저 기본 삼각형은 자리가 제각각이라 줄이 흔들린다. */
+  .step-summary::before{content:"▸";color:var(--ink-mute);font-size:12px;
+    transition:transform .15s ease;flex:none}
+  .note-step[open] > .step-summary::before{transform:rotate(90deg)}
+  .step-summary:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+  .step-summary-title{font-size:15px;margin:0;font-weight:600}
+  .note-step[data-state="later"] .step-summary-title{color:var(--ink-mute);font-weight:500}
+  .step-now-badge{font-size:12px;font-weight:700;color:#fff;background:var(--indigo);
+    border-radius:99px;padding:2px 9px;flex:none}
+  .step-open-hint{font-size:12px;color:var(--ink-mute);margin-left:auto}
+  /* 막힌 STEP — 회색으로만 두지 않는다. 바로 아래에 왜 막혔는지 한 줄이 붙는다. */
+  .note-step[data-locked="true"] .step-summary{cursor:not-allowed}
+  .note-step[data-locked="true"] .step-summary::before{opacity:.4}
+  .step-why{font-size:12.5px;color:var(--warn,#8a5a00);margin:0;padding:0 12px 10px}
+  .step-body{padding:0 12px 14px}
+  /* 못 누르는 이유. 회색 단추 옆에 **말이 있어야** 학생이 고장으로 읽지 않는다. */
+  .read-why{font-size:13px;color:var(--warn,#8a5a00);margin:6px 0 8px}
+  .read-confirm[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+  .step-tally{font-size:13px;color:var(--ink-mute);margin:0 0 12px}
+  .step-tally--done{color:var(--good);font-weight:600}
+  @media (prefers-reduced-motion:reduce){.step-summary::before{transition:none}}
+  .substep-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  .substep{border:1px solid var(--rule);border-radius:6px;padding:10px}
+  .substep--next{border-color:var(--indigo)}
+  .substep-title{font-size:13.5px;font-weight:600;margin-bottom:6px}
+  .notes-label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-mute);margin-bottom:6px}
+  textarea[data-note],input[data-note]{width:100%;min-height:64px;resize:vertical;border:1px solid var(--rule);
+    border-radius:5px;background:var(--sunk);color:var(--ink);padding:8px;font:inherit}
+  input[data-note]{min-height:0}
+  .stage-text{font-size:14px}
+  .stage-empty{color:var(--ink-mute);font-size:13.5px}
+  .materials-list,.safety-list,.step-notes-recap{margin:0 0 14px;padding-left:18px;font-size:13px}
+
+  /* 준비물 표 — 생김새 · 이름 · 하는 일 */
+  .materials-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:16px}
+  .materials-table th,.materials-table td{border-bottom:1px solid var(--rule);
+    padding:8px 6px;text-align:left;vertical-align:middle}
+  .materials-table thead th{font-size:11.5px;color:var(--ink-mute);font-weight:600;
+    border-bottom-width:2px}
+  .materials-table tbody th{font-weight:600;white-space:nowrap;width:1%}
+  .mat-fig{width:56px}
+  .mat-fig svg{width:52px;height:auto;display:block}
+
+  /* 예상 — 1·2단계는 보기에서 고른다 */
+  .predict-choices{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+  .predict-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:6px 10px;font-size:12.5px;color:var(--ink-mute)}
+  .predict-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  .predict-block{margin-bottom:16px}
+
+  /* 결과 카드에 그때 본 시야 */
+  .capture-strip{background:var(--sunk);border-radius:5px;padding:8px;margin:6px 0}
+  .capture-strip svg{width:100%;max-width:160px;height:auto;display:block;margin:0 auto}
+
+  /* 시작 화면 */
+  .start-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:var(--ground)}
+  .start-screen[hidden]{display:none}
+  .start-card{width:100%;max-width:620px;background:var(--surface);border:1px solid var(--rule);
+    border-radius:12px;padding:28px 26px}
+  .start-card h1{font-size:20px;margin:0 0 8px}
+  .start-lead{font-size:13.5px;color:var(--ink-mute);margin:0 0 20px}
+  .start-levels{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+  .start-level{display:block;width:100%;text-align:left;border:1px solid var(--rule);
+    background:var(--sunk);border-radius:8px;padding:14px 16px}
+  .start-level[aria-checked="true"]{border-color:var(--indigo);border-width:2px;padding:13px 15px;
+    background:var(--surface)}
+  .start-level-name{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+  .start-level-desc{display:block;font-size:12.5px;color:var(--ink-mute);line-height:1.5}
+  .start-go{width:100%;background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+    padding:12px;font-size:15px;font-weight:600}
+  .start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
+  .start-sub{font-size:13.5px;margin:0 0 10px}
+  .start-modes{margin-bottom:20px}
+  .predict-compare-row{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px}
+  /* 예상과 실제를 나란히. 라벨과 답이 한 줄에 붙어 있으면 어디까지가 질문인지 안 읽힌다. */
+  .compare-pair{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:6px 0 0}
+  .compare-pair dt{color:var(--ink-mute);font-size:12px;white-space:nowrap}
+  .compare-pair dd{margin:0}
+  .capture-card{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:12px}
+  .capture-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .capture-head h3{margin:0}
+  .capture-del{font-size:11.5px;padding:4px 8px;border-radius:4px;color:var(--warn);
+    white-space:nowrap}
+  .capture-readout{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
+  .capture-readout dt{color:var(--ink-mute)}
+  .capture-readout dd{margin:0}
+  .grade-block{margin-bottom:18px}
+  .grade-line{font-size:12.5px;margin:6px 0 0}
+  .grade-line[data-grade="more"]{color:var(--warn)}
+  .grade-line[data-grade="pass"]{color:var(--good)}
+  .grade-line[data-grade="unavailable"]{color:var(--ink-mute)}
+  #reflect{border-top:1px solid var(--rule);padding-top:12px;margin-top:12px}
+  .reflect-options{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .reflect-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
+  .reflect-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  .reflect-retry{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:5px 9px;font-size:12.5px;cursor:pointer}
+  /* 자기 평가 — 리커트 5점 척도. 라디오를 쓰므로 화살표 이동은 브라우저가 해 준다. */
+  .likert-row{border:1px solid var(--rule);border-radius:6px;padding:10px 12px 12px;
+    margin:0 0 12px;min-width:0}
+  .likert-row legend{font-size:13px;font-weight:600;padding:0 4px}
+  .likert-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+  .likert-cell{display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 2px;border:1px solid transparent;border-radius:5px;cursor:pointer;text-align:center}
+  .likert-cell:hover{background:var(--sunk)}
+  .likert-cell input{margin:0;accent-color:var(--indigo)}
+  .likert-num{font-size:12.5px;font-weight:600}
+  .likert-word{font-size:10.5px;color:var(--ink-mute);line-height:1.25}
+  .likert-cell:has(input:checked){border-color:var(--indigo);background:var(--sunk)}
+  .likert-cell:has(input:focus-visible){outline:2px solid var(--indigo);outline-offset:1px}
+  #self-eval .self-eval-item{margin-bottom:16px}
+  /* 안전 안내 — **판정이 아니다.** ✓/✗ 도 색으로 하는 잘잘못도 없다. 그냥 읽는 글이다. */
+  .safety-list{margin:6px 0 10px;padding-left:18px;font-size:13.5px;line-height:1.75}
+  .safety-list li{margin-bottom:4px}
+  .safety-not-checked{font-size:12.5px;color:var(--ink-mute);margin:0}
+
+  /* 토스트 — 언제나 **화면 위쪽**에 뜬다.
+     아래쪽에 두었더니, 세로로 쌓이는 작은 화면에서는 그 자리가 탐구 노트였다.
+     실험대에서 한 조작의 결과 문구가 노트 위에 겹쳐 떠서 어느 쪽 이야기인지 알 수 없었다.
+     기기마다 다른 자리에 두지 않는다 — 큰 화면에서도 조작한 손이 향하는 쪽은 위다. */
+  /* z-index 는 확대 뷰(#zoom, 100)보다 위다. 앞서는 50 이라 확대 화면을 열어 놓고
+     조작하면 결과 문구가 그 뒤에 가려, 방금 무슨 일이 일어났는지 볼 수가 없었다. */
+  #toast-region{position:fixed;left:50%;top:14px;transform:translateX(-50%);
+    display:flex;flex-direction:column;gap:8px;z-index:200;
+    /* **`max-width` 가 아니라 `width` 다.**
+       `max-width` 로 두면 상자가 내용에 맞춰 줄어드는데, 재어 보니 320 px 화면에서
+       쓸 수 있는 307 중 **160 px 만 쓰고** 나머지를 버린 채 **세로로 길어졌다**
+       (글 3줄 · 상자 87 px). 폭을 못 박으니 같은 글이 한 줄에 들어간다.
+       가로를 안 쓰고 세로로 자라면 그만큼 **화면을 더 덮는다.**
+       (허브 세션이 정본에서 「160×171 기둥」으로 먼저 겪고 알려 줬다.) */
+    width:min(96vw,520px);
+    pointer-events:none}
+
+  /* **토스트를 폰에서 아래로 내려 봤다가 되돌렸다 — 문제가 옮겨 갔을 뿐이다.**
+
+     위에 두면 좁은 화면에서 선반의 거름종이·모세관·연필·원심관을 **100 % 덮는다**
+     (320~390 px. 768 px 에서는 「자」 18 % 뿐이다). 하필 뭘 하고 난 직후에 뜨는데
+     학생이 다음 물건을 찾는 것이 바로 그때다 — 그래서 `bottom:14px` 로 내렸다.
+
+     그런데 재어 보니 **아래도 남의 자리였다.** 좁은 화면은 실험대 위 · 탐구 노트 아래로
+     쌓이므로, 아래 끝은 노트다:
+
+         320 px  노트 위 100 % · 「개인정보처리방침」 링크 15 %
+         375 px  노트 위 100 % · 관찰 기록 글칸 53 %
+         390 px  노트 위 100 % · 글칸 41 %
+         767 px  노트 위 90 %
+
+     실험대에서 한 조작의 결과 문구가 노트 위에 겹쳐 뜨면 **어느 쪽 이야기인지 알 수 없다.**
+     그래서 위로 되돌렸다. **선반이 덮이는 것은 아직 남은 문제다** — 아래 검사가 그 숫자를
+     매번 찍어 두고, 「노트를 덮지 않는다」만 빨간불로 지킨다.
+
+     ★ 처음 잰 검사가 초록불이었던 이유: 대상을 `button`·`.token` 만 훑었다.
+       `a[href]` 와 `textarea` 가 빠져 있었다. **덮이는 것을 재려면 덮일 수 있는 것을 다 훑는다.**
+     (허브 세션이 제 처방을 회수하며 알려 줬다. germination·micrometer 도 재 보고 안 넣었다.) */
+
+  /* 색은 둘뿐이다 — 초록은 뜻대로 됐다, 빨강은 뜻대로 안 됐다 (toast.js).
+     앞서는 흰 바탕에 왼쪽 띠만 색이 있었는데, 교실 프로젝터와 스마트폰 바깥에서는
+     4 px 짜리 띠가 보이지 않아 사실상 색이 없는 것과 같았다. 바탕을 칠한다. */
+  /* 글과 닫기 단추가 나란히. **머무는 시간은 그대로 두고 치울 길만 준다.** */
+  .toast{display:flex;align-items:flex-start;gap:6px}
+  .toast-text{flex:1;min-width:0}
+  /* 말풍선 자리는 pointer-events:none 이라 손가락이 통과한다 — **✕ 에만 돌려준다.** */
+  /*
+     ★ **단추가 말풍선을 키우면 안 된다.** 사장님이 요청하신 것은 닫기 단추이지
+       더 큰 말풍선이 아니다. 처음에 26px 로 두었더니 두 군데서 커졌다:
+         가로 — 26 + 틈 10 = 36px 을 먹어 320px 에서 글이 **한 줄 더** 접혔다 (2줄→3줄)
+         세로 — 26px 이 한 줄(21px)보다 커서 **넓은 화면에서도** 키가 올라갔다 (43→50px)
+       그래서 **글 한 줄 높이(21px)에 맞추고** 틈을 6px 로 줄였다.
+       보이는 것이 작아진 만큼 **닿는 자리는 아래 `::after` 가 지킨다.** */
+  .toast-x{pointer-events:auto;flex:0 0 auto;position:relative;
+    width:21px;height:21px;border:0;border-radius:5px;cursor:pointer;
+    background:rgba(255,255,255,.16);color:#fff;font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;padding:0}
+  .toast-x:hover{background:rgba(255,255,255,.3)}
+  .toast-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  /* 보이는 것은 26px 이지만 **닿는 자리는 44px** 이다 (손가락 기준). */
+  .toast-x::after{content:'';position:absolute;inset:-12px}
+  .toast{color:#fff;border-radius:8px;padding:11px 15px;font-size:14px;line-height:1.5;
+    font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.28);
+    border:1px solid rgba(255,255,255,.22);
+    animation:toast-in .22s ease-out both, toast-flash .5s ease-out .22s 1}
+  .toast--done{background:#1B7048}
+  .toast--warn{background:#A82920}
+  /* 움직임을 줄여 달라고 한 기기에서는 애니메이션만 뺀다. 머무는 시간은 그대로다 —
+     읽는 데 걸리는 시간은 움직임 설정과 상관이 없다. */
+  .toast--still{animation:none}
+  @keyframes toast-in{from{opacity:0;transform:translateY(-10px) scale(.97)}
+    to{opacity:1;transform:none}}
+  /* 한 번만 밝아졌다 돌아온다. 화면 위쪽은 학생이 보고 있지 않을 수 있는 자리라,
+     떴다는 것 자체를 알려야 한다. 계속 깜빡이지는 않는다 — 읽는 것을 방해한다. */
+  @keyframes toast-flash{0%{filter:brightness(1)}35%{filter:brightness(1.45)}100%{filter:brightness(1)}}
+
+  /* 확대 뷰.
+     ── 작은 화면에서 잘리지 않게 ──────────────────────────────────
+     앞서는 `align-items:center` + `max-height:92vh` 였다. 모바일 브라우저에서 `vh` 는
+     주소창이 숨겨졌을 때의 **가장 큰** 높이를 가리키므로, 92vh 가 실제로 보이는 높이를
+     넘어선다. 넘친 부분은 화면 밖에 있고, 덮개(#zoom)가 스크롤되지 않으니 닿을 수가 없었다.
+     이제 셋을 함께 쓴다:
+       · #zoom 자체가 스크롤된다 (align-items 대신 패널의 margin:auto 로 가운데 정렬 —
+         center 정렬은 넘칠 때 위쪽을 잘라 먹는다)
+       · 패널 높이는 dvh 로 잰다. 주소창을 뺀 실제 높이다
+       · 닫기 단추는 sticky 라 아래로 내려도 따라온다 */
+  #zoom{position:fixed;inset:0;background:rgba(10,12,8,.55);display:flex;
+    justify-content:center;z-index:100;padding:16px;
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  #zoom[hidden]{display:none}
+  .zoom-panel{position:relative;background:var(--surface);border-radius:10px;
+    max-width:640px;width:100%;margin:auto;padding:22px;
+    max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;
+    display:flex;flex-direction:column}
+  .zoom-close{position:sticky;top:0;align-self:flex-end;z-index:3;
+    border:1px solid var(--rule);
+    background:var(--sunk);border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12.5px}
+  .zoom-body h2{font-size:16px;margin:0 0 14px}
+  /* 무대(기구 그림)와 결과(거름종이). 둘 다 손가락으로 끌 것이 없으므로
+     세로 스크롤을 그대로 돌려준다 — 무대에 touch-action:none 을 걸어 두면
+     화면의 대부분이 무대라, 가로 모드에서 아래쪽 단추에 손이 닿지 않는다. */
+  .zoom-vessel-stage,.zoom-strip{background:var(--sunk);border-radius:6px;padding:10px;
+    display:flex;justify-content:center;touch-action:pan-y}
+  .zoom-vessel-stage svg{width:100%;max-width:300px;height:auto}
+  .zoom-strip svg{width:100%;max-width:230px;height:auto;user-select:none}
+  .zoom-readout{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:14px 0;font-size:13px}
+  .zoom-readout dt{color:var(--ink-mute)}
+  .zoom-readout dd{margin:0;font-family:ui-monospace,monospace}
+  /* 눈에 띄어야 하는 버튼 — 찍기, 원점 긋기, 결과 기록 */
+  .zoom-action{width:100%;background:var(--indigo);color:var(--surface);
+    border-color:var(--indigo);padding:10px 14px;font-size:13.5px;font-weight:600;margin-top:8px}
+
+  /* 손이 정하는 값 — 원점 높이, 대는 시간, 붓는 깊이.
+     **이 손잡이들이 이 실험의 변인이다.** 가져다 대기만 하면 정해지게 두면
+     세어 볼 일 자체가 없어진다 (PLAYBOOK §4). */
+  .zoom-slider{margin:12px 0 4px}
+  .zoom-slider-head{display:flex;justify-content:space-between;font-size:12.5px;
+    color:var(--ink-mute);margin-bottom:4px}
+  .zoom-slider-head span{font-family:ui-monospace,monospace;color:var(--ink)}
+  .zoom-slider input[type=range]{width:100%;accent-color:var(--indigo)}
+
+  /* 한 줄짜리 안내. 무엇이 지금 상태인지, 무엇을 조심해야 하는지. */
+  .zoom-note{font-size:12.5px;color:var(--ink-mute);margin:6px 0}
+  .zoom-note--warn{color:var(--warn)}
+  .zoom-note--good{color:var(--good)}
+
+  /* 연필/볼펜처럼 **고르는** 값 */
+  .zoom-choice{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .zoom-choice-label{font-size:12.5px;color:var(--ink-mute)}
+  .zoom-opt{border:1px solid var(--rule);background:var(--surface);border-radius:5px;
+    padding:6px 12px;font-size:13px;cursor:pointer}
+  .zoom-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+
+  /* 눕힌 스마트폰. 높이가 350 px 안팎이라 세로로 쌓으면 무엇을 하든 스크롤이 된다.
+     스크롤이 되게 만드는 것(위 pan-y)과 **스크롤할 일을 줄이는 것**은 다른 문제다.
+     그림을 줄이고 여백을 좁혀, 무대와 단추가 한 화면에 함께 보이게 한다. */
+  @media (orientation:landscape) and (max-height:560px){
+    #zoom{padding:8px}
+    .zoom-panel{padding:14px 16px;max-height:calc(100dvh - 16px);max-width:min(96vw,860px)}
+    .zoom-vessel-stage svg{max-width:210px}
+    .zoom-strip svg{max-width:170px}
+    .zoom-readout{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px;margin:10px 0}
+    .zoom-body h2{margin:0 0 8px}
+  }
+
+  .zoom-gauge{margin:14px 0}
+  .zoom-gauge .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+  .zoom-gauge .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+  .zoom-gauge .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute);margin-top:4px}
+  .zoom-gauge .hint{font-size:12px;color:var(--ink-mute)}
+
+  .ctrl-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px}
+  .ctrl-group span,.ctrl-group label{color:var(--ink-mute);min-width:70px}
+  .ctrl-group button{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+    padding:5px 9px;cursor:pointer}
+  /* 지금 고른 배율. 단추에 적힌 숫자를 대물렌즈 배율로 바꾸고 나니, 어느 것이 지금인지가
+     화면에 없으면 아래 「접안 × 대물」 줄과 맞춰 볼 수가 없다. */
+  .ctrl-group button[aria-pressed="true"]{background:var(--indigo);color:var(--surface);
+    border-color:var(--indigo);font-weight:600}
+  .ctrl-group input[type=range]{flex:1;accent-color:var(--indigo)}
+  .zoom-empty{color:var(--ink-mute);font-size:13.5px}
+
+  /* 보고서 만들기 — 이름을 받는 창. <dialog> 라 포커스 가두기와 Esc 는 브라우저가 한다. */
+  .note-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .note-head h1{margin-bottom:14px}
+  #make-report{padding:6px 11px;font-size:12.5px;white-space:nowrap}
+  .report-dialog{border:1px solid var(--rule);border-radius:10px;background:var(--surface);
+    color:var(--ink);max-width:460px;width:calc(100% - 32px);padding:22px;
+    /* 확대 뷰와 같은 이유다 — 작은 화면에서 창이 화면보다 길면 아래를 볼 수 없었다. */
+    max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+  .report-dialog::backdrop{background:rgba(10,12,8,.55)}
+  .report-dialog h2{font-size:16px;margin:0 0 10px}
+  /* 활동지 종류 — 개별 / 모둠. 같은 기록에서 두 가지 종이가 나온다. */
+  .rp-kinds{display:flex;gap:6px;margin:0 0 8px}
+  .rp-kind{flex:1;padding:8px 10px;font-size:13px;border-radius:5px}
+  .rp-kind[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+  .rp-kind-note{font-size:12px;color:var(--ink-mute);margin:0 0 14px;min-height:1.4em}
+  .rp-fields--group{margin-top:10px}
+  .rp-fields--group[hidden]{display:none}
+  .rp-privacy{font-size:12.5px;color:var(--ink-mute);margin:0 0 16px;line-height:1.55}
+  /* input 은 아무것도 안 하면 기본 너비(약 20자)를 최소 폭으로 우긴다. 세 칸을 나란히 놓으면
+     그 합이 창보다 넓어져 번호 칸이 잘리고 가로 스크롤이 생겼다. 실제로 그랬다.
+     `min-width:0` 이 그걸 푼다. `minmax(0,1fr)` 은 그리드 쪽에서 같은 것을 한 번 더 막는다. */
+  .rp-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .rp-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute);min-width:0}
+  .rp-field--wide{grid-column:1/-1}
+  .rp-field input{min-width:0;border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
+    color:var(--ink);padding:8px;font:inherit}
+  .rp-howto{font-size:12.5px;color:var(--ink-mute);margin:14px 0 0}
+  .rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .rp-actions button{padding:9px 14px;font-size:13.5px}
+  /* 제출은 눈에 띄어야 한다. PDF 저장은 늘 있던 길이라 그대로 둔다. */
+  #rp-submit{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
+
+  /* 수업 코드 — 여섯 자리를 손으로 친다. 작게 만들면 스마트폰에서 못 친다. */
+  .rp-code input{font-family:ui-monospace,monospace;font-size:19px;letter-spacing:.22em;
+    text-align:center}
+  .rp-code-hint{font-size:12px;color:var(--ink-mute);margin:4px 0 0;line-height:1.5}
+  .rp-submit-msg{font-size:13px;margin:10px 0 0;line-height:1.55;min-height:1.2em}
+  .rp-submit-msg[data-kind="done"]{color:var(--good);font-weight:600}
+  .rp-submit-msg[data-kind="warn"]{color:var(--warn);font-weight:600}
+  #rp-make{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
+  /* 종이는 화면에 두지 않는다. 인쇄할 때만 나타난다. */
+  .report-sheet{display:none}
+
+  /* 개인정보처리방침 링크. 실험을 가리지 않도록 구석에 작게 두되 늘 닿을 수 있게 한다. */
+  .site-foot{position:fixed;right:10px;bottom:6px;z-index:40;font-size:11px;
+    background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:2px 7px;
+    opacity:.75}
+  .site-foot:hover,.site-foot:focus-within{opacity:1}
+  .site-foot a{color:var(--ink-mute);text-decoration:none}
+  .site-foot a:hover,.site-foot a:focus-visible{color:var(--ink);text-decoration:underline}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ---- 인쇄 (= PDF로 저장) ----------------------------------------
+     화면 UI 를 통째로 감추고 보고서만 남긴다. 시야 그림은 색이 곧 결과이므로
+     배경색을 반드시 함께 인쇄한다 — 색이 빠지면 청람색도 선홍색도 없는 종이가 된다. */
+  @media print{
+    @page{margin:14mm}
+    html,body{height:auto;background:#fff;color:#000}
+    .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
+    .report-sheet{display:block}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    /* 종이의 모양은 public/report-sheet.css 에 있다 — 선생님 화면(teacher.html)이
+       같은 종이를 화면에서도 그리기 때문이다. 두 벌로 두면 언젠가 서로 달라진다. */
+  }
+
+  /* 터치 기기에서 손가락으로 누르는 버튼은 44px 이상. 실험대 물건(.token)은
+     ::after 로 이미 보장하므로 여기서는 나머지 버튼만 다룬다. */
+  @media (pointer:coarse){
+    button:not(.token){min-height:44px;padding-left:14px;padding-right:14px}
+  }
+</style>
+</head>
+<body>
+<div id="start" class="start-screen"></div>
+<div id="app" hidden>
+  <div class="layout">
+    <div id="bench" aria-label="실험대"></div>
+    <div id="notebook"></div>
+  </div>
+  <div id="toast-region"></div>
+  <div id="zoom" hidden></div>
+  <div id="report"></div>
+</div>
+<!-- 개인정보처리방침 링크는 **정적 HTML 에** 둔다.
+     시작 화면은 자바스크립트가 그리므로, 응답 HTML 만 읽는 쪽(검사 도구·크롤러)에는
+     아무것도 안 보인다. 사람에게도 늘 보여야 하는 링크라 화면 구석에 띄워 둔다. -->
+<footer class="site-foot">
+  <a href="/privacy">개인정보처리방침</a>
+</footer>
+<script type="module" src="/experiments/chromatography/src/main.js"></script>
+</body>
+</html>

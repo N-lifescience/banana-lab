@@ -16,9 +16,9 @@
 npm run dev
 ```
 
-- 앱 — http://localhost:5173/
-- 애셋·시야 손잡이 — http://localhost:5173/harness.html
-- 배치 편집 — http://localhost:5173/?edit=1 **또는 아무 화면에서나 `Ctrl+P`(⌘P)**
+- 앱 — http://localhost:5173/experiments/banana/
+- 애셋·시야 손잡이 — http://localhost:5173/experiments/banana/harness.html
+- 배치 편집 — http://localhost:5173/experiments/banana/?edit=1 **또는 아무 화면에서나 `Ctrl+P`(⌘P)**
 - 2·3단계 — `?level=2` · `?level=3`
 
 **「Port 5173 is already in use」가 뜨면** 남은 서버가 있는 것입니다:

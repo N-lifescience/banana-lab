@@ -14,9 +14,9 @@
 npm run dev
 ```
 
-- 앱 — http://localhost:5176/
-- 애셋 시트·반응 속도 손잡이 — http://localhost:5176/harness.html
-- 배치 편집 — http://localhost:5176/?edit=1 (배포 주소에서도 열립니다)
+- 앱 — http://localhost:5173/experiments/catalase/
+- 애셋 시트·반응 속도 손잡이 — http://localhost:5173/experiments/catalase/harness.html
+- 배치 편집 — http://localhost:5173/experiments/catalase/?edit=1 (배포 주소에서도 열립니다)
 - 2·3단계 — `?level=2` · `?level=3`
 
 「Port 5176 is already in use」가 뜨면 남은 서버가 있는 것입니다:

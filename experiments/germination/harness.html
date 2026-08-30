@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 제목은 src/harness.js 가 UI.appTitle 로 다시 쓴다. 두 곳에 적으면 언젠가 달라진다. -->
+<title>개발 하네스</title>
+<style>
+  :root{
+    --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+    --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF; --indigo:#26348C;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+      --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441; --indigo:#94A4F2;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.7}
+  .wrap{max-width:1100px;margin:0 auto;padding:36px 24px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .note{color:var(--ink-mute);font-size:14px;margin:0 0 8px;max-width:70ch}
+  .count{color:var(--ink-mute);font-size:12.5px;font-family:ui-monospace,monospace;margin:0 0 24px}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px;
+    display:flex;flex-direction:column;gap:14px}
+  .panel h2{font-size:14px;letter-spacing:.06em;color:var(--ink-mute);margin:0;font-weight:600}
+  /* 애셋 시트 — 선 두께·음영 방향·크기 감각을 한눈에 대조하기 위한 격자 */
+  .sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media (max-width:860px){.sheet-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{background:var(--sunk);border-radius:5px;padding:8px;display:flex;
+    flex-direction:column;align-items:center;gap:4px}
+  .cell svg{width:100%;height:auto;display:block}
+  .cell .name{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink-mute);text-align:center}
+  .cell .state{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--ink-mute);
+    opacity:.75;text-align:center;word-break:break-all}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="harness-title"></h1>
+  <p class="note" id="harness-note"></p>
+  <p class="count" id="sheet-count"></p>
+
+  <div class="panel">
+    <h2>애셋 시트 — 전 종 · 전 상태 대조</h2>
+    <div class="sheet-grid" id="asset-sheet"></div>
+  </div>
+</div>
+<script type="module" src="/experiments/germination/src/harness.js"></script>
+</body>
+</html>
