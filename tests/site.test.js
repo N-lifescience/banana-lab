@@ -158,3 +158,45 @@ test('방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다'
     + '  → 안 받는 것을 받는다고 적은 것도 틀린 고지입니다. privacy.html 에서 그 줄을 지우거나,\n'
     + '    정말 보내야 하는 값이면 그 실험의 SUBMIT_* 목록에 넣으세요.');
 });
+
+/*
+ * ── 실험마다 「내가 사는 자리」를 맞게 가리키는가 ────────────────────
+ *
+ * 실험 검사에는 「**다른** 실험의 배포 주소를 가리키지 않는다」가 있다. 그런데
+ * 그 검사는 **자기 id 를 목록에서 뺀다** — 자기 주소를 가리키는 것은 옳으니까.
+ * 그래서 osmosis 가 따로 서 있던 시절의 주소(`osmosis-virtual-lab.vercel.app`)를
+ * 그대로 달고 있어도 **자기 이름이 들었다는 이유로 통과**했다. 합친 뒤로 그 주소는
+ * 남의 배포본인데도 그렇다.
+ *
+ * micrometer 는 반대쪽이었다 — canonical 이 아예 **없었다.** 「배포 주소가 정해지면
+ * 넣는다」고 적어 두고 정해진 뒤에도 아무도 안 왔다. **비워 둔 자리는 아무 검사도
+ * 울지 않는다.**
+ *
+ * 둘 다 실험 하나만 보고는 알 수 없다. **어느 사이트에 사는가**는 사이트가 안다.
+ * (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
+ */
+test('실험마다 canonical 이 이 사이트의 자기 자리를 가리킨다', () => {
+  // 기준은 손으로 적지 않는다 — 이미 맞게 적힌 것 하나에서 사이트 주소를 뽑아 온다.
+  const hosts = new Set();
+  const seen = [];
+  for (const id of EXPERIMENTS) {
+    const html = read(`experiments/${id}/index.html`);
+    const canon = html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];
+    const og = html.match(/<meta property="og:url" content="([^"]+)"/)?.[1];
+    assert.ok(canon, `experiments/${id}/index.html 에 canonical 이 없습니다\n`
+      + '  → 비워 두면 검색과 링크 미리보기가 무엇을 이 실험으로 여길지 알 수 없습니다.');
+    assert.equal(og, canon, `${id}: canonical 과 og:url 이 다릅니다\n  ${canon}\n  ${og}`);
+    hosts.add(new URL(canon).host);
+    seen.push([id, canon]);
+  }
+  assert.equal(hosts.size, 1,
+    `실험들이 서로 다른 사이트를 가리킵니다: ${[...hosts].join(' · ')}\n`
+    + seen.map(([id, u]) => `  ${id}  ${u}`).join('\n') + '\n'
+    + '  → 따로 서 있던 시절의 주소가 남은 것입니다. 합친 사이트의 자기 자리를 가리키세요.');
+
+  // 주소의 **마지막 조각**이 그 실험의 폴더 이름이어야 한다 — 서로 바뀐 것을 잡는다.
+  const wrong = seen.filter(([id, u]) => new URL(u).pathname.split('/').filter(Boolean).at(-1) !== id);
+  assert.deepEqual(wrong.map(([id]) => id), [],
+    `자기 자리가 아닌 곳을 가리키는 실험이 있습니다:\n`
+    + wrong.map(([id, u]) => `  ${id}  ${u}`).join('\n'));
+});

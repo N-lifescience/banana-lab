@@ -10,7 +10,7 @@
 
 ### 가장 쉬운 길 — 배포된 주소 (터미널이 필요 없습니다)
 
-**https://osmosis-virtual-lab.vercel.app**
+**https://virtual-biolab.vercel.app/cell-metabolism/osmosis**
 
 교실에서 학생이 여는 것과 **같은 판**입니다. 아래 것들도 주소 뒤에 붙이면 그대로 열립니다.
 
