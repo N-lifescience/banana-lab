@@ -316,3 +316,50 @@ test('실험의 tokens.js 는 공용을 다시 내보내기만 한다', () => {
     assert.equal(lines.length, 1, `${id}: 다시-내보내기가 한 줄이 아닙니다 (${lines.length}줄)`);
   }
 });
+
+/*
+ * ── 카탈로그가 **없는 실험**으로 데려가지 않는가 ─────────────────────
+ *
+ * 첫 화면은 교과서 탐구활동 열일곱을 다 보여 줍니다. 그중 가상 실험 여덟은 **다 만들어졌지만**,
+ * 이 사이트로 옮긴 것은 아직 일부입니다. 그런데 카드 여덟 장이 전부 「지금 열기 →」로
+ * 남아 있었습니다 — **학생이 다섯 장을 누르면 404 를 봤습니다.**
+ *
+ * 로컬에서는 아무도 못 봅니다. 개발 서버는 되쓰기(`/cell-metabolism/…`)를 안 읽어서
+ * 그 주소가 어차피 안 열리고, 배포본에서만 「어떤 것은 열리고 어떤 것은 404」로 갈립니다.
+ * **파일끼리 맞대면 지금 여기서 압니다.**
+ *
+ * 옮긴 실험 = `experiments/` 의 폴더. 그 밖으로 가는 링크는 카드에 있으면 안 됩니다.
+ * (합치기 4단계, 2026-08-30)
+ */
+test('카탈로그가 이 사이트에 없는 실험으로 데려가지 않는다', () => {
+  const html = read('index.html');
+  const links = [...html.matchAll(/<a[^>]+class="card[^"]*"[^>]+href="\/[a-z-]+\/([a-z-]+)"/g)]
+    .map((m) => m[1]);
+  // 앞 조건 — 하나도 못 읽으면 아래가 **아무것도 안 재고 통과**한다.
+  assert.ok(links.length > 0, '카탈로그에서 실험 링크를 하나도 못 찾았습니다 — 검사가 헛돌고 있습니다');
+
+  const dead = [...new Set(links)].filter((id) => !EXPERIMENTS.includes(id));
+  assert.deepEqual(dead, [],
+    `카탈로그가 이 저장소에 없는 실험으로 데려갑니다: ${dead.join(', ')}\n`
+    + `  있는 것: ${EXPERIMENTS.join(' · ')}\n`
+    + '  → 배포하면 학생이 그 카드를 눌렀을 때 **404** 를 봅니다.\n'
+    + '    아직 안 옮겼으면 `<span class="card soon">` 에 「준비 중」 배지를 다세요 (링크를 주지 마세요).');
+});
+
+test('아직 안 옮긴 실험은 「준비 중」으로 보인다', () => {
+  const html = read('index.html');
+  const soon = (html.match(/<span class="badge soon">/g) ?? []).length;
+  const cards = (html.match(/<span class="card soon">/g) ?? []).length;
+  assert.equal(soon, cards,
+    `「준비 중」 카드 ${cards}장 중 배지가 달린 것은 ${soon}장입니다 — 배지가 없으면 왜 안 열리는지 알 수 없습니다`);
+
+  /*
+   * **범례는 화면에 있는 것만 설명한다.** 없는 상태를 설명하면 학생이 그것을 찾고,
+   * 있는 상태를 안 설명하면 왜 어떤 카드는 안 눌리는지 모른다. 둘 다 잡는다.
+   */
+  const hasLegend = /<span class="swatch soon">/.test(html);
+  assert.equal(hasLegend, cards > 0,
+    cards > 0
+      ? '「준비 중」 카드가 있는데 범례에 그 칸이 없습니다 — 왜 안 눌리는지 학생이 알 수 없습니다'
+      : '「준비 중」 카드가 하나도 없는데 범례가 그 상태를 설명합니다 — 학생이 없는 것을 찾습니다');
+});
