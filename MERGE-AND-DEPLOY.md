@@ -26,7 +26,17 @@
 
 ### ★ 다음 사람이 먼저 알아야 할 것 둘
 
-**① 뿌리의 `docs/`·`PLAYTEST.md`·`tasks/` 는 banana 것입니다. 공용이 아닙니다.**
+**① 뿌리의 `docs/`·`PLAYTEST.md`·`tasks/`·`PROGRESS.md` 는 banana 것입니다. 공용이 아닙니다.**
+
+> 2026-08-30 갱신 — **나머지 일곱은 자기 폴더 안에 다 들어왔습니다.**
+> `experiments/<실험>/PROGRESS.md` 와 `experiments/<실험>/tasks/` 에 있습니다.
+> 원래 저장소 일곱을 지워도 「무엇을 왜 그렇게 했나」가 남게 하려고 옮겼습니다.
+> **banana 것만 아직 뿌리에 있습니다** — 옮기면 `AGENTS.md`·`CLAUDE.md`·작업 카드
+> 스무 곳의 `docs/…` 가 끊어져서 미뤘습니다. 그 스무 곳을 같이 고칠 때 옮기세요.
+>
+> ★ 옮기며 `tasks/` 안의 `localhost:517x` 를 살아 있는 주소로 고쳤습니다.
+> 그것들은 **기록이 아니라 안내**였습니다 (`npm run dev → http://localhost:5177/?edit=1`).
+> 감사 기록(`tasks/AUDIT-*.md`)만 그대로 두었습니다.
 micrometer 는 자기 것을 안 고쳐서 banana 것과 바이트까지 같았고, 그래서 아무도 몰랐습니다.
 osmosis 는 고쳤기 때문에 **자기 문서를 `experiments/osmosis/` 안에** 넣었습니다 —
 그 실험의 검사가 「PLAYTEST 에 적힌 숫자가 실제 값과 맞는가」로 자기 문서를 읽기 때문입니다.
@@ -331,15 +341,18 @@ rm -rf experiments/$E/docs/banana-progress.md experiments/$E/docs/banana-tasks
 
 **① 문서가 죽은 주소를 열라고 하고 있었다 — 여덟 개 전부.**
 
-    experiments/catalase/PLAYTEST.md:17   localhost:5176
-    experiments/germination/PLAYTEST.md:14 localhost:5180   ← 그 서버는 이제 없다
+    experiments/catalase/PLAYTEST.md:17     포트 5176
+    experiments/germination/PLAYTEST.md:14   포트 5180   ← 그 서버는 이제 없다
+
+(★ 여기에 `localhost:` 를 붙여 적지 마세요. **이 검사가 이 문서도 훑습니다** —
+ 예시로 적은 죽은 주소를 안내로 읽고 빨간불을 냅니다. 실제로 그렇게 한 번 울었습니다)
 
 실험마다 **따로 서 있던 시절의 포트**가 그대로였다. 합친 뒤로는 다 5173 이고, 게다가
 뿌리가 카탈로그라 `localhost:5173/` 도 그 실험이 아니다 — `/experiments/<실험>/` 이다.
 **뿌리 `PLAYTEST.md`(banana 것)까지 틀려 있었다.** 아무도 못 본 이유는 그 검사가
 자기 폴더만 훑고 있어서다. 사이트 뿌리를 보게 하자 여덟 개를 한꺼번에 물었다.
 
-★ **합칠 때 이걸 먼저 하세요:** `grep -rn "localhost:5" experiments/*/PLAYTEST.md`
+★ **합칠 때 이걸 먼저 하세요:** `grep -rn localhost experiments/*/PLAYTEST.md`
 
 **② 감사 기록은 안내가 아니다 — 숫자를 갈면 기록이 거짓이 된다.**
 
