@@ -25,6 +25,22 @@ import { UI } from './strings.js';
 const holdFor = (text) => Math.min(8000, Math.max(3500, 2200 + text.length * 90));
 
 /**
+ * **잘된 말은 뒤에 줄이 서면 이만큼만 머물고 비켜 준다.**
+ *
+ * 잘된 조작마다 초록 말풍선이 하나씩 나오는데(「스포이트에 증류수를 담았습니다」), 한 번에
+ * 하나씩 3.5~8초를 머문다. 학생은 그 사이에 조작을 서너 개 더 한다 — 그러면 화면은
+ * **한참 전에 한 일**을 읽어 주고 있다. osmosis 플레이테스트(2026-09-02)에서 1단계 정상
+ * 경로를 그대로 밟았더니 5 % 용액을 가장자리에 댈 때 화면에는 아직 「바깥쪽 표피를
+ * 얇게 벗겼습니다」가 떠 있었다 — **여덟 조작 전** 말이다. 「지금 무엇이 바뀌었나」를
+ * 말하려던 문장이 지금 사실이 아닌 것을 읽힌다.
+ *
+ * 그래서 초록 말풍선은 **뒤에 기다리는 것이 있으면** 이 시간만 채우고 다음에 자리를 준다.
+ * 아무것도 안 기다리면 원래 시간(`holdFor`)을 다 머문다. 빨간 말풍선(뜻대로 안 된 것)은
+ * 건드리지 않는다 — 그건 읽어야 하는 말이라 시간을 줄이지 않는다.
+ */
+const OK_YIELD_MS = 1500;
+
+/**
  * 난이도별로 화면에 보일 메시지를 만든다. 표에 없는 tag 는 원인만 보여 준다(undefined 를 내지 않는다).
  *
  * 3단계에서 숨기는 것은 **뜻대로 안 됐을 때의 원인**이다 (스스로 찾으라는 단계이므로).
@@ -67,6 +83,23 @@ export function createToastQueue(root, getLevel) {
   let showingShown = null;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
+  /** 지금 떠 있는 것이 잘된 말인가, 언제 떴는가 — 비켜 줄지 정할 때 쓴다 (`OK_YIELD_MS`). */
+  let showingGood = false;
+  let shownAt = 0;
+  let yieldTimer = 0;
+
+  /**
+   * 초록 말풍선이 떠 있고 뒤에 줄이 있으면, 최소 시간을 채운 뒤 비켜 준다.
+   * 새 말이 줄에 설 때마다 부른다 — 뜰 때 줄이 비어 있었어도 나중에 찰 수 있다.
+   */
+  function yieldIfCrowded() {
+    if (!showing || !showingGood || queue.length === 0) return;
+    clearTimeout(yieldTimer);
+    const left = Math.max(0, OK_YIELD_MS - (Date.now() - shownAt));
+    yieldTimer = setTimeout(() => {
+      if (showing && showingGood && queue.length > 0) dismiss?.();
+    }, left);
+  }
 
   function reducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -79,6 +112,8 @@ export function createToastQueue(root, getLevel) {
     showingTag = tag ?? null;
     showingBlocked = !!wasBlocked;
     showingShown = message;
+    showingGood = good;
+    shownAt = Date.now();
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -109,14 +144,18 @@ export function createToastQueue(root, getLevel) {
     const timer = setTimeout(() => { dismiss?.(); }, holdFor(message));
     dismiss = () => {
       clearTimeout(timer);
+      clearTimeout(yieldTimer);
       el.remove();
       dismiss = null;
       showing = false;
       showingTag = null;
       showingBlocked = false;
       showingShown = null;   // 지울 때 함께 잊는다 — 안 잊으면 다음 막힘이 삼켜진다
+      showingGood = false;
       showNext();
     };
+    // 뜨는 순간 이미 줄이 있으면(연달아 조작한 뒤) 이것도 최소 시간만 머문다.
+    yieldIfCrowded();
   }
 
   return {
@@ -174,6 +213,7 @@ export function createToastQueue(root, getLevel) {
 
       queue.push({ message: detail(message, tag, level, good), good, tag });
       showNext();
+      yieldIfCrowded();
     },
   };
 }

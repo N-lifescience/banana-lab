@@ -136,7 +136,8 @@ export function createZoom(root, store) {
     body.innerHTML = `
       <h2>${UI.zoom.onionMode}</h2>
       <p class="cover-hint">${UI.zoom.onionLead}</p>
-      <div class="zoom-slide-workspace">
+      <!-- 도구가 위에 뜨지 않는 화면이라 그 자리(padding-top)를 비워 두지 않는다 -->
+      <div class="zoom-slide-workspace zoom-slide-workspace--flat">
         <div class="zoom-slide-stage" id="onion-stage"></div>
       </div>
       <div class="ctrl-group" role="group" aria-label="${UI.controls.side}">

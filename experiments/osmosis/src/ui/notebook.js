@@ -423,7 +423,20 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const stepsHtml = groups.map((group, gi) => {
       const isDone = groupsDone[gi];
       const isNow = gi === nowIdx;
-      const { state, open } = panels[gi];
+      const { state } = panels[gi];
+      let { open } = panels[gi];
+      /*
+       * **ⓐ 를 적기 전에는 STEP 4 를 접지 않는다.**
+       *
+       * 질문 ⓐ(거름종이를 대는 까닭)는 STEP 4 **안**, 기록칸 4d 바로 아래에 있다 — 종이를
+       * 대기 전과 후를 눈으로 본 직후에 물어야 답이 나오기 때문이다 (`docs/06`, 순서가 곧
+       * 논증이다). 그런데 4d 를 적고 손을 떼는 순간 STEP 4 는 「다 적었다」가 되어 접히고,
+       * 다음 STEP 이 펼쳐진다. **ⓐ 가 눈앞에서 사라진다** — 학생은 6쪽에 가서야
+       * 「STEP 4 를 마치면 여기에 답이 옮겨집니다」를 보고 되짚어야 한다.
+       * osmosis 플레이테스트(2026-09-02)에서 1단계 정상 경로 그대로 밟다 잡았다.
+       * 손으로 접은 것은 그대로 둔다. 잠금과는 무관하다 — 다음 STEP 은 그대로 열린다.
+       */
+      if (group.id === '4' && isDone && !hasNote(st, 'q.a') && !manualOpen.has(group.id)) open = true;
 
       /*
        * **잠그는 자리는 셋을 다 지나야 한다:**
@@ -890,11 +903,25 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const locked = e.target.closest?.('.note-step--locked');
       if (!locked) return;
       const focused = document.activeElement;
-      if (!focused?.matches?.('[data-note]')) return;
-      store.dispatch('SAVE_NOTE', { step: focused.dataset.note, text: focused.value });
+      /*
+       * ★ **손이 글칸에 없어도 판정한다.** 앞서는 글칸에 손이 없으면 곧장 `return` 했다.
+       *   그런데 학생이 STEP 3 기록을 적고 **딴 데를 한 번 누른 뒤**(손을 떼려고 흔히 그런다)
+       *   잠긴 STEP 4 를 누르면 — 저장은 `change` 로 이미 됐지만 판은 안 갈렸고
+       *   (`savingNote` 는 글자만 고친다), 여기서는 손이 글칸에 없다고 아무것도 안 했다.
+       *   화면에는 「이제 열립니다. 눌러서 여세요」가 떠 있는데 **눌러도 안 열렸다.**
+       *   osmosis 플레이테스트(2026-09-02)에서 1단계 정상 경로 그대로 밟다 잡았다.
+       *   저장은 손이 글칸에 있을 때만, 판정과 열기는 언제나 한다.
+       */
+      if (focused?.matches?.('[data-note]')) {
+        store.dispatch('SAVE_NOTE', { step: focused.dataset.note, text: focused.value });
+      }
       const { openableUpTo } = lockInfo(store.getState());
       const gi = UI.protocol.findIndex((g) => g.id === locked.dataset.stepGroup);
-      if (gi <= openableUpTo) manualOpen.set(locked.dataset.stepGroup, true);
+      if (gi <= openableUpTo) {
+        manualOpen.set(locked.dataset.stepGroup, true);
+        // 누르는 중이라 `render()` 는 미뤄지고(`pressing`), 손을 떼는 순간 한 번 그려진다.
+        render();
+      }
     });
 
     panelEl.querySelectorAll('details[data-step-group] > summary').forEach((el) => {
@@ -1130,6 +1157,30 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     if (why) why.hidden = !blocked;
   }
 
+  /**
+   * **손이 노트를 떠나면 그때 한 번 제대로 그린다.**
+   *
+   * `savingNote` 갈래는 글자만 고치고 판은 안 간다 — 손이 있는 글칸을 지키려는 것이다.
+   * 그런데 그 뒤로 **아무것도 판을 안 갈아 주면** 화면이 낡은 채 남는다:
+   *   · 잠긴 STEP 이 「이제 열립니다」라고 말하면서 잠긴 껍데기 그대로다
+   *   · 서술형을 적고 손을 떼도 첨삭 줄이 안 뜬다 (첨삭은 판을 갈 때만 붙는다)
+   *   · 결과 기록을 적어도 ✓ 가 안 붙는다
+   * 다음 조작(실험대·탭)이 올 때까지 그대로다. 학생은 「적었는데 아무 일도 없다」를 본다.
+   * osmosis 플레이테스트(2026-09-02)에서 잡았다.
+   *
+   * 한 박자 뒤에 **손이 노트 안에 없을 때만** 통째로 그린다. 글칸이든 단추든 노트 안에
+   * 손이 있으면 그대로 둔다 — Tab 으로 옆 칸에 간 손, 「읽었습니다」에 얹힌 손이 사라지면
+   * 안 된다. 누르는 중이면 `pressing` 이 손을 뗄 때 그려 준다.
+   */
+  function settleSoon() {
+    setTimeout(() => {
+      if (pressing) { renderPending = true; return; }
+      const a = document.activeElement;
+      if (a && a !== document.body && panelEl.contains(a)) return;
+      render();
+    }, 0);
+  }
+
   function render() {
     /*
      * **`savingNote` 를 `pressing` 보다 먼저 본다.** 순서를 거꾸로 두면, 글칸을 눌러
@@ -1152,6 +1203,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
        * 이 자리는 노트 바깥(`#report-slot`)이라 글칸을 건드리지 않는다 — 안전하게 갈 수 있다.
        */
       renderReportSlot(now);
+      settleSoon();
       return;
     }
     if (pressing) { renderPending = true; return; }

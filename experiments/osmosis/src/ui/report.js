@@ -90,13 +90,23 @@ function predict(st) {
  * `tests/report.test.js` 가 화면의 칸 수와 종이의 빈칸 수를 맞대 본다.
  */
 function process(st) {
+  /*
+   * **3단계는 STEP 마다 칸 하나다** (`notes['3']`, 세부 단계 칸이 아니다 — notebook.js renderStage4).
+   * 앞서는 세부 단계 키(`3d`)만 읽어서 3단계 학생의 글이 종이에 **한 자도 안 실리고**, 그 자리
+   * 일곱 곳에 「적지 않았습니다」가 붙었다 — 다 적은 학생이 선생님 눈에는 건너뛴 학생으로 보인다.
+   * PLAYTEST.md 가 「한때 여기서 한 자도 안 실렸다」고 적어 둔 바로 그 자리가 되살아나 있었다.
+   * osmosis 플레이테스트(2026-09-02) 3단계 종이에서 잡았다. `tests/report.test.js` 가 지킨다.
+   */
+  const goalOnly = st.session.level >= 3;
   const groups = UI.protocol.map((g) => {
     const items = g.steps.map((s, i) => {
       const key = `${g.id}${String.fromCharCode(97 + i)}`;
-      if (!s.note) return `<li><b>${escapeHtml(s.label)}</b></li>`;
+      if (!s.note || goalOnly) return `<li><b>${escapeHtml(s.label)}</b></li>`;
       return `<li><b>${escapeHtml(s.label)}</b><span>${or(st.session.notes[key], R.notWritten)}</span></li>`;
     }).join('');
-    return `<div class="rp-row"><h3>STEP ${g.id} · ${escapeHtml(g.title)}</h3><ul class="rp-steps">${items}</ul></div>`;
+    const goalNote = goalOnly
+      ? `<li><b>${escapeHtml(N.notesLabel)}</b><span>${or(st.session.notes[g.id], R.notWritten)}</span></li>` : '';
+    return `<div class="rp-row"><h3>STEP ${g.id} · ${escapeHtml(g.title)}</h3><ul class="rp-steps">${items}${goalNote}</ul></div>`;
   }).join('');
   return `<section><h2>${R.sections.process}</h2>${groups}</section>`;
 }
@@ -162,7 +172,7 @@ function wrapup(st, group) {
     [N.q3Label, st.session.notes.q3],
     ...(group ? [[N.q4Label, st.session.notes.q4]] : []),
   ].map(([label, text]) => `
-    <div class="rp-row"><h3>${label}</h3><p>${or(text, R.notWritten)}</p></div>`).join('');
+    <div class="rp-row"><h3>${emphasize(label)}</h3><p>${or(text, R.notWritten)}</p></div>`).join('');
 
   // 세부 단계 기록은 4단계에서 이미 통째로 실었다. 여기서 또 싣지 않는다.
   return `<section><h2>${R.sections.wrapup}</h2>${compare}${answers}</section>`;
@@ -225,12 +235,19 @@ function selfEval(st) {
  */
 export function buildSheet(st, who, kind) {
   const group = kind ? kind === 'group' : isGroup(st);
+  /*
+   * 문제와 준비물 설명은 **우리가 쓴 문장**이라 「**굵게**」 표기가 들어 있다.
+   * 화면(notebook.js)은 emphasize 로 풀어 쓰는데 종이만 날것으로 실어서, 인쇄된 활동지의
+   * 1절이 「**어느 농도에서 세포의 절반이 변할까?**」 로 별표째 나왔다.
+   * osmosis 플레이테스트(2026-09-02)에서 종이를 찍어 보고 잡았다. tests/report.test.js 가 지킨다.
+   * (템플릿 문자열 안이라 주석에 백틱을 쓰면 그 자리에서 끊긴다 — 실제로 끊겼다.)
+   */
   return `
     ${head(st, who)}
-    <section><h2>${R.sections.problem}</h2><p>${N.problem}</p></section>
+    <section><h2>${R.sections.problem}</h2><p>${emphasize(N.problem)}</p></section>
     <section><h2>${R.sections.materials}</h2>
       <ul class="rp-steps">${N.materials.map((m) =>
-        `<li><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.role)}</span></li>`).join('')}</ul>
+        `<li><b>${escapeHtml(m.name)}</b><span>${emphasize(m.role)}</span></li>`).join('')}</ul>
     </section>
     ${predict(st)}
     ${process(st)}

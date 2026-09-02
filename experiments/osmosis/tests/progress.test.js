@@ -90,7 +90,8 @@ test('절차를 끝까지 밟으면 여섯 단계가 모두 끝난 것으로 판
 
   go('MOUNT', { slide: 'A' });
   go('SET_DIAPHRAGM', { value: 0.7 });
-  go('COARSE_FOCUS', { delta: 0 });
+  // 올리면 초점이 흐트러진다 (MOUNT_COARSE). 저배율에서 조동나사로 되돌려 맞춘다.
+  go('COARSE_FOCUS', { delta: -s.microscope.coarse });
   go('SET_OBJECTIVE', { objective: 10 });
   s = tickUntilSettled(s);
   go('CAPTURE');

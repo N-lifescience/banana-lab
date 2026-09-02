@@ -195,3 +195,22 @@ test('화면에 보이는 한국어에 이 실험에 없는 재료가 섞여 있
   })(UI, 'UI');
   assert.deepEqual(bad, [], `이 실험에 없는 재료가 화면 문구에 남아 있습니다:\n  ${bad.join('\n  ')}`);
 });
+
+test('종이에 `**굵게**` 표기가 날것으로 남지 않는다', () => {
+  // 화면은 emphasize 로 풀어 쓰는데 종이만 날것으로 실어서, 인쇄된 활동지의 1절이
+  // 「**어느 농도에서 세포의 절반이 변할까?**」 로 별표째 나왔다 (osmosis 플레이테스트 2026-09-02).
+  // 학생이 쓴 글에 별표가 있을 수는 있으니, 학생 글이 하나도 없는 초기 상태로 본다.
+  const html = buildSheet(initialState(1), {}, 'group');
+  assert.equal(html.includes('**'), false, '종이에 별표가 그대로 남았습니다 — emphasize 를 거치지 않은 문구가 있습니다');
+});
+
+test('3단계 학생이 STEP 마다 적은 글이 종이에 실린다', () => {
+  // 3단계는 STEP 마다 칸 하나(`notes['3']`)인데 종이는 세부 단계 키만 읽어서 **한 자도 안 실렸고**,
+  // 그 자리에 「적지 않았습니다」 일곱 개가 붙었다 (osmosis 플레이테스트 2026-09-02).
+  const st = initialState(3);
+  for (const g of UI.protocol) st.session.notes[g.id] = `STEP${g.id}에서 본 것을 적었다`;
+  const html = buildSheet(st, {}, 'individual');
+  for (const g of UI.protocol) assert.ok(html.includes(`STEP${g.id}에서 본 것을 적었다`), `STEP ${g.id} 의 글이 종이에 없습니다`);
+  const process = html.slice(html.indexOf(UI.report.sections.process), html.indexOf(UI.report.sections.result));
+  assert.equal((process.match(/적지 않았습니다/g) ?? []).length, 0, '다 적었는데 탐구 과정에 「적지 않았습니다」가 붙습니다');
+});

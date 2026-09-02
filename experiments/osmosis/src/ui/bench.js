@@ -217,7 +217,14 @@ export function dropTable(store, openZoom = () => {}) {
        * 학생이 한 적 없는 일로 나무라지도 않는다.
        */
       microscope: (item) => {
-        store.dispatch('MOUNT', { slide: item.slide });
+        const r = store.dispatch('MOUNT', { slide: item.slide });
+        /*
+         * **안 올라갔으면 맞춰 줄 것도 없다.** 금 간 유리는 `MOUNT` 가 막는데, 그 뒤에도
+         * 배율·초점을 맞추는 세 조작이 그대로 돌아서 빨간 「금이 갔습니다」 바로 뒤에
+         * 초록 「대물렌즈를 10배로 바꿨습니다」가 떴다 — 막힌 직후에 잘됐다는 말이 따라오면
+         * 학생은 올라간 줄 안다. osmosis 플레이테스트(2026-09-02)에서 잡았다.
+         */
+        if (r.outcome === 'blocked') return;
         if (store.getState().session.level !== 1) return;
         store.dispatch('SET_OBJECTIVE', { objective: 4 });
         store.dispatch('COARSE_FOCUS', { delta: -store.getState().microscope.coarse });

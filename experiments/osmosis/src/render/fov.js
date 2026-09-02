@@ -198,6 +198,9 @@ export function renderFOV(p, { idPrefix = '' } = {}) {
     }
   }
 
+  // 시야 지름 글자는 원 **바깥**, 패널 바탕 위에 앉는다. 검정을 박아 두면 다크 모드에서
+  // 어두운 바탕에 어두운 글자가 되어 안 읽혔다 (osmosis 플레이테스트 2026-09-02).
+  // currentColor 는 화면에서는 --ink 를, 인쇄(body color #000)에서는 검정을 따른다.
   // 상은 재물대와 반대로 움직인다.
   // 기포와 금 간 선은 슬라이드에 붙은 것이라 함께 움직인다 — 렌즈에 붙은 얼룩만 고정이다.
   const scene = `<g id="${id('fov-scene')}" transform="translate(${(-panX).toFixed(1)},${(-panY).toFixed(1)})">${body}${fold}${bubbles}${cracks}</g>`;
@@ -249,6 +252,6 @@ export function renderFOV(p, { idPrefix = '' } = {}) {
     <circle cx="${CX}" cy="${CY}" r="${R}" fill="${ref('fov-vig')}"/>
   </g>
   <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="4"/>
-  <text x="${CX}" y="${FS - 6}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="rgba(0,0,0,.42)">시야 지름 약 ${Math.round(fieldDiameterUm(p.objective))} µm</text>
+  <text x="${CX}" y="${FS - 6}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="currentColor" opacity="0.55">시야 지름 약 ${Math.round(fieldDiameterUm(p.objective))} µm</text>
 </svg>`;
 }

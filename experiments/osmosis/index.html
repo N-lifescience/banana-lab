@@ -476,6 +476,9 @@
 
   /* 핀셋에 물린 덮개 유리. 받침 유리 위쪽에서 좌우로 기울이고 아래로 내린다. */
   .zoom-slide-workspace{position:relative;padding-top:104px}
+  /* 비늘잎 화면에는 위에 뜨는 도구가 없다. 그 여백을 그대로 두면 제목 아래 104px 이 비어
+     그림이 화면 밖으로 밀린다 — 눕힌 폰에서는 그만큼 더 스크롤해야 한다. */
+  .zoom-slide-workspace--flat{padding-top:0}
   /* 받침 유리 한가운데 바로 위에 둔다. 옆에 두면 받침 유리까지 내려오는 동안
      가로로 움직일 수밖에 없고, 가로 움직임이 곧 기울기라 각도가 딸려 바뀐다. */
   .cover-tool{position:absolute;top:0;left:calc(50% - 75px);width:150px;height:112px;padding:0;

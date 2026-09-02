@@ -69,7 +69,10 @@ function readySlide(state, slide = 'A') {
   s = run(s, 'PEEL_EPIDERMIS', { side: SIDES.OUTER, thickness: 0.28 }).state;
   s = run(s, 'PLACE_SAMPLE', { slide }).state;
   s = run(s, 'FILL_DROPPER', { solution: 'WATER' }).state;
-  s = run(s, 'DROP', { slide, count: 2 }).state;
+  // 화면과 같은 길로 간다 — 고무를 누를 때마다 한 방울 (`src/ui/zoom.js`).
+  // count:2 로 한 번에 떨어뜨리면 「첫 방울에 경고가 뜬다」를 정상 경로 검사가 못 본다.
+  s = run(s, 'DROP', { slide, count: 1 }).state;
+  s = run(s, 'DROP', { slide, count: 1 }).state;
   s = run(s, 'PICK_COVERSLIP').state;
   s = run(s, 'PLACE_COVERSLIP', { slide, angleDeg: 45 }).state;
   return s;
@@ -206,9 +209,24 @@ test('빈 스포이트로는 아무것도 떨어지지 않는다', () => {
 test('한 방울만 떨어뜨려도 막지 않는다 — 일부만 잠긴다', () => {
   let s = run(S0(), 'FILL_DROPPER', { solution: 'WATER' }).state;
   const r = run(s, 'DROP', { slide: 'A', count: 1 });
-  assert.equal(r.outcome, 'happened');
+  // **첫 방울은 경고가 아니다.** 화면은 고무를 누를 때마다 한 방울이라, 두 방울을 제대로
+  // 떨어뜨리는 학생도 반드시 이 상태를 지난다. 빨간 말풍선이 뜨면 정상 경로에 경고가 뜬 것이다.
+  assert.equal(r.outcome, 'ok', '첫 방울에 빨간 말풍선이 뜹니다 — 정상 경로 한가운데입니다');
   assert.equal(r.tag, 'partial');
+  assert.ok(r.message && /더/.test(r.message), '한 방울 더 필요하다는 말이 있어야 한다');
   assert.equal(coverage(r.state.slides.A), 0.5);
+});
+
+test('화면처럼 한 방울씩 두 번 떨어뜨려도 경고가 없다', () => {
+  // `readySlide` 는 count:2 로 한 번에 떨어뜨리는데, 실제 화면(`src/ui/zoom.js`)은
+  // 고무를 누를 때마다 `count:1` 이다. 검사가 화면과 다른 길을 걸으면 여기서 뜨는
+  // 경고를 영영 못 본다 — 실제로 그랬다 (osmosis 플레이테스트 2026-09-02).
+  let s = run(S0(), 'FILL_DROPPER', { solution: 'WATER' }).state;
+  const r1 = run(s, 'DROP', { slide: 'A', count: 1 });
+  const r2 = run(r1.state, 'DROP', { slide: 'A', count: 1 });
+  assert.equal(r1.outcome, 'ok');
+  assert.equal(r2.outcome, 'ok');
+  assert.equal(r2.state.slides.A.drops, 2);
 });
 
 test('다섯 방울은 넘쳐서 덮개 유리를 띄운다', () => {
@@ -455,6 +473,7 @@ test('재물대는 ±240 px 를 넘지 않지만 끝에 닿아도 막지 않는�
 test('평형에 닿기 전에 기록해도 막지 않고, 그렇다고 말해 준다', () => {
   let s = tickUntilSettled(readySlide(S0(), 'A'));
   s = run(s, 'MOUNT', { slide: 'A' }).state;
+  s = run(s, 'COARSE_FOCUS', { delta: -s.microscope.coarse }).state;   // 올리면 흐트러진 초점을 되돌린다
   s = run(s, 'SET_OBJECTIVE', { objective: 10 }).state;
   s = exchangeTo(s, 'A', 'S20');
   const r = run(s, 'CAPTURE');
@@ -644,7 +663,8 @@ test('정상 경로를 끝까지 밟으면 농도열과 되돌림까지 기록�
   // 재물대 → 저배율 초점 → 100배
   go('MOUNT', { slide: 'A' });
   go('SET_DIAPHRAGM', { value: 0.7 });
-  go('COARSE_FOCUS', { delta: 0 });
+  // 올리면 초점이 흐트러진다 (MOUNT_COARSE). 저배율에서 조동나사로 되돌려 맞춘다.
+  go('COARSE_FOCUS', { delta: -s.microscope.coarse });
   go('SET_OBJECTIVE', { objective: 10 });
   s = tickUntilSettled(s);
   go('CAPTURE');   // 증류수
@@ -761,6 +781,7 @@ test('★ 그 말대로 따라가면 실제로 초점이 맞는다', () => {
 test('초점이 맞은 뒤에는 끝까지 돌려도 그 말을 하지 않는다', () => {
   let s = readySlide(S0(), 'A');
   s = run(s, 'MOUNT', { slide: 'A' }).state;
+  s = run(s, 'COARSE_FOCUS', { delta: -s.microscope.coarse }).state;   // 올리면 흐트러진 초점을 되돌린다
   // coarse 0, fine 을 끝까지 — 저배율(4배)은 허용 0.30 이라 0.2 는 맞은 것이다
   for (let i = 0; i < 40; i += 1) s = run(s, 'FINE_FOCUS', { delta: 0.02 }).state;
   assert.equal(s.microscope.fine, 0.2);
@@ -793,4 +814,46 @@ test('막힘 결과에는 tag 가 없다 — 태그로 겹침을 다루는 장�
   assert.equal(r.tag, undefined, '막힘에 tag 가 생겼습니다 — toast.js 의 전제를 다시 보세요');
   assert.equal(r.reason, BLOCKING_REASONS.BROKEN);
   assert.ok(r.message, '막힘은 반드시 이유를 말한다');
+});
+
+/* ---------------- 조사 ---------------- */
+
+test('용액 이름 뒤의 조사가 맞다 — 「%」 는 「퍼센트」로 읽혀 받침이 없다', () => {
+  // 「설탕 용액 10 %을 담았습니다」 「증류수으로 다 바뀌었습니다」 가 실제로 화면에 떴다
+  // (osmosis 플레이테스트 2026-09-02). 조사는 글자로 박지 않고 이름을 보고 고른다.
+  let s = S0();
+  const bad = [];
+  const say = (r) => { if (r.message && /%[을이으]|수으로|%으로/.test(r.message)) bad.push(r.message); };
+  for (const sol of ['WATER', 'S05', 'S10', 'S15', 'S20']) {
+    let t = readySlide(S0(), 'A');
+    say(run(t, 'FILL_DROPPER', { solution: sol }));
+    t = run(t, 'FILL_DROPPER', { solution: sol }).state;
+    say(run(t, 'APPLY_SOLUTION', { slide: 'A' }));
+    t = run(t, 'APPLY_SOLUTION', { slide: 'A' }).state;
+    t = run(t, 'WICK', { slide: 'A' }).state;
+    say(run(t, 'WICK', { slide: 'A' }));
+    s = t;
+  }
+  // 증류수로 되돌릴 때 — 「증류수로」 라야 한다
+  s = run(run(s, 'RINSE_DROPPER').state, 'FILL_DROPPER', { solution: 'WATER' }).state;
+  s = run(s, 'APPLY_SOLUTION', { slide: 'A' }).state;
+  s = run(s, 'WICK', { slide: 'A' }).state;
+  const r = run(s, 'WICK', { slide: 'A' });
+  say(r);
+  assert.ok(/증류수로 다 바뀌었습니다/.test(r.message), `「증류수로」 라야 합니다: ${r.message}`);
+  assert.deepEqual(bad, [], `조사가 틀린 문장:\n  ${bad.join('\n  ')}`);
+});
+
+test('재물대에 올리면 초점이 흐트러진다 — 2·3단계가 저배율부터 직접 맞추는 자리다', () => {
+  // 처음 상태가 조동 0 이라 올린 순간 초점이 맞아 있었다. 그러면 나사를 한 번도 안 돌려도
+  // 40배까지 선명하고, STEP 3 「저배율에서 초점 맞추기」는 영영 「아직」이다
+  // (osmosis 플레이테스트 2026-09-02, 3단계). 올리면 저배율 허용 범위 밖에서 시작한다.
+  let s = readySlide(S0(), 'A');
+  s = run(s, 'MOUNT', { slide: 'A' }).state;
+  assert.equal(s.microscope.lowMagFocused, false);
+  assert.ok(focusError(s.microscope) >= focusTolerance(4), '올린 직후에 이미 초점이 맞아 있습니다');
+  // 그래도 조동나사 범위 안이라 되돌려 맞출 수 있다
+  const r = run(s, 'COARSE_FOCUS', { delta: -s.microscope.coarse });
+  assert.ok(focusError(r.state.microscope) < focusTolerance(4));
+  assert.equal(r.state.microscope.lowMagFocused, true);
 });

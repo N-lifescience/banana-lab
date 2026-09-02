@@ -56,15 +56,36 @@ export const BLOCKING_REASONS = {
  */
 const ok = (state, message = null, tag = null) => ({ state, outcome: 'ok', message, tag });
 
-/** 마지막 글자에 받침이 있는가. 한글이 아니면 있는 것으로 본다. */
+/**
+ * 마지막 글자에 받침이 있는가. 한글이 아니면 있는 것으로 본다.
+ *
+ * **`%` 는 「퍼센트」로 읽는다** — 받침이 없다. 용액 이름 넷이 「설탕 용액 10 %」 로 끝나서,
+ * 한글 아닌 글자를 전부 받침 있음으로 치면 「10 %을 담았습니다」 「10 %으로 바뀌었습니다」 가
+ * 화면에 뜬다. osmosis 플레이테스트(2026-09-02)에서 실제로 떴다.
+ */
 const hasJong = (w) => {
+  const last = w[w.length - 1];
+  if (last === '%') return false;
   const c = w.charCodeAt(w.length - 1);
   if (c < 0xac00 || c > 0xd7a3) return true;
   return (c - 0xac00) % 28 !== 0;
 };
 
+/** 받침 ㄹ 인가. 「으로/로」 는 ㄹ 받침을 받침 없음과 같이 다룬다 (「물로」). */
+const hasRieul = (w) => {
+  const c = w.charCodeAt(w.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return false;
+  return (c - 0xac00) % 28 === 8;
+};
+
 /** 받침 조사. 받침이 있으면 '을', 없으면 '를'. */
 const eul = (w) => (hasJong(w) ? '을' : '를');
+
+/**
+ * 「으로/로」. 받침이 없거나 ㄹ 받침이면 '로', 그 밖에는 '으로'.
+ * 「증류수으로 다 바뀌었습니다」 가 실제로 떴다 — 조사를 글자로 박아 두면 이름이 바뀔 때 틀린다.
+ */
+const ro = (w) => (!hasJong(w) || hasRieul(w) ? '로' : '으로');
 
 /**
  * 받침 조사. 받침이 있으면 '이', 없으면 '가'.
@@ -133,6 +154,13 @@ export function bubblesFromAngle(angleDeg) {
  * 세포가 겹쳐 보이는 시야가 대신 답한다.
  */
 export const UNCUT_MIN_THICKNESS = 0.72;
+
+/**
+ * 슬라이드를 재물대에 올린 직후의 조동나사 자리. 4배 허용 범위(0.30)보다 커서 저배율에서도
+ * 흐리게 시작한다 — 조동나사로 맞추는 것이 첫 일이 되게. 조동나사 범위(±1) 안쪽이라
+ * 어느 쪽으로 돌려도 닿는다 (`MOUNT` 주석 참조).
+ */
+export const MOUNT_COARSE = 0.45;
 
 /* ------------------------------------------------------------------ */
 /* 액션                                                                */
@@ -251,8 +279,18 @@ export const ACTIONS = {
     if (contaminated && !s.contaminated) {
       return happened(next, '씻지 않은 스포이트를 썼습니다. 덮개 유리 아래 농도가 이름표와 다릅니다.', 'cross-contamination');
     }
+    /*
+     * **첫 방울은 실패가 아니다.** 화면의 스포이트는 고무를 누를 때마다 한 방울씩 떨어뜨린다
+     * (`src/ui/zoom.js` — 단추 하나로 두 방울을 내면 조작이 아니라 계산기 두드리기가 된다).
+     * 그러니 두 방울을 제대로 떨어뜨리는 학생도 **반드시 한 번은 한 방울인 상태**를 지난다.
+     * 앞서는 여기서 `happened` 를 돌려줘서, 정상 경로 한가운데에 빨간 말풍선
+     * 「한 방울이 떨어졌습니다. 표피 전체가 잠기지는 않았습니다」가 떴다 — 제대로 하고 있는데
+     * 「뜻대로 안 됐다」는 색을 본다. 거름종이 한 번(`WICK` 의 `wicking`)과 같은 자리다.
+     * osmosis 플레이테스트(2026-09-02)에서 잡았다. 진행 상황만 말한다.
+     * 한 방울에서 멈추면 그것은 시야가 답한다 (`coverage` 0.5 — 잠긴 자리에만 삼투).
+     */
     if (drops === 1) {
-      return happened(next, '한 방울이 떨어졌습니다. 표피 전체가 잠기지는 않았습니다.', 'partial');
+      return ok(next, '한 방울 떨어뜨렸습니다. 한 방울 더 떨어뜨려야 표피 전체가 잠깁니다.', 'partial');
     }
     if (drops >= 5) {
       return happened(next, `액이 받침 유리 밖으로 흘러넘쳐 실험대에 고였습니다 (${drops}방울). `
@@ -317,13 +355,15 @@ export const ACTIONS = {
     }
     if (!s.pending) {
       return happened(state,
-        '가장자리에 새 용액이 없습니다. 반대쪽에 용액을 한 방울 대고 나서 빨아들이세요.', 'nothing-to-wick');
+        // 「반대쪽에 용액을」 이라고 하면 거름종이 자리를 기준으로 읽혀 어느 쪽인지 헷갈린다.
+        // 용액 → 반대쪽 종이, 순서 그대로 말한다.
+        '가장자리에 새 용액이 없습니다. 덮개 유리 한쪽에 용액을 한 방울 대고 나서 반대쪽에서 빨아들이세요.', 'nothing-to-wick');
     }
     const exchange = s.exchange + EXCHANGE_PER_WICK;
     if (exchange >= 1) {
       const next = withSlide(state, slide, { medium: s.pending, pending: null, exchange: 0 });
       const dn = SOLUTION_NAME[s.pending.id] ?? '용액';
-      return ok(next, `덮개 유리 아래가 ${dn}으로 다 바뀌었습니다.`, 'exchanged');
+      return ok(next, `덮개 유리 아래가 ${dn}${ro(dn)} 다 바뀌었습니다.`, 'exchanged');
     }
     // 여기서 happened 를 돌려주면 안 된다. **한 번에 다 안 바뀌는 것이 정상**이라,
     // 제대로 하고 있는 학생에게 매번 경고가 뜬다. 진행 상황을 말해 줄 뿐이다.
@@ -376,14 +416,24 @@ export const ACTIONS = {
     return ok(next, `${SLIDE_NAME[slide]}에 덮개 유리를 기포 없이 덮었습니다.`, 'covered');
   },
 
-  /** R-07 재물대에 슬라이드를 올린다. */
+  /**
+   * R-07 재물대에 슬라이드를 올린다.
+   *
+   * **올리면 초점이 흐트러진다.** 앞서는 재물대에 올린 순간 초점이 맞아 있었다(처음 상태가
+   * 조동 0·미동 0). 그러면 2·3단계에서 「저배율부터 직접 맞춘다」(`docs/06`)가 빈말이 된다 —
+   * 나사를 한 번도 안 돌려도 40배까지 선명하고, STEP 3 「저배율에서 초점 맞추기」는 영영
+   * 「아직」이며, 40배로 올리면 「저배율에서 초점을 맞추지 않고 올렸습니다」라고 나무라는데
+   * 화면은 선명하다 — 화면과 문구가 다른 말을 했다. osmosis 플레이테스트(2026-09-02)에서
+   * 3단계를 밟다 잡았다. 실물도 슬라이드를 갈면 초점을 다시 잡는다.
+   * 1단계는 `bench.js` 가 올린 직후 조동나사를 되돌려 맞춰 준다 (그 손을 뺏지 않는 것이 2·3단계다).
+   */
   MOUNT(state, { slide }) {
     const s = state.slides[slide];
     if (s.cracked) {
       return blocked(state, '이 슬라이드는 금이 갔습니다. 받침 유리 통에서 새것을 꺼내 처음부터 다시 만드세요.',
         BLOCKING_REASONS.BROKEN);
     }
-    const next = withScope(state, { stage: slide });
+    const next = withScope(state, { stage: slide, coarse: MOUNT_COARSE, lowMagFocused: false });
     if (!s.coverslip.placed) {
       return happened(next, '덮개 유리 없이 올렸습니다. 고배율로 올리면 대물렌즈가 시료에 닿습니다.', 'no-coverslip');
     }
