@@ -162,6 +162,9 @@
   .report-todo ul{margin:6px 0 0;padding-left:18px}
   .note-graph{margin-bottom:8px}
   .note-graph svg{width:100%;height:auto;display:block}
+  /* 결과 그림(그래프·관찰 창)의 글자와 축은 `currentColor` 다 (src/render/graph.js 머리말).
+     여기서 테마 글자색을 준다 — 다크 모드에서 검정 글자가 검정 바탕에 묻히던 자리다. */
+  svg[data-render]{color:var(--ink)}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   .result-card{background:var(--surface);border:1px solid var(--rule);border-radius:8px;
     padding:16px;margin-top:14px}
@@ -431,7 +434,11 @@
   .report-slot{flex:0 0 auto;max-width:58%}
   .report-todo{font-size:12px;color:var(--warn);border:1px solid var(--rule);
     border-radius:6px;padding:6px 9px;background:var(--sunk)}
-  .report-todo summary{cursor:pointer;white-space:nowrap}
+  /* 「보고서를 만들려면 아직 남은 것이 있습니다」— `nowrap` 이면 1280 px 교실 노트북에서도
+     칸(58 %)보다 길어 **「…남은 것이 있」에서 잘렸다** (183/216 px). 잘린 채로는 무엇이 남았는지
+     펼칠 수 있다는 것도 안 보인다. 접히게 둔다 — 두 줄이어도 다 읽히는 쪽이 낫다.
+     플레이테스트에서 잡았다 (2026-09-02). */
+  .report-todo summary{cursor:pointer}
   .report-todo ul{margin:6px 0 0;padding-left:16px;color:var(--ink-mute);line-height:1.5}
   .note-step{margin-bottom:18px}
   .substep-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
@@ -743,6 +750,8 @@
     .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
     .report-sheet{display:block}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    /* 종이는 늘 흰 바탕이다. 다크 모드 기기에서 인쇄해도 그래프 글자가 밝은 색으로 나가면 안 된다. */
+    svg[data-render]{color:#000}
     /* 종이의 모양은 public/report-sheet.css 에 있다 — 선생님 화면(teacher.html)이
        같은 종이를 화면에서도 그리기 때문이다. 두 벌로 두면 언젠가 서로 달라진다. */
   }

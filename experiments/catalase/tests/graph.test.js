@@ -125,6 +125,17 @@ test('갈래마다 모양이 다르다 — 색만으로 가르지 않는다', ()
   assert.ok(one({ floated: false, seconds: null }).includes('<g id="g-p0"'), '안 뜬 점이 가위표가 아닙니다');
 });
 
+test('글자와 축은 currentColor 다 — 다크 모드에서도 읽힌다', () => {
+  // 고정 검정(INK)이면 다크 모드에서 눈금·축 이름·「뜨지 않음」 칸이 통째로 안 보였다.
+  const svg = renderGraph([trial(0), trial(1, { tempC: 37 }, { seconds: 8 }),
+    trial(2, { tempC: 100 }, { floated: false, seconds: null })], DESIGN);
+  const texts = svg.match(/<text[^>]*>/g) ?? [];
+  assert.ok(texts.length > 0);
+  for (const t of texts) assert.match(t, /fill="currentColor"/, `글자가 고정색입니다: ${t}`);
+  assert.doesNotMatch(svg, /#[0-9A-Fa-f]{6}"[^>]*>[^<]*(초|℃|뜨지 않음)/, '축 글자에 고정 색이 남아 있습니다');
+  assert.ok(svg.includes('<g id="g-p2" stroke="currentColor"'), '안 뜬 점(가위표)이 고정색입니다');
+});
+
 /* ---------------- 축 ---------------- */
 
 test('재지 않은 조건도 가로축에 남는다', () => {

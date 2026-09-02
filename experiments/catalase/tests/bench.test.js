@@ -57,6 +57,14 @@ test('실험대 밖으로 나간 물건이 없다', () => {
     out.map((i) => `${i.id} ${Math.round(i.x)}~${Math.round(i.x + i.w)} mm`).join(', '));
 });
 
+test('물건의 프레임까지 실험대 안에 있다 — 빈 여백이 삐져나가 스크롤을 만들지 않는다', () => {
+  // 그려진 부분은 안에 있어도 `<button>` 은 프레임 크기다. 줄 끝 물건의 프레임 여백이
+  // 실험대 밖으로 나가면 `#bench` 에 가로 스크롤이 생긴다 — 1280 px 에서 23 px 이 그랬다.
+  const out = LAYOUT.filter((i) => i.frame.x < -0.01 || i.frame.x + i.frame.w > STAGE_W_MM + 0.01);
+  assert.deepEqual(out.map((i) => i.id), [],
+    out.map((i) => `${i.id} 프레임 ${Math.round(i.frame.x)}~${Math.round(i.frame.x + i.frame.w)} mm`).join(', '));
+});
+
 test('조건마다 물건이 하나씩 있다', async () => {
   // 화면이 조건을 대신 골라 주면 통제변인을 틀릴 수가 없어지고, 틀릴 수 없으면
   // 그래프에서 어긋난 점을 볼 일도 없다 — 이 실험이 가르치려는 것이 사라진다.

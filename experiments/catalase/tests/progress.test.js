@@ -87,6 +87,17 @@ test('한 시행을 끝내면 2·3·4단계가 다 켜진다', () => {
   }
 });
 
+test('담근 원반을 비커에 넣은 뒤에도 「담그기」 칸이 꺼지지 않는다', () => {
+  // DROP_DISC 가 핀셋의 원반을 비운다. 핀셋만 보면 넣은 순간 ✓ 가 · 로 되돌아갔다 —
+  // 기록하기 전까지 「담그기」가 안 한 일로 보였다. 플레이테스트에서 잡았다 (2026-09-02).
+  const st = run(initialState(), [
+    ['PUNCH_DISC', {}], ['MAKE_EXTRACT', { pct: 100 }], ['SOAK_DISC', {}],
+    ['POUR_H2O2', { pct: 3 }], ['DROP_DISC', {}],
+  ]);
+  assert.equal(st.trials.length, 0, '아직 기록 전이어야 하는 검사입니다');
+  assert.equal(stepDone(st, '2', 1), true, '원반을 넣자마자 「담그기」가 꺼졌습니다');
+});
+
 test('되돌리기로 무른 조작도 「한 적 있다」로 남는다', () => {
   // 로그는 되돌리지 않는다 — 되돌아보기용 기록이기 때문이다 (rules.js 의 UNDO).
   let st = run(initialState(2), [['PUNCH_DISC', {}]]);

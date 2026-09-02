@@ -20,7 +20,15 @@
  * 그려도 `id` 가 부딪히지 않는다 (보고서가 그렇게 쓴다).
  */
 
-import { INK } from '../style/tokens.js';
+/*
+ * ── 글자와 축은 `currentColor` 다 ──────────────────────────────────
+ * 앞서는 `INK`(고정된 검정)였다. 다크 모드에서 이 그래프가 놓이는 자리(`--surface`)가
+ * 검정에 가까워져 **눈금 숫자·축 이름·「뜨지 않음」 칸·축선이 통째로 안 보였다** —
+ * 점과 선만 허공에 떠 있었다. 플레이테스트에서 다크 모드로 켜 보고 잡았다 (2026-09-02).
+ * `currentColor` 는 이 그림이 놓인 자리의 글자색을 따라간다 — 화면에서는 테마 색,
+ * 인쇄에서는 검정(`index.html` 의 `svg[data-render]` 규칙). fermentation 과 같은 방식이다.
+ * 갈래 색(점의 채움)은 그대로 팔레트에서 온다 — 모양이 먼저이고 색은 거들 뿐이다.
+ */
 import { EXP_PALETTE } from '../style/palette.experiment.js';
 import { CHOICES, VARIABLE_KEY, offDesign } from '../sim/state.js';
 import { OBSERVE_LIMIT_S } from '../sim/kinetics.js';
@@ -117,12 +125,12 @@ function marker(kind, x, y, id) {
   const c = {
     line: EXP_PALETTE.bathWater[1],
     'off-design': EXP_PALETTE.potatoBoiled[1],
-    'no-float': INK,
+    'no-float': 'currentColor',
     'other-variable': EXP_PALETTE.potatoBoiled[1],
-    unknown: INK,
+    unknown: 'currentColor',
   }[kind];
   if (kind === 'line') {
-    return `<circle id="${id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${c}" stroke="${INK}" stroke-width="1.5"/>`;
+    return `<circle id="${id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${c}" stroke="currentColor" stroke-width="1.5"/>`;
   }
   if (kind === 'no-float') {
     // 가위표. 「여기까지 기다렸는데 안 됐다」를 뜻한다.
@@ -166,13 +174,13 @@ export function renderGraph(trials = [], design = {}, { idPrefix = 'g' } = {}) {
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => {
     const y = p.y1 - (p.y1 - p.y0) * f;
     const s = Math.round(yMax * f);
-    return `<path d="M ${p.x0},${y.toFixed(1)} L ${p.x1},${y.toFixed(1)}" stroke="${INK}" stroke-opacity="0.14" stroke-width="1"/>`
-      + `<text x="${p.x0 - 8}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="${INK}" fill-opacity="0.75">${s}</text>`;
+    return `<path d="M ${p.x0},${y.toFixed(1)} L ${p.x1},${y.toFixed(1)}" stroke="currentColor" stroke-opacity="0.14" stroke-width="1"/>`
+      + `<text x="${p.x0 - 8}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="currentColor" fill-opacity="0.75">${s}</text>`;
   }).join('');
 
   const xLabels = values.map((v) => {
     const x = xOf(values, v);
-    return `<text x="${x.toFixed(1)}" y="${p.y1 + 18}" font-size="11" text-anchor="middle" fill="${INK}" fill-opacity="0.8">${UI.units[key](v)}</text>`;
+    return `<text x="${x.toFixed(1)}" y="${p.y1 + 18}" font-size="11" text-anchor="middle" fill="currentColor" fill-opacity="0.8">${UI.units[key](v)}</text>`;
   }).join('');
 
   const marks = points.map((q, i) => marker(
@@ -185,20 +193,20 @@ export function renderGraph(trials = [], design = {}, { idPrefix = 'g' } = {}) {
   role="img" data-render="graph" data-points="${trials.length}">
   <!-- 「뜨지 않음」 칸. 시간 축과 선으로 갈라 둔다 — 같은 축이 아니다 -->
   <rect x="${p.x0}" y="${GRAPH.top}" width="${p.x1 - p.x0}" height="${GRAPH.noFloatBand}"
-    fill="${INK}" fill-opacity="0.05"/>
+    fill="currentColor" fill-opacity="0.05"/>
   <text x="${p.x0 - 8}" y="${GRAPH.top + GRAPH.noFloatBand / 2 + 4}" font-size="10"
-    text-anchor="end" fill="${INK}" fill-opacity="0.75">${G.noFloatLabel}</text>
-  <path d="M ${p.x0},${p.y0} L ${p.x1},${p.y0}" stroke="${INK}" stroke-opacity="0.35"
+    text-anchor="end" fill="currentColor" fill-opacity="0.75">${G.noFloatLabel}</text>
+  <path d="M ${p.x0},${p.y0} L ${p.x1},${p.y0}" stroke="currentColor" stroke-opacity="0.35"
     stroke-width="1.5" stroke-dasharray="4 3"/>
 
   <g id="${id('ticks')}">${ticks}</g>
 
   <!-- 축 -->
   <path d="M ${p.x0},${GRAPH.top} L ${p.x0},${p.y1} L ${p.x1},${p.y1}"
-    fill="none" stroke="${INK}" stroke-width="2"/>
+    fill="none" stroke="currentColor" stroke-width="2"/>
   <!-- 세로축 이름을 **가로로 위에** 둔다. 회전해서 축 왼쪽에 붙였더니 글자가 잘렸다 -->
-  <text x="4" y="14" font-size="11" fill="${INK}" fill-opacity="0.85">${G.yLabel}</text>
-  <text x="${(p.x0 + p.x1) / 2}" y="${GRAPH.h - 8}" font-size="11" text-anchor="middle" fill="${INK}">${
+  <text x="4" y="14" font-size="11" fill="currentColor" fill-opacity="0.85">${G.yLabel}</text>
+  <text x="${(p.x0 + p.x1) / 2}" y="${GRAPH.h - 8}" font-size="11" text-anchor="middle" fill="currentColor">${
     key ? UI.conditions[key] : G.noIndependent}</text>
 
   <g id="${id('xlabels')}">${xLabels}</g>

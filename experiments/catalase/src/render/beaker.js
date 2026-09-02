@@ -106,7 +106,9 @@ function bath(tempC) {
     + ` fill="${EXP_PALETTE.bathWater[0]}" stroke="${INK}" stroke-width="2.5"/>`
     + `<rect x="286" y="140" width="50" height="220" rx="6" fill="${EXP_PALETTE.bathWater[1]}" stroke="none"/>`
     + marks
-    + `<text x="180" y="384" font-size="19" font-weight="bold" text-anchor="middle" fill="${INK}">${tempC} ℃</text>`;
+    // 온도 글자는 `currentColor` — 고정 검정(`INK`)이면 다크 모드에서 관찰 창 바탕에 묻혀
+    // **몇 도 수조인지 안 보였다.** 유리·수조의 선은 밝은 채움 위에 있어 그대로 둔다.
+    + `<text x="180" y="384" font-size="19" font-weight="bold" text-anchor="middle" fill="currentColor">${tempC} ℃</text>`;
 }
 
 /**

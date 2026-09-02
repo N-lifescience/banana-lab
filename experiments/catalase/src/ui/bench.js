@@ -139,6 +139,19 @@ const at = (x, y, rest) => ({ x, y, bottom: y + heightMm(rest.asset), ...rest })
 
 function row(entries, { from, to, bottom }) {
   const drawn = entries.map((e) => drawnBoxMm(e.asset));
+  /*
+   * **프레임까지 실험대 안에 둔다.** `from`·`to` 는 그려진 부분의 자리인데, 물건의
+   * `<button>` 은 프레임(400×300 전체) 크기다. 줄 끝 물건의 그려진 부분을 실험대 가장자리에
+   * 붙이면 **프레임의 빈 여백이 실험대 밖으로 삐져나가** `#bench`(overflow:auto) 에
+   * 가로 스크롤이 생겼다 — 1280 px 에서 23 px, 768 px 태블릿에서 19 px. 눈에는 아무것도
+   * 없는데 실험대가 옆으로 밀리고 스크롤 막대가 붙었다. 플레이테스트에서 잡았다 (2026-09-02).
+   * `tests/bench.test.js` 의 「프레임까지 실험대 안」이 지킨다.
+   */
+  const first = drawn[0];
+  const last = drawn[drawn.length - 1];
+  const lastFrame = CONTRACT[entries[entries.length - 1].asset].realSizeMm;
+  from = Math.max(from, first.dx);
+  to = Math.min(to, STAGE_W_MM - (lastFrame - last.dx - last.w));
   const used = drawn.reduce((w, d) => w + d.w, 0);
   const gap = entries.length > 1 ? ((to - from) - used) / (entries.length - 1) : 0;
   let cursor = from;
@@ -325,7 +338,12 @@ export function benchLayout() {
     const d = drawnBoxMm(it.asset);
     // `kind` 를 함께 낸다. 검사가 조작표의 종류와 실제로 놓인 물건을 맞춰 보려면 필요한데,
     // 소스를 정규식으로 훑어 읽게 두었더니 도우미 함수로 만든 물건을 통째로 놓쳤다.
-    return { id: it.id, kind: it.kind, x: it.x + d.dx, y: it.y + d.dy, w: d.w, h: d.h };
+    // `frame` 은 `<button>` 이 실제로 차지하는 자리(프레임)다. 그려진 부분과 따로 낸다 —
+    // 겹침은 그려진 부분으로, 실험대 밖으로 나갔는가는 프레임으로 재야 한다 (`row()` 주석).
+    return {
+      id: it.id, kind: it.kind, x: it.x + d.dx, y: it.y + d.dy, w: d.w, h: d.h,
+      frame: { x: it.x, w: CONTRACT[it.asset].realSizeMm },
+    };
   });
 }
 

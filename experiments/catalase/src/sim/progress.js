@@ -41,7 +41,13 @@ export const STEP_DONE = {
   // 2. 감자즙과 원반 준비하기
   '2': [
     (st) => did(st, 'PUNCH_DISC'),
+    /*
+     * 담근 원반은 **비커에 넣는 순간 핀셋에서 사라진다** (`DROP_DISC` 가 `bench.disc` 를
+     * 비운다). 핀셋만 보면 넣은 뒤 기록하기 전까지 이 칸이 ✓ 에서 · 로 **되돌아갔다** —
+     * 방금 담가서 넣은 학생 눈에 「담그기」가 안 한 일로 바뀐다. 비커 속 원반도 함께 본다.
+     */
     (st) => st.bench.disc.soakedPct > 0
+      || (st.bench.beaker.disc?.extractPct ?? 0) > 0
       || everTrial(st, (t) => t.conditions.extractPct > 0),
   ],
   // 3. 비커 준비하기

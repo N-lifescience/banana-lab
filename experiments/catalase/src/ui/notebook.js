@@ -104,6 +104,49 @@ export function trialSummary(st, trial) {
 /** 칸이 채워졌는가. 공백만 있는 것은 안 채운 것이다. */
 const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length > 0;
 
+/**
+ * 그 STEP 의 관찰 기록이 다 찼는가 — **화면에 있는 칸**(세부 단계마다 하나)을 본다.
+ *
+ * 앞서는 `if (level >= 3) return hasNote(st, group.id)` 가 있었다. 그런데 3단계도
+ * 칸은 세부 단계마다(`1a`·`1b`) 그려지고 **`'1'` 이라는 키의 칸은 어디에도 없다** —
+ * 바나나랩에서 3단계가 「목표 한 칸」이던 시절의 조각이 남은 것이다.
+ * 그래서 **3단계는 STEP 1 을 다 적어도 STEP 2 가 영영 안 열렸다.** 잠긴 칸은
+ * 「STEP 1 의 관찰 기록을 적어야 여기가 열립니다」라고, 방금 적은 학생에게 계속 말했다.
+ * 플레이테스트에서 3단계로 끝까지 가 보다 잡았다 (2026-09-02).
+ *
+ * `tests/notebook.test.js` 가 세 난이도 모두에서 못 박는다.
+ */
+export function stepNotesWritten(st, group) {
+  return group.steps.every((_, i) => hasNote(st, substepId(group, i)));
+}
+
+/**
+ * STEP 마다 **무엇에 잠겨 있는가.** 잠기지 않았으면 `null`, 잠겼으면 「이 STEP 을 적어야
+ * 열린다」는 그 STEP 의 id 다. 화면은 이 값으로 잠긴 칸을 그리고, 그 문구도 이 값에서 나온다.
+ *
+ * ── 기준은 관찰 기록 하나뿐이다 ────────────────────────────────────
+ * 앞서는 「지금 STEP」(실험대 조작을 **마쳤고** 적기까지 한 첫 STEP 의 다음)에서 한 칸만
+ * 더 열었다. 그러면 잠긴 칸이 하는 말과 실제 잠긴 까닭이 어긋났다:
+ *
+ *     STEP 2 의 기록을 다 적어도 「이대로 실험하기」를 안 눌렀으면(STEP 1 이 「했다」가
+ *     아니라서) STEP 3 은 잠긴 채 「STEP 2 의 관찰 기록을 적어야 여기가 열립니다」라고 했다.
+ *     온도 계열에서 완충 용액을 안 넣으면(STEP 3b) STEP 5 가 같은 얼굴로 잠겼다.
+ *
+ * 설계 화면은 「설계를 정하지 않아도 실험은 됩니다」라고 적어 두었는데, 탐구 노트가 뒤에서
+ * 그 단추를 관문으로 쓰고 있던 것이다. **적으라고 말했으면 적으면 열려야 한다.**
+ * 조작을 했는가는 ✓ 표시가 따로 말한다 — 잠금이 그것까지 떠맡을 이유가 없다 (AGENTS.md §2.1).
+ *
+ * 한 번에 **한 칸씩만** 연다: 처음으로 안 적은 STEP 까지 열리고, 그 너머는 그 STEP 에 잠긴다.
+ * `everOpened` 에 든 것은 잠그지 않는다 — 열려 있던 것이 사라지면 고장으로 읽힌다.
+ */
+export function stepLocks(st, everOpened = new Set()) {
+  const unwritten = UI.protocol.map((g) => !stepNotesWritten(st, g));
+  const firstUnwritten = unwritten.indexOf(true);
+  const openableUpTo = firstUnwritten < 0 ? UI.protocol.length : firstUnwritten;
+  return UI.protocol.map((g, gi) => (gi > openableUpTo && !everOpened.has(g.id)
+    ? UI.protocol[openableUpTo].id : null));
+}
+
 /*
  * 쪽마다 「다 했는가」. 탭의 ✓ 와 보고서 단추가 **같은 함수**를 본다.
  * 따로 세면 언젠가 어긋나고, 그때 학생은 탭이 전부 ✓ 인데 보고서가 안 나오는 화면을 본다.
@@ -302,12 +345,6 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
    * 순서를 건너뛴 학생은 접힌 칸을 열어 적으면 된다 (AGENTS.md §2.1).
    * 앞으로 올 STEP 도 지우지 않는다 — 몇 칸짜리 여정인지 보여야 자기가 어디쯤인지 안다.
    */
-  /** 그 STEP 의 관찰 기록이 다 찼는가. 3단계는 목표 한 칸만 본다. */
-  function stepNotesWritten(st, group) {
-    if (st.session.level >= 3) return hasNote(st, group.id);
-    return group.steps.every((_, i) => hasNote(st, substepId(group, i)));
-  }
-
   function stage4(st) {
     // **1단계만 다음에 할 일을 짚어 준다.** 2단계는 목록만, 3단계는 그것도 없다.
     // 짚어 주는 것은 안내이지 잠금이 아니다 — 어느 칸이든 언제든 쓸 수 있다.
@@ -323,32 +360,20 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
      */
     const nowIdx = doneFlags.findIndex((d, i) => !(d && !unwritten[i]));
     const doneCount = doneFlags.filter(Boolean).length;
+    /*
+     * 잠금은 `stepLocks` 가 정한다 — **관찰 기록만 보고, 한 칸씩만 연다.**
+     * 「지금 STEP」(위 `nowIdx`)은 펼쳐 둘 칸과 「지금 할 차례」 배지에만 쓴다.
+     * 둘을 섞어 잠갔더니 잠긴 칸이 하는 말이 거짓이 됐다 (`stepLocks` 주석).
+     */
+    const locks = stepLocks(st, everOpened);
 
     const groups = UI.protocol.map((group, gi) => {
       /*
-       * **잠그는 자리는 셋을 다 지나야 한다:**
-       *   ① 지금 STEP 보다 **뒤**여야 한다 — 지나온 것과 지금 것은 안 잠근다.
-       *   ② 지금 STEP 의 관찰 기록이 **비어** 있어야 한다.
-       *   ③ 그 STEP 을 **한 번도 열어 본 적이 없어야** 한다 — 열려 있던 것이 사라지면 고장이다.
-       *
        * `<details>` 로 그리지 않는다. **열리는 척하다 안 열리는 것이 가장 나쁘다.**
        * `disabled` 도 `pointer-events` 도 안 쓴다 — 제목은 그대로 남기고, 왜 잠겼는지를 적는다.
        * 몇 칸짜리 여정인지는 계속 보여야 한다.
        */
-      /**
-       * **한 칸씩만 열린다.**
-       *
-       * 앞서는 「지금 STEP 의 기록이 비었으면 그 뒤가 전부 잠긴다」였다. 그래서 기록을
-       * 채우는 순간 **뒤가 통째로 열렸다.** 선생님이 「step1의 관찰 기록을 작성하면
-       * step2가 열리도록 해야지;; 왜 나머지 step들 까지도 다 열려」라고 하셨다.
-       *
-       * 열 수 있는 데까지를 먼저 정한다 — 지금 STEP 을 안 적었으면 거기까지,
-       * 적었으면 **딱 한 칸 더.** 그 너머는 잠근다.
-       */
-      const openableUpTo = nowIdx < 0 ? UI.protocol.length
-        : (unwritten[nowIdx] ? nowIdx : nowIdx + 1);
-      const lockedBy = gi > openableUpTo && !everOpened.has(group.id)
-        ? UI.protocol[Math.min(openableUpTo, UI.protocol.length - 1)].id : null;
+      const lockedBy = locks[gi];
       if (lockedBy) {
         return `<div class="note-step note-step--locked" data-step-group="${group.id}"
           data-state="locked">
