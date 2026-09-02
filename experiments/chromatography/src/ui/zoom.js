@@ -30,7 +30,7 @@ const Z = UI.zoom;
  * 어느 쪽이든 **움직일 수 있는 범위는 같다.**
  */
 const NEUTRAL_ORIGIN_MM = Math.round((ORIGIN_RANGE_MM[0] + ORIGIN_RANGE_MM[1]) / 2);
-const SAFE_POUR_MM = 5;      // 원점(10 mm)보다 얕다
+const SAFE_POUR_MM = 5;      // 원점(ORIGIN_MM = 25 mm)보다 얕다 — 출처는 develop.js
 const NEUTRAL_POUR_MM = 6;   // 손잡이 범위(1~10)의 가운데
 
 function clamp(v, a, b) {
@@ -264,13 +264,14 @@ export function createZoom(root, store) {
       ${zoomTool === 'pencil' ? pencilControls(p) : ''}
       ${zoomTool === 'capillary' ? capillaryControls(st) : ''}
       ${zoomTool === null ? measureControls(p) : ''}
+      ${p.runT > 0 ? `
       <div class="zoom-gauge">
         <div class="bar"><div class="fill" style="width:${q.score}%"></div></div>
         <div class="cap"><span>${esc(UI.observability.label)}</span><b>${q.score}</b></div>
         <div class="hint">${esc(q.worst
           ? UI.observability.hint(UI.observability.worst[q.worst])
           : UI.observability.allGood)}</div>
-      </div>`;
+      </div>` : note(Z.notDeveloped)}`;
 
     bindPencil();
     bindCapillary();

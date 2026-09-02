@@ -480,7 +480,12 @@ export const ACTIONS = {
   /** R-11 색소 위치를 표시한다. 젖어 있으면 연필 자국이 번진다. */
   MARK_BANDS(state) {
     const p = state.paper;
-    if (p.load <= 0 || p.washedOut >= 1) {
+    // 원점이 잠겨 씻겨 나간 것과 덜 찍은 것은 **고쳐야 할 것이 다르다.** 한 태그로 묶었더니
+    // 원점을 잠근 학생에게 「더 여러 번 찍으세요」가 갔다 (플레이테스트 실패 경로 A).
+    if (p.washedOut >= 1) {
+      return happened(state, '원점이 전개액에 잠겨 색소가 씻겨 나갔습니다. 표시할 색 띠가 없습니다.', 'origin-submerged');
+    }
+    if (p.load <= 0) {
       return happened(state, '표시할 색 띠가 없습니다.', 'no-bands');
     }
     const next = withPaper(state, { markedBands: true });

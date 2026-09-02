@@ -84,6 +84,8 @@ test('제출 대상 값에 개인을 가리키는 것이 없다', () => {
     'frontMm', 'overrun', 'markedFront', 'markedBands', 'rulerPlaced',
     'submerged', 'washedOut', 'chlorophyllKept', 'wetness', 'torn',
     'depthMm', 'inVial', 'seed',
+    // 전개할 때의 깊이(mm). 그림용 depthMm 은 꺼내면 0 이라 카드·보고서가 「0 mm」를 찍었다 (PLAYTEST-REVIEW).
+    'runDepthMm',
   ]);
   for (const key of Object.keys(p)) {
     assert.ok(allowed.has(key), `stripParams 에 예상 못 한 값이 있습니다: ${key}`);

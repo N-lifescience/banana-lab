@@ -269,14 +269,19 @@ function bandLabels(bands) {
 /**
  * 자. 종이 왼쪽에 붙는 mm 눈금이다.
  * **여기에 숫자로 답을 적어 두지 않는다** — 눈금만 그리고, 읽는 것은 학생이다.
+ *
+ * 잔눈금은 **1 mm** 다. 5 mm 마다만 그었더니 「잔눈금이 mm」라고 적힌 PLAYTEST 와도 어긋났고,
+ * 학생이 실제로 손에 쥐는 자와도 달랐다 — 전개율 첨삭이 ±0.05 를 허용하는 것은 mm 까지
+ * 읽는다는 전제다. 5 mm 눈금으로 어림하면 짧게 오른 종이에서는 그 폭을 넘는다.
  */
 function rulerShape(id) {
   const ticks = [];
-  for (let mm = 0; mm <= PAPER_H_MM; mm += 5) {
+  for (let mm = 0; mm <= PAPER_H_MM; mm += 1) {
     const big = mm % 10 === 0;
+    const mid = mm % 5 === 0;
     ticks.push(`<line x1="${esc(PAPER_X - 26)}" y1="${esc(yOf(mm))}"
-      x2="${esc(PAPER_X - (big ? 12 : 17))}" y2="${esc(yOf(mm))}"
-      stroke="${RULER_LINE}" stroke-width="${big ? 1.2 : 0.8}"/>`);
+      x2="${esc(PAPER_X - (big ? 12 : mid ? 17 : 21))}" y2="${esc(yOf(mm))}"
+      stroke="${RULER_LINE}" stroke-width="${big ? 1.2 : mid ? 0.8 : 0.5}"/>`);
     if (big) {
       ticks.push(`<text x="${esc(PAPER_X - 30)}" y="${esc(yOf(mm) + 3.5)}" text-anchor="end"
         font-size="8.5" fill="${RULER_LINE}">${mm / 10}</text>`);

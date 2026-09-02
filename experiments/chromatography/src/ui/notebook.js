@@ -22,6 +22,20 @@ import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
 
 const N = UI.notebook;
 
+/**
+ * 질문 ⓐ 를 어느 STEP 밑에 붙이는가 — **꺼내기(6)**. 갈라진 띠를 처음 보는 자리다.
+ * `docs/06` 의 「질문 ⓐ 의 배치」와 `UI.notebook.qaNotYet` 이 이 번호를 말한다.
+ * `tests/playtest-review.test.js` 가 셋이 같은 번호인지 본다.
+ */
+export const QUESTION_A_AFTER = '6';
+
+/**
+ * 기록의 「뚜껑」 칸 — 엽록소가 이만큼 남았으면 「덮음」이다. 세우고 나서 뚜껑을 덮기까지의
+ * 몇 초는 실제 절차에도 있어, 빛 노출 0 을 요구하면 절차를 지킨 학생도 「열려 있었음」이 된다.
+ * `report.js` 의 종이도 같은 값을 쓴다 (순환 참조를 피하려고 여기 둔다).
+ */
+export const CAPPED_KEPT = 0.9;
+
 /** 흐림 판정 기준 점수. observability().score 가 이보다 낮으면 성찰 문항이 붙는다. */
 // ponytail: 임계값 추정치. docs/06 에 정확한 수치가 없다 — 체감상 어긋나면 이 숫자만 바꾸면 된다.
 const LOW_OBSERVABILITY = 60;
@@ -53,30 +67,41 @@ function notePlaceholder(level, step) {
   return UI.notebook.notePlaceholders[level] ?? '';
 }
 
-/** STEP(UI.protocol 의 한 원소) 안에서 i번째 세부 단계의 저장 키. '3b' 같은 형태. */
 /**
  * STEP 하나하나가 **접혀 있어야 하는가 펼쳐져 있어야 하는가.**
  *
- * 「지금 할 STEP」은 `groupDone` 이 거짓인 **첫 STEP** 이다 — 상태에서 나오므로
+ * 「지금 할 STEP」은 **아직 마치지 않은 첫 STEP** 이다 — 상태에서 나오므로
  * 따로 저장하지 않는다. 저장하면 되돌리기와 어긋나 화면이 상태보다 뒤처진다.
+ *
+ * ── 「마쳤다」는 실험대에서 **했고**, 관찰 기록을 **적은** 것이다 ────────────────
+ * 앞서는 실험대에서 한 것(`groupsDone`)만 봤다. 그러면 잎을 넣고 추출액을 붓고 흔든
+ * 학생이 노트로 돌아왔을 때 STEP 1·2 는 이미 ✓ 로 **접혀 있고** STEP 3 이 펼쳐져 있다 —
+ * 「방금 했습니다. 무엇을 보았는지 적어 보세요」는 한 번도 안 뜬다. 관찰 기록칸은 그렇게
+ * 끝까지 비고, 보고서에는 「적지 않았습니다」가 열네 줄 찍힌다. 플레이해 보니 그랬다.
+ * 이 쪽이 하려는 일은 **하고 나서 적게 하는 것**이다 (`stepLeadIn`). 그러니 적기 전에는
+ * 접지 않는다. `groupsFinished` 가 그 판정이고, 없으면 예전처럼 `groupsDone` 을 쓴다.
  *
  * **학생이 손으로 여닫은 것이 있으면 그것이 이긴다.** 앞으로 올 STEP 을 펼쳐 놓고
  * 실험대에서 손을 대는 길을 막지 않기 위해서다 — **접힘은 잠금이 아니다**
  * (AGENTS.md §2.1). `disabled` 도 `pointer-events:none` 도 쓰지 않는다.
  *
+ * @param {boolean[]} groupsDone      실험대에서 했는가 (✓ 표시)
  * @param {Map<string,boolean>} manualOpen  손으로 여닫은 기록 (STEP id → 열림)
+ * @param {boolean[]} [groupsFinished] 했고 적었는가 (접을지 정한다)
  */
-export function stepPanelStates(groups, groupsDone, manualOpen = new Map()) {
-  const nowIdx = groupsDone.findIndex((d) => !d);   // 다 끝났으면 -1
+export function stepPanelStates(groups, groupsDone, manualOpen = new Map(), groupsFinished = groupsDone) {
+  const nowIdx = groupsFinished.findIndex((d) => !d);   // 다 끝났으면 -1
   return groups.map((group, gi) => {
     const isDone = groupsDone[gi];
     const isNow = gi === nowIdx;
     return {
-      state: isDone ? 'done' : (isNow ? 'now' : 'later'),
+      state: isNow ? 'now' : (isDone ? 'done' : 'later'),
       open: manualOpen.has(group.id) ? manualOpen.get(group.id) : isNow,
     };
   });
 }
+
+/** STEP(UI.protocol 의 한 원소) 안에서 i번째 세부 단계의 저장 키. '3b' 같은 형태. */
 
 function substepId(group, i) {
   return `${group.id}${String.fromCharCode(97 + i)}`;
@@ -422,16 +447,21 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
 
   const noteAt = (st, extra, key) => String(extra[key] ?? st.session.notes[key] ?? '').trim();
 
-  function openableUpToNow(st, extra = {}) {
-    const level = st.session.level;
-    const groups = UI.protocol;
-    const done = groups.map((g) => groupDone(st, g.id));
-    const nowIdx = done.findIndex((d) => !d);
-    if (nowIdx < 0) return groups.length;
-    const g = groups[nowIdx];
-    const filled = level >= 3
+  /** 그 STEP 의 관찰 기록을 다 적었는가. 3단계는 STEP 에 한 칸, 그 밖에는 세부 단계마다. */
+  function groupWritten(st, g, extra = {}) {
+    return st.session.level >= 3
       ? Boolean(noteAt(st, extra, g.id))
       : g.steps.every((_, i) => Boolean(noteAt(st, extra, substepId(g, i))));
+  }
+
+  /** 실험대에서 했고 기록도 적었다 — 그래야 접는다 (`stepPanelStates` 머리말). */
+  const groupFinished = (st, g, extra = {}) => groupDone(st, g.id) && groupWritten(st, g, extra);
+
+  function openableUpToNow(st, extra = {}) {
+    const groups = UI.protocol;
+    const nowIdx = groups.findIndex((g) => !groupFinished(st, g, extra));
+    if (nowIdx < 0) return groups.length;
+    const filled = groupWritten(st, groups[nowIdx], extra);
     return filled ? nowIdx + 1 : nowIdx;
   }
 
@@ -497,9 +527,11 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const level = st.session.level;
     const groups = UI.protocol;
     const groupsDone = groups.map((g) => groupDone(st, g.id));
-    const nowIdx = groupsDone.findIndex((d) => !d);
+    // 접을지는 **했고 적었는가**로 정한다. ✓ 는 실험대에서 했는가다.
+    const groupsFinished = groups.map((g) => groupFinished(st, g));
+    const nowIdx = groupsFinished.findIndex((d) => !d);
     const doneCount = groupsDone.filter(Boolean).length;
-    const panels = stepPanelStates(groups, groupsDone, manualOpen);
+    const panels = stepPanelStates(groups, groupsDone, manualOpen, groupsFinished);
 
     /*
      * **관찰 기록을 안 적으면 다음 STEP 이 안 열린다.**
@@ -600,7 +632,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           ${why}
           <div class="step-body">
             ${body}
-            ${group.id === '4' ? questionA(st) : ''}
+            ${group.id === QUESTION_A_AFTER ? questionA(st) : ''}
           </div>
         </details>`;
     }).join('');
@@ -615,11 +647,14 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   }
 
   /**
-   * 질문 ⓐ — STEP 4 직후에 묻는다. **순서가 곧 논증이다** (`docs/06`).
+   * 질문 ⓐ — STEP 6(꺼내기) 직후에 묻는다. **순서가 곧 논증이다** (`docs/06`).
    *
-   * (가) 대조군과 (나)(다)의 색 차이를 눈으로 본 **직후**에 물어야 답이 나온다.
-   * 6단계까지 미뤄서 물으면 학생은 그때 본 것을 기억으로 더듬어야 하고,
-   * "왜 용액을 쓰는가" 가 눈앞의 관찰이 아니라 지식 회상 문제가 된다.
+   * 갈라진 띠를 눈으로 본 **직후**에 물어야 답이 나온다. 정리(6쪽)까지 미루면 학생은 그때 본 것을
+   * 기억으로 더듬어야 하고, 「왜 갈라지는가」가 눈앞의 관찰이 아니라 지식 회상 문제가 된다.
+   *
+   * **STEP 4(점 찍기) 밑에 붙어 있었다** — 바나나랩의 자리(네 번째 STEP 이 현미경 관찰)를
+   * 그대로 물려받은 것이다. 이 실험에서 STEP 4 는 아직 전개 전이라 「방금 띠가 여러 개
+   * 갈라졌습니다」가 거짓말이 된다. 문서(docs/06)와 `qaNotYet` 문구는 처음부터 STEP 6 이었다.
    *
    * 여기서 받은 답은 `notes['q.a']` 한 곳에 저장되고, 6단계에서는 같은 값을 이어 쓴다 —
    * 다시 묻지 않는다.
@@ -631,8 +666,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       <div class="grade-block question-a">
         <h4>${N.questionA.heading}</h4>
         <p class="stage-text">${N.questionA.prompt}</p>
-        <label class="notes-label" for="note-qa-step4">${N.questionA.label}</label>
-        <textarea data-note="q.a" id="note-qa-step4">${escapeHtml(val)}</textarea>
+        <label class="notes-label" for="note-qa-step">${N.questionA.label}</label>
+        <textarea data-note="q.a" id="note-qa-step">${escapeHtml(val)}</textarea>
         ${g ? `<p class="grade-line" id="grade-qa" data-grade="${g.status}">${g.message ?? N.gradeOk}</p>` : ''}
       </div>`;
   }
@@ -677,11 +712,12 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
                  되짚을 때 필요한 값이다. -->
             <div><dt>${N.spotsLabel}</dt><dd>${UI.units.times(c.spots ?? 0)}</dd></div>
             <div><dt>${N.originLabel}</dt><dd>${UI.units.mm(Math.round(c.originMm ?? ORIGIN_MM))}</dd></div>
-            <div><dt>${N.depthLabel}</dt><dd>${UI.units.mm(Math.round(c.depthMm ?? 0))}</dd></div>
+            <div><dt>${N.depthLabel}</dt><dd>${UI.units.mm(Math.round(c.runDepthMm ?? c.depthMm ?? 0))}</dd></div>
+            <div><dt>${N.cappedLabel}</dt><dd>${(c.chlorophyllKept ?? 1) >= CAPPED_KEPT ? N.cappedKept : N.cappedOpened}</dd></div>
             <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
           </dl>
           ${travel === null
-            ? `<p class="grade-line" data-grade="unavailable">${N.rfUnmeasurable}</p>`
+            ? `<p class="grade-line" data-grade="unavailable">${c.overrun ? N.rfOverrun : N.rfUnmeasurable}</p>`
             : `<label class="notes-label" for="${domId}">${N.rfInput}</label>
                <p class="stage-hint">${N.rfHowTo.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p>
                <input type="text" inputmode="decimal" placeholder="${N.rfPlaceholder}"
@@ -1050,6 +1086,16 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   function focusSelector(el) {
     if (!el || !panelEl.contains(el)) return null;
     if (el.id) return `#${el.id}`;
+    /*
+     * STEP 의 제목줄(`<summary>`)에도 이름을 준다. 한 STEP 의 마지막 칸에서 Tab 을 치면
+     * 손이 **다음 STEP 의 제목줄**로 가는데, 그 순간 저장(`change`)이 판을 다시 그린다.
+     * 제목줄은 id 도 data-note 도 없어 여기서 `null` 이 되고, 포커스는 `body` 로 떨어졌다 —
+     * 키보드로 4쪽을 채우던 학생이 매 STEP 마다 처음부터 Tab 해 돌아와야 했다 (플레이테스트).
+     */
+    if (el.classList?.contains('step-summary')) {
+      const g = el.parentElement?.dataset?.stepGroup;
+      if (g) return `.note-step[data-step-group="${attrQuote(g)}"] > .step-summary`;
+    }
     const d = el.dataset ?? {};
     if (d.note) return `[data-note="${attrQuote(d.note)}"]`;
     if (d.choice) return `[data-choice="${attrQuote(d.choice)}"][data-value="${attrQuote(d.value ?? '')}"]`;

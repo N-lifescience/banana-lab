@@ -209,6 +209,12 @@ export function stripParams(state) {
     wetness: p.wetness,
     torn: p.torn,
     depthMm: p.inVial ? state.vial.depthMm : 0,
+    /*
+     * **전개할 때의 깊이.** 위 `depthMm` 은 그림용이라 종이를 꺼내면 0 이 된다 — 그대로
+     * 카드와 보고서에 실렸더니 「전개액 깊이 0 mm」가 찍혔다. 학생이 5 mm 를 붓고 세운 조건이
+     * 종이에서는 안 부은 것으로 읽힌다. 조건은 여기서 읽는다.
+     */
+    runDepthMm: p.depthAtRun,
     inVial: p.inVial,
     seed: p.seed,
   };

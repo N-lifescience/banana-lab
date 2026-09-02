@@ -20,18 +20,18 @@
  * (`R.privacySubmit`) — "저장하지 않습니다" 를 띄워 놓고 저장하지 않기 위해서다.
  */
 
-import { measurableFrontMm } from '../sim/state.js';
 import { renderStrip } from '../render/strip.js';
 import { observability } from '../sim/quality.js';
 import { ORIGIN_MM } from '../sim/develop.js';
 import { isGroup } from './notebook.js';
-import { actualSummary, escapeHtml } from './notebook.js';
+import { actualSummary, escapeHtml, CAPPED_KEPT } from './notebook.js';
 import { UI } from './strings.js';
 import { manifest } from '../manifest.js';
 import { enabled as submitEnabled, findClass, submitReport } from '../../../../packages/lab-kit/net/supabase.js';
 
 const R = UI.report;
 const N = UI.notebook;
+
 
 /** 값이 없으면 줄표. 빈칸을 그냥 두면 종이에서 항목이 사라진 것처럼 보인다. */
 const or = (v, fallback = R.blank) => (String(v ?? '').trim() ? escapeHtml(v) : fallback);
@@ -84,6 +84,17 @@ function predict(st) {
  */
 function process(st) {
   const groups = UI.protocol.map((g) => {
+    /*
+     * **3단계의 기록은 STEP 하나에 한 칸이다** (`notes['3']`). 세부 단계 키(`3a`)만 돌면
+     * 3단계로 푼 학생의 글이 **한 자도 안 실리고** 열네 칸이 전부 「적지 않았습니다」로 찍힌다 —
+     * 선생님 눈에는 아무것도 안 한 학생이다. 플레이테스트에서 실제로 그렇게 나왔다.
+     * (PLAYTEST.md §6 이 바로 이것을 보라고 했다.) STEP 칸에 글이 있으면 그것을 싣는다.
+     */
+    const whole = String(st.session.notes[g.id] ?? '').trim();
+    if (whole) {
+      return `<div class="rp-row"><h3>STEP ${g.id} · ${escapeHtml(g.title)}</h3>
+        <p>${escapeHtml(whole)}</p></div>`;
+    }
     const items = g.steps.map((s, i) => {
       const key = `${g.id}${String.fromCharCode(97 + i)}`;
       return `<li><b>${escapeHtml(s.label)}</b><span>${or(st.session.notes[key], R.notWritten)}</span></li>`;
@@ -104,7 +115,11 @@ function results(st) {
     const at = c.at ?? i;
     // 잰 값을 종이가 대신 적어 주지 않는다 — 여기 실리는 것은 학생이 정한 **조건**이고,
     // 전개율은 학생이 자로 재어 적은 답이다.
-    const front = measurableFrontMm(c);
+    // (「뚜껑」 칸에 용매 전선 높이(mm)가 찍히고 있었다 — 이름표와 값이 다른 데다,
+    //  그 값은 학생이 자로 읽어야 하는 분모다. 기록에 남은 빛 노출로 뚜껑 여부를 적는다.)
+    // 세우고 나서 뚜껑을 덮기까지 몇 초는 실제 절차에서도 열려 있다 — 그 몇 초(빛 노출 ≈ 0.1)까지
+    // 「열려 있었음」으로 적으면 절차를 지킨 학생의 종이에도 그렇게 찍힌다. 재어 보니 그랬다.
+    const capped = (c.chlorophyllKept ?? 1) >= CAPPED_KEPT ? N.cappedKept : N.cappedOpened;
     return `
     <div class="rp-capture">
       <h3>${escapeHtml(UI.units.times(c.spots ?? 0))} · ${escapeHtml(UI.markers[c.marker] ?? '')}</h3>
@@ -112,8 +127,8 @@ function results(st) {
       <dl class="rp-readout">
         <div><dt>${N.spotsLabel}</dt><dd>${escapeHtml(UI.units.times(c.spots ?? 0))}</dd></div>
         <div><dt>${N.originLabel}</dt><dd>${escapeHtml(UI.units.mm(Math.round(c.originMm ?? ORIGIN_MM)))}</dd></div>
-        <div><dt>${N.depthLabel}</dt><dd>${escapeHtml(UI.units.mm(Math.round(c.depthMm ?? 0)))}</dd></div>
-        <div><dt>${N.cappedLabel}</dt><dd>${front === null ? '—' : escapeHtml(UI.units.mm(Math.round(front)))}</dd></div>
+        <div><dt>${N.depthLabel}</dt><dd>${escapeHtml(UI.units.mm(Math.round(c.runDepthMm ?? c.depthMm ?? 0)))}</dd></div>
+        <div><dt>${N.cappedLabel}</dt><dd>${escapeHtml(capped)}</dd></div>
         <div><dt>${UI.observability.label}</dt><dd>${observability(c).score}</dd></div>
         <div><dt>${R.rfAnswer}</dt><dd>${or(st.session.notes[`rf.${at}`])}</dd></div>
       </dl>
