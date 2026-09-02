@@ -90,6 +90,15 @@
   /* 펼친 보고서는 **종이**다. 다크 모드를 따라가면 종이 색(#555, #999)이 배경에 묻는다. */
   .tc-item-body{padding:16px;background:#fff;color:#111;overflow-x:auto}
 
+  .tc-choices{display:flex;flex-wrap:wrap;gap:6px 16px}
+  .tc-choices label{display:inline-flex;gap:6px;align-items:center;font-size:14px;white-space:nowrap}
+  .tc-field .tc-choice{display:inline;font-size:14px;color:var(--ink);margin:0}
+  .tc-print-qr{text-align:center;padding-top:40px}
+  .tc-print-qr h1{font-size:26px;margin:0 0 6px}
+  .tc-print-qr p{font-size:15px;color:#333}
+  .tc-print-qr svg{margin:18px auto;display:block}
+  .tc-print-url{font-family:ui-monospace,monospace;font-size:13px;word-break:break-all}
+
   .tc-print-area{display:none}
 
   /* 인쇄 — 화면 조작은 빼고 보고서만 낸다. 학생이 낸 것과 같은 종이가 나와야 한다. */

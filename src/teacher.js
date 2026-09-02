@@ -19,6 +19,7 @@
  */
 
 import { mountTeacher } from '../packages/lab-kit/teacher.js';
+import { enabled } from '../packages/lab-kit/net/supabase.js';
 
 /*
  * 이 사이트에서 실험이 사는 주소의 앞자리. `vercel.json` 의 되쓰기가 이 값을
@@ -44,9 +45,12 @@ const $ = (sel) => document.querySelector(sel);
 
 /** 실험을 아직 안 골랐을 때. 골라야 화면이 무엇을 그릴지 정해진다. */
 async function renderPicker() {
+  // 제출 서버가 꺼져 있으면(기본 — B안, 2026-09-03) 이 화면은 링크·QR 만 만든다. 말도 그렇게 한다.
+  const on = enabled();
   $('#tc-title-h').textContent = '선생님 화면';
-  $('#tc-lead').innerHTML = '수업을 열 <b>실험</b>을 먼저 고르세요. '
-    + '반마다 다른 실험으로 여러 수업을 열 수 있습니다.';
+  $('#tc-lead').innerHTML = on
+    ? '수업을 열 <b>실험</b>을 먼저 고르세요. 반마다 다른 실험으로 여러 수업을 열 수 있습니다.'
+    : '링크·QR 을 만들 <b>실험</b>을 먼저 고르세요. 이 사이트는 학생 정보를 저장하지 않습니다 — 학생은 PDF 로 냅니다.';
 
   const cards = await Promise.all(EXPERIMENTS.map(async (id) => {
     const { manifest } = await import(`../experiments/${id}/src/manifest.js`);
@@ -54,14 +58,14 @@ async function renderPicker() {
       <li class="tc-item">
         <div class="tc-item-head">
           <span class="tc-name">${manifest.title}</span>
-          <a class="tc-when" href="?exp=${encodeURIComponent(id)}">수업 열기 →</a>
+          <a class="tc-when" href="?exp=${encodeURIComponent(id)}">${on ? '수업 열기' : '링크 · QR 만들기'} →</a>
         </div>
       </li>`;
   }));
 
   $('#tc-app').innerHTML = `
     <section class="tc-card">
-      <h2>어느 실험의 수업인가요?</h2>
+      <h2>${on ? '어느 실험의 수업인가요?' : '어느 실험인가요?'}</h2>
       <ul class="tc-list">${cards.join('')}</ul>
     </section>`;
 }
@@ -97,6 +101,17 @@ if (!exp) {
     buildSheet,
     escapeHtml,
     links: {
+      /**
+       * **서버 없이** 나눠 주는 학생 링크 — 실험의 교과 주소에 단계·방식만 붙인다 (B안, 2026-09-03).
+       * 수업 코드가 없으므로 아무것도 서버에 남지 않는다. 학생은 PDF 로 낸다.
+       */
+      plain: ({ level, mode } = {}) => {
+        const q = new URLSearchParams();
+        if (level) q.set('level', String(level));
+        if (mode) q.set('mode', mode);
+        const qs = q.toString();
+        return `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}${qs ? `?${qs}` : ''}`;
+      },
       /** 학생이 여는 곳 — 그 실험의 교과 주소. 반 코드를 달아 준다. */
       student: (code) =>
         `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}`

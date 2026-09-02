@@ -42,6 +42,7 @@ import { generateTeacherKeys, open as unseal, isSealed } from './net/seal.js';
  * 이 파일은 **어느 실험인지 모르는 채로** 불러도 아무 일이 없어야 한다.
  */
 let T = null;
+let UI_ALL = null;
 let manifest = null;
 let buildSheet = null;
 let escapeHtml = null;
@@ -59,9 +60,10 @@ function bind(deps) {
   T = deps.UI.teacher;
   ({ manifest, buildSheet, escapeHtml, links } = deps);
   if (!T) throw new Error('이 실험의 UI 에 teacher 문구가 없습니다 (UI.teacher)');
-  for (const k of ['student', 'admin']) {
+  for (const k of ['student', 'admin', 'plain']) {
     if (typeof links[k] !== 'function') throw new Error(`links.${k}(…) 가 없습니다`);
   }
+  UI_ALL = deps.UI;
 }
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -397,6 +399,63 @@ async function renderBoard(root, token, secret = secretFromUrl()) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 서버 없이 — 링크·QR 만들기 (B안, 2026-09-03)                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 제출 서버가 없을 때의 선생님 화면. **아무것도 저장하지 않는다.**
+ *
+ * 사장님 결정(2026-09-03): 학생 개인정보를 사이트 주인이 들고 있지 않는다 — 봉인해도
+ * 서버는 주인 것이라 법적 책임이 남는다. 그래서 학생은 자기 기기에서 PDF 로 내고,
+ * 선생님은 여기서 **단계·방식이 박힌 링크와 QR** 만 만들어 나눠 준다.
+ * 제출 기능은 환경변수를 넣으면 그때 켜진다 (`enabled()`).
+ */
+function renderShare(root) {
+  const S = UI_ALL.start;
+  const Sh = T.share;
+  let level = 1;
+  let mode = 'group';
+
+  const draw = () => {
+    const url = links.plain({ level, mode });
+    root.innerHTML = `
+      <section class="tc-card">
+        <h2>${Sh.heading}</h2>
+        <div class="tc-field"><span>${S.chooseLabel}</span>
+          <div class="tc-choices" role="radiogroup" aria-label="${S.chooseLabel}">
+            ${S.levels.map((l) => `<label><input type="radio" name="tc-level" value="${l.id}"${l.id === level ? ' checked' : ''}> <span class="tc-choice">${escapeHtml(l.name)}</span></label>`).join('')}
+          </div></div>
+        <div class="tc-field"><span>${S.modeLabel}</span>
+          <div class="tc-choices" role="radiogroup" aria-label="${S.modeLabel}">
+            ${S.modes.map((m) => `<label><input type="radio" name="tc-mode" value="${m.id}"${m.id === mode ? ' checked' : ''}> <span class="tc-choice">${escapeHtml(m.name)}</span></label>`).join('')}
+          </div></div>
+        <hr class="tc-rule">
+        ${copyable('tc-plain', T.made.linkLabel, url)}
+        <div class="tc-qr">
+          <span class="tc-copy-label">${T.made.qrLabel}</span>
+          <div class="tc-qr-box">${qrSVG(url, { size: 200 })}</div>
+          <p class="tc-hint">${Sh.qrHint}</p>
+        </div>
+        <button type="button" id="tc-print-qr">${Sh.print}</button>
+        <p class="tc-duty">${Sh.howToCollect}</p>
+      </section>
+      <div id="tc-print-area" class="tc-print-area">
+        <div class="tc-print-one tc-print-qr">
+          <h1>${escapeHtml(manifest.title)}</h1>
+          <p>${escapeHtml(S.levels.find((l) => l.id === level)?.name ?? '')} · ${escapeHtml(S.modes.find((m) => m.id === mode)?.name ?? '')}</p>
+          ${qrSVG(url, { size: 360 })}
+          <p class="tc-print-url">${escapeHtml(url)}</p>
+        </div>
+      </div>`;
+    bindCopy(root);
+    root.querySelectorAll('input[name="tc-level"]').forEach((el) => el.addEventListener('change', () => { level = Number(el.value); draw(); }));
+    root.querySelectorAll('input[name="tc-mode"]').forEach((el) => el.addEventListener('change', () => { mode = el.value; draw(); }));
+    $('#tc-print-qr', root).addEventListener('click', () => setTimeout(() => window.print(), 60));
+  };
+  draw();
+}
+
+/* ------------------------------------------------------------------ */
 
 /**
  * 화면을 붙인다. **실험이 정해진 뒤에** 부른다.
@@ -408,15 +467,11 @@ export function mountTeacher(deps) {
   bind(deps);
 
   const app = $('#tc-app');
-  $('#tc-title-h').textContent = T.title;
-  $('#tc-lead').innerHTML = T.lead;
+  $('#tc-title-h').textContent = enabled() ? T.title : T.share.title;
+  $('#tc-lead').innerHTML = enabled() ? T.lead : T.share.lead;
 
   if (!enabled()) {
-    app.innerHTML = `
-      <section class="tc-card">
-        <h2>${T.offTitle}</h2>
-        <p class="tc-hint">${T.offBody}</p>
-      </section>`;
+    renderShare(app);
   } else if (tokenFromUrl()) {
     renderBoard(app, tokenFromUrl());
   } else {
