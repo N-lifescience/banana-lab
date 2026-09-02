@@ -2,13 +2,18 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>세포와 물질대사 실험실</title>
+<title>가상 생명과학 실험실</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="손으로 조작하고 눈으로 확인하는 가상 생명과학 실험실. 탐구 노트가 질문부터 결론까지 안내하고, 잘못해도 막지 않습니다 — 결과가 대신 답합니다. 선생님은 QR 하나로 수업을 열고 보고서를 받습니다.">
+<link rel="canonical" href="https://virtual-biolab.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="가상 생명과학 실험실">
+<meta property="og:description" content="손으로 조작하고 눈으로 확인하는 안내된 탐구. 잘못해도 막지 않습니다 — 결과가 대신 답합니다.">
+<meta property="og:url" content="https://virtual-biolab.vercel.app/">
 <!-- 글꼴은 **직접 호스팅한다.** 남의 서버에서 받아 오면 배포 헤더의 CSP(`font-src 'self'`)에
      막혀 시스템 글꼴로 떨어지고, 학교망에서 구글 도메인이 느리거나 막히는 일도 있다.
-     이 페이지에 쓰인 글자만 잘라 담아 256 KB 다 (통째로 실으면 13.1 MB).
-     문구를 고쳤으면 `node scripts/build-fonts.mjs` 를 다시 돌린다 — 안 그러면 새 글자가
-     시스템 글꼴로 떨어진다. `--check` 가 그것을 알려 준다. -->
+     이 페이지에 쓰인 글자만 잘라 담는다. 문구를 고쳤으면 `node scripts/build-fonts.mjs` 를
+     다시 돌린다 — 안 그러면 새 글자가 시스템 글꼴로 떨어진다. `--check` 가 그것을 알려 준다. -->
 <link rel="preload" href="/fonts/noto-sans-kr-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/gowun-batang-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts/fonts.css">
@@ -18,7 +23,12 @@
      * ★ **강조는 주황, 바탕은 크림 — 실험 화면은 지금 톤 그대로 둔다.**
      *   사장님 결정(2026-08-29): 메인만 쨍하게 하고 **실험으로 들어가면 지금 그대로**.
      *   메인까지 실험 톤이면 밋밋하고, 실험까지 주황이면 **문을 열고 들어갔을 때
-     *   다른 건물**이 된다. 애셋 15종을 다시 칠하는 일도 없다.
+     *   다른 건물**이 된다. 애셋을 다시 칠하는 일도 없다.
+     *
+     * 2026-09-02 개편: 제목을 「가상 생명과학 실험실」로, 컨셉을 **안내된 탐구**로.
+     *   사장님 말씀 — 「지금은 너무 딱딱해」. 그래서 첫 화면에 실험 그림(현미경 시야)과
+     *   탐구 노트 7단계 레일을 두고, 사용법을 학생·선생님 각 세 걸음으로 적었다.
+     *   색은 그대로다 — 바꾼 것은 **말투와 그림**이다.
      */
     --ground:#FFFDEA;      /* 크림 바탕 */
     --surface:#FFFFFF;
@@ -29,8 +39,12 @@
     --line:#EADFC0;
     --line-2:#DCCB9E;
     --accent:#F06231;      /* 주황 — 이 페이지의 강조색 */
+    --accent-ink:#C24A1E;  /* 주황 글자용 — 크림 위에서 대비를 지킨다 */
     --accent-soft:#FFE479; /* 노랑 — 알약·배지 */
     --coral:#BE3247;       /* 지질 반응색 선홍 계열 (실험과 같은 뜻으로만 쓴다) */
+    --iodine:#2B3A67;      /* 아이오딘–녹말 청람색 (그림에서만) */
+    --cell:#F3E3A1;        /* 바나나 세포 바탕 (그림에서만) */
+    --cell-line:#B8973E;   /* 세포벽 선 (그림에서만) */
     --green:#2F7350;       /* 생명·광합성 */
     --green-soft:#E4F0E8;
     --amber:#B06A1E;
@@ -40,178 +54,369 @@
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --ground:#17150F;
-      --surface:#211E16;
-      --surface-2:#2A2619;
-      --ink:#F5EFDD;
-      --ink-2:#BDB49B;
-      --ink-3:#8C8677;
-      --line:#332E20;
-      --line-2:#453E2B;
-      --accent:#FF8A5C;
-      --accent-soft:#4A3D14;
-      --coral:#E8899A;
-      --green:#7CC49B;
-      --green-soft:#1D2E27;
-      --amber:#D6A25E;
-      --glass:#2A3A40;
-      --shadow:rgba(0,0,0,.4);
-      --focus:#FF8A5C;
+      --ground:#17150F; --surface:#211E16; --surface-2:#2A2619;
+      --ink:#F5EFDD; --ink-2:#BDB49B; --ink-3:#8C8677;
+      --line:#332E20; --line-2:#453E2B;
+      --accent:#FF8A5C; --accent-ink:#FF9A72; --accent-soft:#4A3D14;
+      --coral:#E8899A; --iodine:#8EA2E6; --cell:#3A3320; --cell-line:#7A6A3A;
+      --green:#7CC49B; --green-soft:#1D2E27; --amber:#D6A25E; --glass:#2A3A40;
+      --shadow:rgba(0,0,0,.4); --focus:#FF8A5C;
     }
   }
   :root[data-theme="dark"]{
-    --ground:#17150F;
-    --surface:#211E16;
-    --surface-2:#2A2619;
-    --ink:#F5EFDD;
-    --ink-2:#BDB49B;
-    --ink-3:#8C8677;
-    --line:#332E20;
-    --line-2:#453E2B;
-    --accent:#FF8A5C;
-    --accent-soft:#4A3D14;
-    --coral:#E8899A;
-    --green:#7CC49B;
-    --green-soft:#1D2E27;
-    --amber:#D6A25E;
-    --glass:#2A3A40;
-    --shadow:rgba(0,0,0,.4);
-    --focus:#FF8A5C;
+    --ground:#17150F; --surface:#211E16; --surface-2:#2A2619;
+    --ink:#F5EFDD; --ink-2:#BDB49B; --ink-3:#8C8677;
+    --line:#332E20; --line-2:#453E2B;
+    --accent:#FF8A5C; --accent-ink:#FF9A72; --accent-soft:#4A3D14;
+    --coral:#E8899A; --iodine:#8EA2E6; --cell:#3A3320; --cell-line:#7A6A3A;
+    --green:#7CC49B; --green-soft:#1D2E27; --amber:#D6A25E; --glass:#2A3A40;
+    --shadow:rgba(0,0,0,.4); --focus:#FF8A5C;
   }
 
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
   body{
     margin:0;word-break:keep-all;
-    background:var(--ground);
-    color:var(--ink);
+    background:var(--ground);color:var(--ink);
     font-family:"Noto Sans KR",system-ui,sans-serif;
-    line-height:1.6;
-    -webkit-font-smoothing:antialiased;
+    line-height:1.65;-webkit-font-smoothing:antialiased;
   }
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:inherit}
+  :focus-visible{outline:2.5px solid var(--focus);outline-offset:3px;border-radius:4px}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .serif{font-family:"Gowun Batang",serif;font-weight:700}
 
-  header{
-    border-bottom:1px solid var(--line);
-    background:
-      radial-gradient(120% 140% at 12% -20%, var(--accent-soft) 0%, transparent 55%),
-      var(--surface);
-  }
-  .head-inner{padding:56px 0 44px}
+  /* ── 위 막대 ─────────────────────────────────────────────── */
+  .top{position:sticky;top:0;z-index:5;background:var(--ground);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;gap:18px;height:56px}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:"Gowun Batang",serif;font-weight:700;font-size:17px}
+  .brand svg{width:26px;height:26px;flex:none}
+  .brand small{font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+  .nav{margin-left:auto;display:flex;gap:4px;align-items:center}
+  .nav a{text-decoration:none;font-size:13.5px;color:var(--ink-2);padding:7px 11px;border-radius:8px}
+  .nav a:hover{background:var(--surface-2);color:var(--ink)}
+  .nav a.teacher{color:var(--accent-ink);border:1.5px solid var(--accent);font-weight:500}
+  .nav a.teacher:hover{background:var(--accent);color:#fff}
+  @media (max-width:640px){ .nav a:not(.teacher){display:none} .brand small{display:none} }
+
+  /* ── 첫 화면 ─────────────────────────────────────────────── */
+  .hero{padding:56px 0 30px}
+  .hero .wrap{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:36px;align-items:center}
   .eyebrow{
-    font-family:"IBM Plex Mono",monospace;
-    font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--accent);margin:0 0 18px;display:flex;gap:10px;align-items:center;
+    font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent-ink);margin:0 0 16px;display:flex;gap:10px;align-items:center;
   }
-  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--coral);display:inline-block}
+  .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--coral);display:inline-block}
   h1{
     font-family:"Gowun Batang",serif;font-weight:700;
-    font-size:clamp(30px,5.4vw,50px);line-height:1.12;letter-spacing:-.01em;
-    margin:0 0 20px;text-wrap:balance;color:var(--ink);
+    font-size:clamp(34px,5.6vw,56px);line-height:1.1;letter-spacing:-.01em;
+    margin:0 0 14px;text-wrap:balance;color:var(--ink);
   }
-  h1 .thin{color:var(--ink-2);font-weight:400}
-  .lede{max-width:60ch;font-size:16.5px;color:var(--ink-2);margin:0 0 28px}
+  h1 .thin{display:block;font-size:.5em;font-weight:400;color:var(--ink-2);margin-bottom:10px;letter-spacing:0}
+  .lede{max-width:52ch;font-size:16.5px;color:var(--ink-2);margin:0 0 26px}
   .lede b{color:var(--ink);font-weight:500}
-
-  .legend{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;font-size:13.5px;color:var(--ink-2)}
-  .legend .k{display:inline-flex;align-items:center;gap:8px}
-  .swatch{width:26px;height:16px;border-radius:4px;flex:none}
-  .swatch.live{background:var(--accent);border:1px solid var(--accent)}
-  .swatch.soon{background:var(--surface);border:1.5px solid var(--line-2)}
-  .swatch.class{background:repeating-linear-gradient(135deg,var(--surface-2),var(--surface-2) 5px,var(--surface) 5px,var(--surface) 10px);border:1px solid var(--line)}
-
-  main{padding:8px 0 72px}
-  .unit{padding:44px 0 8px;border-top:1px solid var(--line)}
-  .unit:first-child{border-top:none}
-  .unit-head{display:flex;align-items:baseline;gap:16px;margin:0 0 6px}
-  .roman{
-    font-family:"Gowun Batang",serif;font-weight:700;font-size:34px;line-height:1;
-    color:var(--accent);flex:none;width:44px;
+  .cta{display:flex;flex-wrap:wrap;gap:10px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:500;font-size:15px;
+    padding:12px 18px;border-radius:12px;border:1.5px solid var(--accent);color:var(--accent-ink);
+    transition:transform .14s ease,background .14s ease;
   }
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.primary:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+  .btn:not(.primary):hover{background:var(--surface-2)}
+
+  /* 현미경 시야 — 바나나 실험의 (나) 슬라이드. 아이오딘이 녹말립을 청람색으로 물들인 그대로.
+     그림은 실험 애셋과 같은 규칙으로 그린다: 색 두 단 + 외곽선. 그라데이션·블러 없음. */
+  .fov{position:relative;width:min(100%,360px);margin:0 auto;aspect-ratio:1}
+  .fov svg{width:100%;height:100%;display:block}
+  .fov .cap{
+    position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-3);white-space:nowrap;
+    background:var(--ground);padding:2px 8px;border-radius:999px;border:1px solid var(--line);
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .fov .cells{transform-origin:200px 200px;animation:focus 1.1s cubic-bezier(.2,.7,.2,1) both}
+    @keyframes focus{from{opacity:.15;transform:scale(1.06)}to{opacity:1;transform:scale(1)}}
+  }
+
+  /* ── 안내된 탐구 — 이 실험실이 안내하는 방법 ────────────────── */
+  .how{padding:26px 0 8px}
+  .rail-card{
+    background:var(--surface);border:1px solid var(--line-2);border-radius:18px;
+    padding:22px 24px 20px;box-shadow:0 1px 0 var(--shadow);
+  }
+  .rail-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin:0 0 14px}
+  .rail-head h2{font-family:"Gowun Batang",serif;font-weight:700;font-size:20px;margin:0}
+  .rail-head p{margin:0;font-size:13.5px;color:var(--ink-2)}
+  /* 탐구 노트의 일곱 탭 그대로. 실험 화면에서 학생이 보게 되는 바로 그 순서다. */
+  .rail{display:grid;grid-template-columns:repeat(7,1fr);gap:0;list-style:none;margin:0;padding:0;position:relative}
+  .rail::before{content:"";position:absolute;left:7%;right:7%;top:15px;height:2px;background:var(--line-2)}
+  .rail li{position:relative;text-align:center;padding-top:36px;font-size:13px;color:var(--ink-2)}
+  .rail li::before{
+    content:attr(data-n);position:absolute;left:50%;top:0;transform:translateX(-50%);
+    width:30px;height:30px;border-radius:50%;border:2px solid var(--line-2);background:var(--surface);
+    font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:26px;color:var(--ink-3);
+  }
+  .rail li.do{color:var(--ink);font-weight:500}
+  .rail li.do::before{border-color:var(--accent);color:var(--accent-ink);background:var(--surface-2)}
+  .rail li small{display:block;font-size:11px;color:var(--ink-3);font-weight:400;margin-top:2px}
+  @media (prefers-reduced-motion:no-preference){
+    .rail li::before{animation:tick .35s ease both}
+    .rail li:nth-child(1)::before{animation-delay:.2s}
+    .rail li:nth-child(2)::before{animation-delay:.35s}
+    .rail li:nth-child(3)::before{animation-delay:.5s}
+    .rail li:nth-child(4)::before{animation-delay:.65s}
+    .rail li:nth-child(5)::before{animation-delay:.8s}
+    .rail li:nth-child(6)::before{animation-delay:.95s}
+    .rail li:nth-child(7)::before{animation-delay:1.1s}
+    @keyframes tick{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+  }
+  @media (max-width:720px){
+    .rail{grid-template-columns:repeat(4,1fr);row-gap:16px}
+    .rail::before{display:none}
+  }
+
+  .principles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0 0}
+  .pr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px}
+  .pr h3{font-family:"Gowun Batang",serif;font-weight:700;font-size:16.5px;margin:0 0 6px;display:flex;align-items:center;gap:9px}
+  .pr h3 svg{width:22px;height:22px;flex:none}
+  .pr p{margin:0;font-size:13.5px;color:var(--ink-2)}
+  .pr .lv{display:flex;gap:6px;margin-top:10px}
+  .pr .lv span{flex:1;height:6px;border-radius:3px;background:var(--accent)}
+  .pr .lv span:nth-child(2){opacity:.55}
+  .pr .lv span:nth-child(3){opacity:.22}
+  @media (max-width:720px){ .principles{grid-template-columns:1fr} }
+
+  /* ── 사용법 ─────────────────────────────────────────────── */
+  .use{padding:44px 0 8px}
+  .sec-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 18px}
+  .sec-head h2{font-family:"Gowun Batang",serif;font-weight:700;font-size:26px;margin:0;white-space:nowrap}
+  .sec-head p{margin:0;font-size:13.5px;color:var(--ink-3)}
+  .use-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .who{
+    background:var(--surface);border:1px solid var(--line-2);border-radius:18px;padding:22px 24px 20px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .who.teacher{background:var(--surface-2)}
+  .who h3{margin:0 0 6px;font-size:14px;font-weight:500;color:var(--accent-ink);display:flex;align-items:center;gap:8px;letter-spacing:.02em}
+  .who h3 .tag{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s}
+  .steps li{position:relative;padding:8px 0 8px 40px;font-size:14px;color:var(--ink-2);counter-increment:s}
+  .steps li + li{border-top:1px dashed var(--line)}
+  .steps li::before{
+    content:counter(s);position:absolute;left:0;top:9px;width:26px;height:26px;border-radius:50%;
+    background:var(--accent);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+    text-align:center;line-height:26px;
+  }
+  .steps b{color:var(--ink);font-weight:500}
+  .who .note{margin:10px 0 0;font-size:12.5px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:10px}
+  .who .go{margin-top:12px;align-self:flex-start}
+  @media (max-width:760px){ .use-grid{grid-template-columns:1fr} }
+
+  /* ── 실험 목록 ───────────────────────────────────────────── */
+  main.catalog{padding:44px 0 72px}
+  .unit{padding:34px 0 8px;border-top:1px solid var(--line)}
+  .unit:first-of-type{border-top:none;padding-top:8px}
+  .unit-head{display:flex;align-items:baseline;gap:16px;margin:0 0 6px}
+  .roman{font-family:"Gowun Batang",serif;font-weight:700;font-size:34px;line-height:1;color:var(--accent-ink);flex:none;width:44px}
   .unit-title{font-family:"Gowun Batang",serif;font-weight:700;font-size:22px;margin:0;color:var(--ink)}
   .unit-sub{font-size:13.5px;color:var(--ink-3);margin:2px 0 0}
   .unit-meta{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3);align-self:center}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px;padding:22px 0 8px}
-
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding:20px 0 6px}
   .card{
-    position:relative;display:flex;flex-direction:column;gap:11px;
-    border-radius:14px;padding:20px 20px 18px;
-    background:var(--surface);border:1px solid var(--line);
-    text-decoration:none;color:inherit;
+    position:relative;display:flex;flex-direction:column;gap:10px;
+    border-radius:16px;padding:20px 20px 18px;
+    background:var(--surface);border:1px solid var(--line-2);
+    text-decoration:none;color:inherit;box-shadow:0 1px 0 var(--shadow);
     transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
   }
+  .card::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
   .card .type{
     font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.09em;
-    text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:8px;
+    text-transform:uppercase;color:var(--accent-ink);display:flex;align-items:center;gap:8px;
   }
-  /*
-   * ★ **한글은 낱말 가운데서 자르지 않는다.**
-   *   기본값(`break-word`)이면 「삼투」가 「삼 / 투」로, 「엽록체」가 「엽 / 록체」로 갈린다.
-   *   영어는 공백에서만 갈리므로 이 문제가 없어서, 영문 레퍼런스를 보고 만들면 놓친다.
-   *   `keep-all` 이 낱말 단위로 지킨다.
-   */
-  .card h3{font-family:"Gowun Batang",serif;font-weight:700;font-size:18.5px;line-height:1.28;margin:0;color:var(--ink);text-wrap:balance;word-break:keep-all}
+  /* ★ 한글은 낱말 가운데서 자르지 않는다 — 「삼투」가 「삼 / 투」로 갈린다. `keep-all`. */
+  .card h3{font-family:"Gowun Batang",serif;font-weight:700;font-size:18px;line-height:1.3;margin:0;color:var(--ink);text-wrap:balance;word-break:keep-all}
   .card p{font-size:13.5px;color:var(--ink-2);margin:0;flex:1;word-break:keep-all}
-  .card .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+  .card .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
   .page{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
-  .badge{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
-
-  .card.live{border-color:var(--line-2);box-shadow:0 1px 0 var(--shadow)}
-  .card.live::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
-  .card.live .type{color:var(--accent)}
-  .card.live:hover,.card.live:focus-visible{transform:translateY(-3px);box-shadow:0 10px 26px var(--shadow);border-color:var(--accent)}
+  .badge{font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:999px;white-space:nowrap}
   .badge.done{background:var(--accent);color:#fff}
-  .badge.soon{background:var(--accent-soft);color:var(--accent)}
+  .card:hover,.card:focus-visible{transform:translateY(-3px);box-shadow:0 10px 26px var(--shadow);border-color:var(--accent)}
+  .card:hover .badge.done{background:var(--accent-ink)}
 
-  /* 옮기는 중 — 실험은 다 만들어졌고 이 사이트에 아직 안 들어왔다. 누를 것이 없으므로
-     들어 올리지 않는다. 「교실에서」(점선)와 달리 **실선**이다 — 곧 열리는 것이라서. */
-  .card.soon{border-color:var(--line-2);cursor:default}
-  .card.soon h3{color:var(--ink-2)}
-
-  .card.class{background:transparent;border-style:dashed;border-color:var(--line)}
-  .card.class h3{font-weight:400;color:var(--ink-2)}
-  .card.class .type{color:var(--ink-3)}
-  .card.class p{color:var(--ink-3);font-size:13px}
-  .badge.class{background:var(--surface-2);color:var(--ink-3)}
-
-  a.card:focus-visible{outline:2.5px solid var(--focus);outline-offset:3px}
+  /* 교실·교과서에서 하는 활동 — 여기서 열 것이 없으니 카드가 아니라 **한 줄 목록**이다.
+     앞서는 점선 카드 아홉 장이 실제 실험 여덟 장과 같은 크기로 서 있어 화면이 무거웠다. */
+  .class-list{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px 10px}
+  .class-list li{
+    font-size:12.5px;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:999px;padding:4px 11px;
+    display:inline-flex;gap:7px;align-items:center;
+  }
+  .class-list .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-3)}
+  .class-head{font-size:12.5px;color:var(--ink-3);margin:14px 0 0}
 
   footer{border-top:1px solid var(--line);padding:30px 0 44px;color:var(--ink-3);font-size:13px}
   footer .wrap{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:center}
+  footer a{color:var(--ink-2)}
   footer code{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);background:var(--surface-2);padding:2px 7px;border-radius:5px}
 
+  @media (max-width:820px){
+    .hero{padding:40px 0 20px}
+    .hero .wrap{grid-template-columns:1fr}
+    .fov{width:min(70%,300px);margin-top:6px}
+  }
   @media (max-width:560px){
-    .head-inner{padding:40px 0 32px}
     .unit-head{flex-wrap:wrap}
     .unit-meta{margin-left:0;width:100%}
     .grid{grid-template-columns:1fr}
   }
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="wrap head-inner">
-    <p class="eyebrow"><span class="dot"></span> 고등 생명과학 · 세포와 물질대사</p>
-    <h1>탐구를 <span class="thin">직접 손으로</span><br>해 보는 가상 실험실</h1>
-    <p class="lede">교과서 <b>세포와 물질대사</b> 단원의 탐구활동 17개를 모았습니다. 이 중 손으로 조작하고 결과를 눈으로 보는 실험은 <b>가상 실험실</b>로 옮깁니다 — 잘못해도 막지 않고, 결과가 대신 답합니다. 나머지는 교실과 교과서에서 하는 활동으로 자리만 표시했습니다.</p>
-    <!-- ★ **범례는 화면에 있는 것만 설명한다.** 없는 상태를 설명하면 학생이 그것을 찾는다.
-         한때 여덟이 각자 따로 배포돼 있어서 「준비 중」칸을 뺐었고, 합치는 중에는
-         아직 안 옮긴 것들이 있어 되살렸다. **여덟을 다 옮겼으므로 다시 뺐다** —
-         `.card.soon` 카드가 한 장도 없다. 다음에 실험을 새로 붙이다 중간 상태가
-         생기면 이 칸과 카드를 **함께** 되살린다.
-         (합치기 5단계, 2026-08-30 — `MERGE-AND-DEPLOY.md`.
-          `tests/site.test.js` 의 「아직 안 옮긴 실험은 「준비 중」으로 보인다」가 양쪽을 잡는다) -->
-    <div class="legend">
-      <span class="k"><span class="swatch live"></span> 가상 실험실 · 지금 열기</span>
-      <span class="k"><span class="swatch class"></span> 교실·교과서에서</span>
+<div class="top">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 26 26" aria-hidden="true" fill="none">
+        <circle cx="13" cy="13" r="11" fill="var(--accent-soft)" stroke="var(--ink)" stroke-width="2"/>
+        <ellipse cx="10" cy="11" rx="3" ry="2.2" fill="var(--iodine)"/>
+        <ellipse cx="16" cy="15" rx="2.6" ry="1.9" fill="var(--iodine)"/>
+        <ellipse cx="14" cy="9" rx="1.6" ry="1.2" fill="var(--iodine)"/>
+      </svg>
+      가상 생명과학 실험실 <small>virtual-biolab</small>
+    </a>
+    <nav class="nav" aria-label="바로 가기">
+      <a href="#experiments">실험</a>
+      <a href="#how-to">사용법</a>
+      <a class="teacher" href="/teacher">선생님 화면 →</a>
+    </nav>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow"><span class="dot"></span> 안내된 탐구 · Guided Inquiry</p>
+      <h1><span class="thin">손으로 조작하고, 눈으로 확인하는</span>가상 생명과학 실험실</h1>
+      <p class="lede">실험대 위의 기구를 <b>직접 끌어다</b> 슬라이드를 만들고, 시약을 떨어뜨리고, 현미경을 돌립니다. <b>잘못해도 막지 않습니다</b> — 두껍게 바르면 뿌옇고, 급하게 덮으면 기포가 생깁니다. 결과가 대신 답하고, 탐구 노트가 질문에서 결론까지 옆에서 안내합니다.</p>
+      <div class="cta">
+        <a class="btn primary" href="#experiments">실험 고르기 ↓</a>
+        <a class="btn" href="#how-to">3분 사용법</a>
+      </div>
     </div>
+
+    <figure class="fov" aria-label="현미경 시야 — 아이오딘으로 물든 바나나 녹말립">
+      <svg viewBox="0 0 400 400" role="img">
+        <!-- 시야 바깥 — 검은 경통 -->
+        <circle cx="200" cy="200" r="196" fill="var(--ink)"/>
+        <circle cx="200" cy="200" r="178" fill="var(--cell)" stroke="var(--cell-line)" stroke-width="3"/>
+        <g class="cells" stroke="var(--cell-line)" stroke-width="3" fill="none" stroke-linejoin="round">
+          <!-- 바나나 과육 세포벽. 실물처럼 크고 성기다 (150 µm 세포, 400배) -->
+          <path d="M60 150 Q120 110 180 140 Q240 160 300 120 Q340 150 330 210 Q300 270 240 280 Q180 300 120 270 Q60 240 60 150 Z"/>
+          <path d="M180 140 Q170 200 200 240 Q230 280 240 280"/>
+          <path d="M120 270 Q140 220 180 220 Q230 210 240 190 Q270 160 300 120"/>
+          <path d="M40 260 Q80 320 150 340 Q220 360 290 330 Q340 300 350 250" opacity=".6"/>
+          <path d="M120 40 Q160 70 210 60 Q260 50 300 80" opacity=".6"/>
+          <!-- 녹말립 — 청람색. 큰 것·작은 것이 섞여 있고 밝은 점 하나가 하이라이트다 -->
+          <g fill="var(--iodine)" stroke="none">
+            <ellipse cx="110" cy="180" rx="22" ry="15" transform="rotate(-18 110 180)"/>
+            <ellipse cx="150" cy="235" rx="17" ry="12" transform="rotate(20 150 235)"/>
+            <ellipse cx="215" cy="175" rx="26" ry="17" transform="rotate(-8 215 175)"/>
+            <ellipse cx="268" cy="215" rx="19" ry="13" transform="rotate(30 268 215)"/>
+            <ellipse cx="200" cy="255" rx="14" ry="10"/>
+            <ellipse cx="300" cy="160" rx="12" ry="9" transform="rotate(-25 300 160)"/>
+            <ellipse cx="90" cy="240" rx="10" ry="7"/>
+            <ellipse cx="240" cy="120" rx="11" ry="8" transform="rotate(15 240 120)"/>
+            <ellipse cx="170" cy="300" rx="13" ry="9" transform="rotate(-30 170 300)"/>
+            <ellipse cx="250" cy="300" rx="9" ry="6"/>
+            <ellipse cx="130" cy="120" rx="8" ry="6"/>
+          </g>
+          <g fill="var(--cell)" stroke="none" opacity=".85">
+            <ellipse cx="104" cy="175" rx="6" ry="3.5" transform="rotate(-18 104 175)"/>
+            <ellipse cx="208" cy="169" rx="7" ry="4" transform="rotate(-8 208 169)"/>
+            <ellipse cx="146" cy="231" rx="4.5" ry="2.8" transform="rotate(20 146 231)"/>
+            <ellipse cx="263" cy="211" rx="5" ry="3" transform="rotate(30 263 211)"/>
+          </g>
+        </g>
+        <!-- 시야 테두리 — 접안렌즈 -->
+        <circle cx="200" cy="200" r="178" fill="none" stroke="var(--ink)" stroke-width="6"/>
+      </svg>
+      <figcaption class="cap">(나) 아이오딘–아이오딘화 칼륨 · 400×</figcaption>
+    </figure>
   </div>
 </header>
 
-<main class="wrap">
+<section class="how wrap" aria-labelledby="how-title">
+  <div class="rail-card">
+    <div class="rail-head">
+      <h2 id="how-title">탐구 노트가 옆에서 안내합니다</h2>
+      <p>실험마다 같은 일곱 쪽. 교과서의 탐구 과정을 그대로 따르되, 답을 대신 말하지 않습니다.</p>
+    </div>
+    <ol class="rail" aria-label="탐구 노트 일곱 단계">
+      <li data-n="1">문제 인식<small>무엇을 알아보나</small></li>
+      <li data-n="2">준비물<small>기구 · 안전</small></li>
+      <li data-n="3">예상<small>먼저 그려 본다</small></li>
+      <li data-n="4" class="do">탐구 과정<small>실험대에서 손으로</small></li>
+      <li data-n="5" class="do">결과<small>본 것을 기록</small></li>
+      <li data-n="6">정리<small>예상과 견준다</small></li>
+      <li data-n="7">자기 평가<small>무엇을 배웠나</small></li>
+    </ol>
+  </div>
+
+  <div class="principles">
+    <div class="pr">
+      <h3><svg viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="2"><path d="M4 12l5 5 9-11"/></svg>막지 않습니다</h3>
+      <p>한 방울만 떨어뜨리면 시야의 절반만 물듭니다. 다섯 방울이면 넘칩니다. 「틀렸다」는 말 대신 <b>그렇게 보입니다</b>.</p>
+    </div>
+    <div class="pr">
+      <h3><svg viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M11 6v5l3 2"/></svg>실제 수치로 돕니다</h3>
+      <p>시야 지름 = 18000 ÷ 대물배율. 저배율에서 녹말립이 안 보이는 것은 꾸민 게 아니라 사실이고, 그 사실이 절차를 설명합니다.</p>
+    </div>
+    <div class="pr">
+      <h3><svg viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="2"><path d="M4 16h4M4 11h8M4 6h13"/></svg>거들어 주는 정도를 고릅니다</h3>
+      <p>1단계는 다음 할 일을 짚어 주고, 2단계는 절차만, 3단계는 목표만 줍니다. 조작은 셋이 같습니다.</p>
+      <div class="lv" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="use wrap" id="how-to" aria-labelledby="use-title">
+  <div class="sec-head">
+    <h2 id="use-title">사용법</h2>
+    <p>설치도 계정도 없습니다. 브라우저만 있으면 됩니다.</p>
+  </div>
+  <div class="use-grid">
+    <div class="who">
+      <h3><span class="tag">Student</span> 학생은 이렇게</h3>
+      <ol class="steps">
+        <li><b>실험을 고르고</b> 단계(1·2·3)와 혼자/모둠을 정합니다. 선생님이 주신 QR·링크로 들어왔다면 수업 코드는 이미 들어가 있습니다.</li>
+        <li><b>탐구 노트를 따라</b> 실험대의 기구를 끌어다 씁니다. 틀려도 멈추지 않으니, 결과를 보고 다시 해 보세요. 되돌리기도 있습니다.</li>
+        <li>결과를 기록하고 결론을 쓰면 <b>「보고서 만들기」</b>. PDF 로 저장하거나, 수업 코드가 있으면 <b>「선생님께 제출」</b>을 누릅니다.</li>
+      </ol>
+      <p class="note">이름과 학번은 보고서를 만들 때만 묻고, 제출을 누르지 않으면 어디에도 보내지 않습니다.</p>
+    </div>
+    <div class="who teacher">
+      <h3><span class="tag">Teacher</span> 선생님은 이렇게</h3>
+      <ol class="steps">
+        <li><b>「선생님 화면」</b>에서 실험을 고르고 수업을 열면 <b>6자리 수업 코드 · QR · 관리 링크</b>가 나옵니다. 관리 링크는 선생님만 보관하세요.</li>
+        <li><b>QR 을 칠판에 띄우거나</b> 링크를 나눠 줍니다. 학생은 찍고 들어와 바로 시작합니다.</li>
+        <li><b>관리 링크를 열면</b> 제출된 보고서가 쌓입니다. 펼쳐 보고, 「전부 인쇄 / PDF」로 한 번에 받습니다. 보관 기간이 지나면 자동으로 지워집니다.</li>
+      </ol>
+      <p class="note">반마다, 실험마다 수업을 따로 열 수 있습니다. 다른 선생님의 수업은 서로 보이지 않습니다.</p>
+      <a class="btn go" href="/teacher">선생님 화면 열기 →</a>
+    </div>
+  </div>
+</section>
+
+<main class="catalog wrap" id="experiments">
+  <div class="sec-head">
+    <h2>실험 고르기</h2>
+    <p>고등 생명과학 · 세포와 물질대사 — 가상 실험 8개</p>
+  </div>
 
   <section class="unit">
     <div class="unit-head">
@@ -220,46 +425,38 @@
         <h2 class="unit-title">세포</h2>
         <p class="unit-sub">구성 물질 · 구조와 기능 · 세포막을 통한 물질 이동</p>
       </div>
-      <span class="unit-meta">가상 4 / 활동 5</span>
+      <span class="unit-meta">가상 4</span>
     </div>
     <div class="grid">
-
-      <a class="card live" href="/cell-metabolism/banana">
-        <span class="type">관찰 실험 · 완성</span>
+      <a class="card" href="/cell-metabolism/banana">
+        <span class="type">관찰 실험</span>
         <h3>바나나에서 탄수화물과 지질 관찰하기</h3>
         <p>과육을 얇게 문질러 시약으로 물들이고, 현미경으로 세포 속 녹말과 지방을 찾는다.</p>
         <div class="foot"><span class="page">교과서 13쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <a class="card live" href="/cell-metabolism/micrometer">
-        <span class="type">관찰 실험 · 가상</span>
+      <a class="card" href="/cell-metabolism/micrometer">
+        <span class="type">관찰 실험</span>
         <h3>현미경으로 세포의 크기 측정하기</h3>
         <p>접안·대물 마이크로미터의 눈금을 나란히 겹쳐, 눈으로 보이지 않는 세포를 잰다.</p>
         <div class="foot"><span class="page">교과서 20쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <a class="card live" href="/cell-metabolism/centrifuge">
+      <a class="card" href="/cell-metabolism/centrifuge">
         <span class="type">제작 실험 · 재구성</span>
         <h3>간이 원심분리기로 혈액 나누기</h3>
         <p>모세관에 혈액을 채워 밀봉하고, 끈을 리듬 있게 당겨 돌려 성분을 층으로 가른다.</p>
         <div class="foot"><span class="page">교과서 24쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <a class="card live" href="/cell-metabolism/osmosis">
-        <span class="type">관찰 실험 · 가상</span>
+      <a class="card" href="/cell-metabolism/osmosis">
+        <span class="type">관찰 실험</span>
         <h3>세포에서 일어나는 삼투 현상 관찰하기</h3>
         <p>적양파 표피를 벗겨 봉입하고, 농도가 다른 용액을 흘려 세포 모양의 변화를 본다.</p>
         <div class="foot"><span class="page">교과서 40쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <span class="card class">
-        <span class="type">모형 제작</span>
-        <h3>단백질과 핵산 모형 제작하기</h3>
-        <p>종이 조각을 오려 붙여 인슐린 단백질과 DNA의 입체 구조를 만든다.</p>
-        <div class="foot"><span class="page">교과서 16쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
     </div>
+    <p class="class-head">교실·교과서에서 하는 활동</p>
+    <ul class="class-list">
+      <li><span class="k">16쪽</span> 단백질과 핵산 모형 제작하기</li>
+    </ul>
   </section>
 
   <section class="unit">
@@ -269,46 +466,28 @@
         <h2 class="unit-title">물질대사와 에너지</h2>
         <p class="unit-sub">세포의 물질대사와 에너지 · 효소</p>
       </div>
-      <span class="unit-meta">가상 2 / 활동 5</span>
+      <span class="unit-meta">가상 2</span>
     </div>
     <div class="grid">
-
-      <a class="card live" href="/cell-metabolism/catalase">
-        <span class="type">실험 설계 · 가상</span>
+      <a class="card" href="/cell-metabolism/catalase">
+        <span class="type">실험 설계</span>
         <h3>효소의 작용에 영향을 미치는 요인 탐구하기</h3>
         <p>온도와 pH를 변인으로 설계하고, 감자즙 거름종이가 떠오르는 때로 카탈레이스의 활성을 읽는다.</p>
         <div class="foot"><span class="page">교과서 72쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <a class="card live" href="/cell-metabolism/germination">
+      <a class="card" href="/cell-metabolism/germination">
         <span class="type">디지털 활동 · 재구성</span>
         <h3>발아 중인 콩의 물질대사 대조 실험</h3>
         <p>발아 콩과 마른 콩의 두 챔버를 꾸미고, 대사가 어느 쪽에서 더 크게 일어나는지 견준다.</p>
         <div class="foot"><span class="page">교과서 62쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <span class="card class">
-        <span class="type">자료 해석</span>
-        <h3>1일 에너지 섭취량과 소비량 비교하기</h3>
-        <p>하루 먹은 것과 움직인 것을 표로 계산해 에너지 균형을 따진다.</p>
-        <div class="foot"><span class="page">교과서 65쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">조사 · 발표</span>
-        <h3>효소 작용의 중요성 발표하기</h3>
-        <p>효소가 결핍되면 생기는 문제를 조사해 홍보물로 만든다.</p>
-        <div class="foot"><span class="page">교과서 69쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">조사 · 발표</span>
-        <h3>효소가 생활·산업에 이용되는 사례 조사하기</h3>
-        <p>청바지 가공부터 혈당 검사지까지, 생활 속 효소 이용을 카드 뉴스로 만든다.</p>
-        <div class="foot"><span class="page">교과서 74쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
     </div>
+    <p class="class-head">교실·교과서에서 하는 활동</p>
+    <ul class="class-list">
+      <li><span class="k">65쪽</span> 1일 에너지 섭취량과 소비량 비교하기</li>
+      <li><span class="k">69쪽</span> 효소 작용의 중요성 발표하기</li>
+      <li><span class="k">74쪽</span> 효소가 생활·산업에 이용되는 사례 조사하기</li>
+    </ul>
   </section>
 
   <section class="unit">
@@ -318,96 +497,43 @@
         <h2 class="unit-title">세포호흡과 광합성</h2>
         <p class="unit-sub">세포호흡 · 발효 · 광합성</p>
       </div>
-      <span class="unit-meta">가상 2 / 활동 7</span>
+      <span class="unit-meta">가상 2</span>
     </div>
     <div class="grid">
-
-      <a class="card live" href="/cell-metabolism/fermentation">
-        <span class="type">실험 설계 · 가상</span>
+      <a class="card" href="/cell-metabolism/fermentation">
+        <span class="type">실험 설계</span>
         <h3>발효 실험 설계하여 수행하기</h3>
         <p>효모액을 만들고 농도·온도를 변인으로 설계해, 알코올발효로 나오는 기체를 지켜본다.</p>
         <div class="foot"><span class="page">교과서 98쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <a class="card live" href="/cell-metabolism/chromatography">
-        <span class="type">관찰 실험 · 가상</span>
+      <a class="card" href="/cell-metabolism/chromatography">
+        <span class="type">관찰 실험</span>
         <h3>크로마토그래피로 광합성색소 분리하기</h3>
         <p>잎에서 뽑은 색소를 판의 원점에 찍고, 전개액을 올려 여러 색의 띠로 나눈다.</p>
         <div class="foot"><span class="page">교과서 105쪽</span><span class="badge done">지금 열기 →</span></div>
       </a>
-
-      <span class="card class">
-        <span class="type">설명 자료 제작</span>
-        <h3>세포호흡 과정을 다양한 매체로 표현하기</h3>
-        <p>해당 과정·TCA 회로·산화적 인산화의 단계별 특징을 매체로 만든다.</p>
-        <div class="foot"><span class="page">교과서 95쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">조사 · 자료 제작</span>
-        <h3>실생활에서 발효를 이용한 사례 조사하기</h3>
-        <p>식품·환경·에너지 속 발효 기술을 조사해 설명 자료로 만든다.</p>
-        <div class="foot"><span class="page">교과서 100쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">모형 제작</span>
-        <h3>마이토콘드리아와 엽록체 모형 제작하기</h3>
-        <p>점토·재활용 재료로 두 세포소기관의 입체 구조를 만든다.</p>
-        <div class="foot"><span class="page">교과서 103쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">설명 자료 제작</span>
-        <h3>광합성과 세포호흡의 전자전달계 비교하기</h3>
-        <p>두 전자전달계의 공통점·차이점을 표로 정리해 매체로 만든다.</p>
-        <div class="foot"><span class="page">교과서 115쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
-      <span class="card class">
-        <span class="type">조사 · 자료 제작</span>
-        <h3>광합성 관련 과학사 연구 조사하기</h3>
-        <p>프리스틀리부터 캘빈까지, 광합성을 밝힌 과학자들의 연구를 조사한다.</p>
-        <div class="foot"><span class="page">교과서 116쪽</span><span class="badge class">교실에서</span></div>
-      </span>
-
     </div>
+    <p class="class-head">교실·교과서에서 하는 활동</p>
+    <ul class="class-list">
+      <li><span class="k">95쪽</span> 세포호흡 과정을 다양한 매체로 표현하기</li>
+      <li><span class="k">100쪽</span> 실생활에서 발효를 이용한 사례 조사하기</li>
+      <li><span class="k">103쪽</span> 마이토콘드리아와 엽록체 모형 제작하기</li>
+      <li><span class="k">115쪽</span> 광합성과 세포호흡의 전자전달계 비교하기</li>
+      <li><span class="k">116쪽</span> 광합성 관련 과학사 연구 조사하기</li>
+    </ul>
   </section>
-
 </main>
 
 <footer>
   <div class="wrap">
-    <span>세포와 물질대사 가상 실험실 · 비상교육 교과서 탐구활동 기반</span>
-    <span>주소는 <code>/&lt;교과&gt;/&lt;실험&gt;</code> — 예: <code>/cell-metabolism/banana</code></span>
+    <span>가상 생명과학 실험실 · 비상교육 『세포와 물질대사』 탐구활동 기반 · MIT</span>
+    <span><a href="/teacher">선생님 화면</a> · <a href="/privacy">개인정보처리방침</a> · 주소는 <code>/&lt;교과&gt;/&lt;실험&gt;</code></span>
   </div>
 </footer>
 
-<script>
-  // 이 화면은 합쳐진 앱의 실험 선택 화면이다.
-  //
-  // 주소는 **`/<교과>/<실험>`** 이다 (사장님 결정 2026-08-29) — 예: `/cell-metabolism/banana`.
-  // 단계는 붙이지 않는다. **QR 은 실험까지만 데려가고 단계는 시작 화면에서 학생이 고른다** —
-  // 난이도는 학년 축이 아니라 화면이 얼마나 거들어 주는가라서, 미리 박으면 고를 수가 없다.
-  // 반마다 고정하고 싶으면 `?level=2` 를 붙이면 된다.
-  //
-  // ★ **여덟이 다 만들어졌지만, 이 사이트에 다 들어와 있지는 않다**(2026-08-30).
-  //   셋(banana·micrometer·osmosis)만 옮겼고 나머지 다섯은 아직 따로 서 있다.
-  //   안 옮긴 것은 `<a href>` 를 아예 안 준다 — 링크가 있으면 **404 로 데려간다.**
-  //   여기서 자바스크립트로 막지 않는다. 자바스크립트가 안 돌아도 안 데려가야 한다.
-  //
-  //   아래 갈래는 그래도 남겨 둔다. 누가 `.card.live` 에 `.badge.soon` 을 달아 두면
-  //   (= 링크는 살아 있는데 아직 준비가 안 된 상태) 그때 이것이 막아 준다.
-  document.querySelectorAll('a.card.live').forEach(function(a){
-    a.addEventListener('click', function(e){
-      var done = a.querySelector('.badge.done');
-      if(!done){
-        e.preventDefault();
-        var b = a.querySelector('.badge');
-        if(b && !b.dataset.said){ b.dataset.said='1'; var t=b.textContent; b.textContent='아직 준비 중이에요'; setTimeout(function(){b.textContent=t;},1400); }
-      }
-    });
-  });
-</script>
+<!-- 이 화면에는 자바스크립트가 없다. 배포 헤더의 CSP 가 `script-src 'self'` 라 인라인 스크립트는
+     어차피 막히고, 여기서 할 일(움직임 둘)은 CSS 로 충분하다. 안 옮긴 실험을 막던 갈래는
+     여덟을 다 옮겨 필요가 없어졌다 — 다시 생기면 `<a href>` 를 아예 주지 않는 쪽으로
+     (`tests/site.test.js` 「카탈로그가 이 사이트에 없는 실험으로 데려가지 않는다」). -->
 </body>
 </html>
