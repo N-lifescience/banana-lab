@@ -240,7 +240,9 @@ export const ACTIONS = {
     const next = withChamber(state, chamber, { sensorDepth: clamped });
     // 콩에 닿은 것이 더 무거운 소식이다 — 끝에 닿은 것보다 먼저 말한다.
     if (sensorState(next.chambers[chamber]) === SENSOR.BURIED && sensorState(ch) !== SENSOR.BURIED) {
-      return happened(next, '센서 끝이 콩에 닿았습니다. 이대로 재면 신호가 튑니다.', 'sensor-buried');
+      // 태그가 `POUR_BEANS` 의 'sensor-buried' 와 다르다. 그쪽 다음 행동은 「챔버를 클릭해
+      // 크게 보고」인데, 여기는 **이미 확대 뷰 안**이라 그 말이 엉뚱하다 (플레이테스트).
+      return happened(next, '센서 끝이 콩에 닿았습니다. 이대로 재면 신호가 튑니다.', 'sensor-touched');
     }
     if (depth !== clamped) {
       return happened(next,
@@ -376,7 +378,16 @@ export const ACTIONS = {
     if (!changed) return ok(state);
     const next = { ...state, chambers };
     if (hitLimit) {
-      return happened(next,
+      /*
+       * **`ok` 다 — 빨간 토스트가 아니다.**
+       *
+       * 관찰 시간을 다 채우는 것은 탐구 노트가 시키는 일이고(STEP 5 「관찰 시간까지 재기」),
+       * 정상 경로의 마지막 장면이다. 앞서는 `happened` 로 내서 **빨갛게** 떴고, PLAYTEST 는
+       * 「빨강이지만 잘못된 것이 아니다」라고 따로 변명해야 했다. 학생은 변명을 못 읽는다 —
+       * 실험을 제대로 끝낸 순간 빨간 글이 뜨면 「내가 뭘 틀렸나」부터 찾는다.
+       * 뜻대로 된 일은 초록이다 (toast.js 머리말). 되돌아갈 길은 문장에 그대로 담아 둔다.
+       */
+      return ok(next,
         `${CH_NAME[hitLimit]}가 관찰 시간(${OBSERVE_LIMIT_MIN}분)을 다 채워 측정을 멈췄습니다. `
         + '다시 시작할 수도, 개수대에서 비우고 처음부터 할 수도 있습니다.', 'observe-limit');
     }

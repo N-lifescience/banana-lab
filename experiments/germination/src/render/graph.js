@@ -69,6 +69,21 @@ export function tempMax(chambers = []) {
   return ROOM_TEMP_C + (NICE.find((n) => n >= rise) ?? NICE[NICE.length - 1]);
 }
 
+/**
+ * CO₂ 칸의 세로 눈금 값. **읽을 수 있는 수**여야 한다.
+ *
+ * 앞서는 바닥·가운데·꼭대기 셋을 그대로 찍어 「380 · 1190 · 2000」이 나왔다 — 바닥이 380
+ * (대기 농도 밑에 둔 여백)이라 가운데가 늘 어중간한 수가 됐다. 보고서를 손에 든 선생님이
+ * 「1190 ppm 눈금」을 보면 그래프 자체를 못 믿는다 (플레이테스트).
+ * 바닥은 눈금 없이 두고(거기는 「대기 농도」 선이 이미 말한다), 꼭대기와 그 절반만 찍는다 —
+ * 절반이 어중간하면(1500 의 절반 750) 500 단위로 쪼갠다.
+ */
+export function co2Ticks(lo, hi) {
+  const half = hi / 2;
+  const ticks = half % 100 === 0 ? [half, hi] : [500, 1000, 1500].filter((v) => v <= hi);
+  return ticks.filter((v) => v > lo);
+}
+
 const xOf = (p, min) => p.x0 + (p.x1 - p.x0) * Math.min(min / OBSERVE_LIMIT_MIN, 1);
 const yOf = (pane, v, lo, hi) => pane.y1 - (pane.y1 - pane.y0) * ((v - lo) / (hi - lo));
 
@@ -123,16 +138,17 @@ export function renderGraph(views = [], { idPrefix = 'g' } = {}) {
   const tMax = tempMax(views);
   const cLo = Math.min(ATMOSPHERIC_CO2_PPM - 40, 380);
 
-  const grid = (pane, lo, hi, fmt) => [0, 0.5, 1].map((f) => {
-    const y = pane.y1 - (pane.y1 - pane.y0) * f;
+  const grid = (pane, lo, hi, fmt, values = [lo, (lo + hi) / 2, hi]) => values.map((v) => {
+    const y = yOf(pane, v, lo, hi);
     return `<path d="M ${p.x0},${y.toFixed(1)} L ${p.x1},${y.toFixed(1)}" stroke="${INK}"
         stroke-opacity="0.12" stroke-width="1"/>`
       + `<text x="${p.x0 - 7}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end"
-        fill="${INK}" fill-opacity="0.7">${fmt(lo + (hi - lo) * f)}</text>`;
+        fill="${INK}" fill-opacity="0.7">${fmt(v)}</text>`;
   }).join('');
 
   // 가로 눈금 — 0 부터 관찰 시간까지. 두 칸이 **같은 시간축**을 쓴다.
-  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => {
+  // 넷으로 나누면 30분에서 「8 · 15 · 23」이 됐다(7.5·22.5 를 반올림). 셋으로 나눠 10 단위로 읽힌다.
+  const xTicks = [0, 1 / 3, 2 / 3, 1].map((f) => {
     const x = p.x0 + (p.x1 - p.x0) * f;
     const m = Math.round(OBSERVE_LIMIT_MIN * f);
     return `<text x="${x.toFixed(1)}" y="${GRAPH.h - 20}" font-size="10" text-anchor="middle"
@@ -170,7 +186,7 @@ export function renderGraph(views = [], { idPrefix = 'g' } = {}) {
   return `<svg viewBox="0 0 ${GRAPH.w} ${GRAPH.h}" xmlns="http://www.w3.org/2000/svg"
   role="img" data-render="graph" data-points="${points}">
   <text x="4" y="13" font-size="11" fill="${INK}" fill-opacity="0.85">${G.co2Label}</text>
-  <g id="${id('co2-grid')}">${grid(p.co2, cLo, cMax, (v) => Math.round(v))}</g>
+  <g id="${id('co2-grid')}">${grid(p.co2, cLo, cMax, (v) => Math.round(v), co2Ticks(cLo, cMax))}</g>
   ${btbLines}
   ${airLine}
   <path d="M ${p.x0},${p.co2.y0} L ${p.x0},${p.co2.y1} L ${p.x1},${p.co2.y1}"
@@ -206,6 +222,17 @@ export function renderGraph(views = [], { idPrefix = 'g' } = {}) {
  * @param {string} comparison               `comparisonKind(state)`
  * @param {string[]} mismatched             `mismatches(state)`
  */
+/**
+ * 잰 시간이 이만큼까지 다른 것은 **다르다고 말하지 않는다** (분).
+ *
+ * 화면의 1초가 1분이고 두 챔버는 **한 손으로 차례로** 시작한다 — 왼쪽을 시작하고 오른쪽
+ * 확대 뷰를 열어 시작하면 그 사이에 1분이 흐른다. 앞서는 그 1분에도 「잰 시간이 다릅니다 —
+ * 왼쪽 18분 · 오른쪽 17분」이 붙어, **제대로 한 학생의 거의 모든 기록**에 어긋났다는 말이
+ * 달렸다 (플레이테스트 — 정상 경로·실패 경로 열 벌 전부). 그건 학생의 실수가 아니라 이 앱의
+ * 시계 눈금이다. 시계 한 눈금(1분)까지는 같은 것으로 본다. 그보다 크면 그대로 말한다.
+ */
+export const TIME_SLACK_MIN = 1;
+
 export function resultNotes(views, comparison, mismatched = []) {
   const G = UI.graph;
   const out = [];
@@ -240,7 +267,7 @@ export function resultNotes(views, comparison, mismatched = []) {
     else out.push(G.notes.co2Readout(l ?? '—', r ?? '—', ATMOSPHERIC_CO2_PPM));
   }
   // 한쪽만 오래 잰 것도 견주기 어렵다. 통제변인은 아니지만 말해 주지 않으면 모른다.
-  if (views.L.elapsedMin !== views.R.elapsedMin) {
+  if (Math.abs(views.L.elapsedMin - views.R.elapsedMin) > TIME_SLACK_MIN) {
     out.push(G.notes.differentTime(views.L.elapsedMin, views.R.elapsedMin));
   }
   return out;

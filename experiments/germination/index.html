@@ -49,7 +49,11 @@
 
   /* 실험대 — 배경 애셋과 물건이 같은 4:3 무대를 쓴다.
      따로 놀면 창 크기가 바뀔 때 물건이 선반에서 떠오른다. */
-  #bench{position:relative;overflow:auto;background:var(--sunk);display:flex;
+  /* 가로는 안 넘긴다. 물건은 저마다 400×300 프레임을 갖는데 오른쪽 끝 물건(쓰레기통)의
+     투명한 프레임이 무대 오른쪽으로 20 px 쯤 삐져나가, 판이 늘 가로로 조금 스크롤됐다 —
+     맥에서는 안 보이고 **윈도우·크롬북에서는 실험대 밑에 가로 스크롤바가 생긴다**
+     (플레이테스트 — 768·844·1280 px 전부). 그려진 부분은 무대 안이라 잘리는 것이 없다. */
+  #bench{position:relative;overflow:auto;overflow-x:hidden;background:var(--sunk);display:flex;
     flex-direction:column;gap:10px;padding:12px}
   /* 실험대는 세로로 길어 패널을 넘칠 수 있다. 그때 도구 막대가 위로 밀려 사라지면
      재물대에 무엇이 올라가 있는지, 되돌릴 수 있는지를 볼 방법이 없어진다. 붙여 둔다. */

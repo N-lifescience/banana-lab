@@ -132,7 +132,28 @@ export function groupNotesEmpty(st, group) {
   const boxes = group.steps.filter((step) => step.note);
   if (boxes.length === 0) return false;
   return group.steps.some((step, i) =>
-    step.note && !String(st.session.notes[substepId(group, i)] ?? '').trim());
+    step.note && !String(st.session.notes[substepId(group, i)] ?? '').trim())
+    || qaEmpty(st, group);
+}
+
+/**
+ * 질문 ⓐ 가 붙은 STEP 은 **ⓐ 까지 적어야 「다 적은 것」이다.**
+ *
+ * ── 플레이테스트에서 잡은 것 ────────────────────────────────────────
+ * STEP 5 의 관찰 기록 두 칸(「몇 분 지켜보기」·「온도계 견주기」)을 적고 손을 떼는 순간
+ * **STEP 5 가 접혔다.** 그 밑에 붙어 있던 질문 ⓐ 는 **한 번도 보지 못한 채** 사라졌다 —
+ * 「방금 두 챔버를 나란히 보았습니다」라고 묻는 물음이 그 봄 직후에 물어야 한다고
+ * 자리까지 정해 두었는데(`QUESTION_A_STEP`), 접히면서 그 자리가 통째로 지나가 버렸다.
+ * 1단계·3단계 둘 다 그랬고 콘솔 에러는 없었다. 6쪽에 같은 칸이 있어 결국 답할 수는
+ * 있지만, 그때는 「눈앞의 관찰」이 아니라 기억을 더듬는 문제가 된다.
+ *
+ * 그래서 ⓐ 를 그 STEP 의 관찰 기록 칸 하나로 센다. ⓐ 를 비워 두면 STEP 5 는 펼쳐진 채
+ * 「기록이 비었습니다」를 달고 있고, 다음 STEP 은 잠겨 있다 — 다른 관찰 기록 칸과 똑같다.
+ * **막는 것이 아니다** — 이미 관찰 기록에 걸려 있던 자물쇠에 칸 하나가 더해질 뿐이다.
+ * `tests/playtest-review.test.js` 가 못 박는다.
+ */
+function qaEmpty(st, group) {
+  return group.id === QUESTION_A_STEP && !String(st.session.notes['q.a'] ?? '').trim();
 }
 
 /**
@@ -147,7 +168,8 @@ export function groupNotesEmpty(st, group) {
  */
 export function stepNotesWritten(st, group) {
   if ((st.session.level ?? 1) >= 3) {
-    return Boolean(String(st.session.notes[group.id] ?? '').trim());
+    // 3단계도 질문 ⓐ 는 그 STEP 밑에 붙어 있다 — 같은 이유로 함께 센다 (qaEmpty).
+    return Boolean(String(st.session.notes[group.id] ?? '').trim()) && !qaEmpty(st, group);
   }
   return !groupNotesEmpty(st, group);
 }
