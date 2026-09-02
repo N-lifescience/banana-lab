@@ -51,10 +51,19 @@ const MIN_BAND_PX = 4;
 
 const GLASS_FILL = 'rgba(228,239,238,.55)';
 const GLASS_EDGE = 'rgba(70,74,80,.75)';
-const LABEL_INK = 'rgba(52,56,62,.92)';
-const LEADER = 'rgba(96,100,108,.7)';
+/*
+ * 글자·지시선은 **테마를 따른다.** 다크 모드에서 이 그림은 어두운 판(`--sunk`) 위에 놓이는데
+ * 잉크를 짙은 회색으로 박아 두었더니 「적혈구층 · 연층 · 혈장」 이름표와 「← 회전 바깥쪽」이
+ * 거의 안 보였다 (플레이테스트 다크 모드 — PLAYTEST-REVIEW #10).
+ * `var()` 에 **밝은 바탕용 값을 예비로** 둔다 — 보고서는 이 SVG 를 그림으로 구워 넣는데
+ * 그때는 문서의 변수가 닿지 않으므로 예비값이 쓰인다 (종이는 흰 바탕이다).
+ */
+const LABEL_INK = 'var(--ink, rgba(52,56,62,.92))';
+const LEADER = 'var(--ink-mute, rgba(96,100,108,.7))';
 const RULER_FILL = 'rgba(255,255,255,.86)';
 const RULER_LINE = 'rgba(70,74,80,.75)';
+/** 자의 숫자는 자(흰 바탕) 위에 놓이므로 테마와 무관하게 짙어야 한다. */
+const RULER_INK = 'rgba(52,56,62,.92)';
 const AIR_FILL = 'rgba(244,246,241,.9)';
 
 const n = (v) => Number(v).toFixed(2);
@@ -210,7 +219,7 @@ function rulerShape(uid) {
       + `stroke="${RULER_LINE}" stroke-width="1"/>`;
     if (big) {
       ticks += `<text x="${n(x)}" y="${n(y + 24)}" text-anchor="middle" `
-        + `font-size="10" fill="${LABEL_INK}">${mm}</text>`;
+        + `font-size="10" fill="${RULER_INK}">${mm}</text>`;
     }
   }
   return `<g data-ruler="1" id="${uid}-ruler">`

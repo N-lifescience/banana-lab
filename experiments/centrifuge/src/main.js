@@ -209,9 +209,28 @@ function startClock(zoom) {
     const st = store.getState();
     // **아무 일도 안 일어나는 동안에는 쏘지 않는다.** 가만히 있는데 TICK 이 계속 들어오면
     // 되돌리기 기록이 채워지고(rules.js 가 TRANSIENT 로 걸러 주긴 하지만), 화면도 쉬지 않는다.
-    const spinning = st.rotor.speed > 0 || Boolean(st.rotor.slots.A || st.rotor.slots.B);
-    const aging = st.finger.drop > 0 || (st.tube.fill > 0 && st.tube.kind === 'plain');
-    if (!spinning && !aging) return;
+    /*
+     * **회전판에 무엇이 들어 있다는 것만으로는 쏘지 않는다.**
+     *
+     * 앞서는 「빨대에 무엇이든 들어 있으면」 쐈다 — 멎어 있어도 박자가 흘러야 처음 당길 때가
+     * 정해진다는 이유였다. 그런데 반대쪽 빈 모세관은 한 번 넣으면 **실험이 끝날 때까지**
+     * 들어 있으므로, 균형을 맞춘 순간부터 세션 내내 0.3초마다 화면 전체가 다시 그려졌다.
+     * 탐구 노트 위의 「아직 남은 것이 있습니다」 를 펼치면 0.3초 뒤에 도로 접혔고
+     * (플레이테스트에서 실제로 그랬다 — PLAYTEST-REVIEW #2), 글칸을 누르면 사라진 칸을
+     * 누른 것이 되는 일이 잦았다.
+     *
+     * 멎어 있을 때 박자가 흐르는 것이 뜻이 있는 자리는 **확대 뷰가 열려 있을 때뿐**이다
+     * (박자 막대). 멎은 회전판의 첫 당김은 박자를 안 따지므로(`spin.js` BEAT_FLOOR)
+     * 닫혀 있는 동안 흐르지 않아도 결과는 같다.
+     *
+     * 핏방울이 굳는 것도 끝이 있다 — `DRAW_BLOOD` 가 `dropAge / 60` 을 1 로 자르므로
+     * 그 뒤로는 더 흘러도 아무것도 안 바뀐다. 굳을 대로 굳은 뒤에는 쏘지 않는다.
+     */
+    const hasLoad = Boolean(st.rotor.slots.A || st.rotor.slots.B);
+    const spinning = st.rotor.speed > 0 || (hasLoad && zoom.isOpen());
+    const dropAging = st.finger.drop > 0 && st.finger.dropAge < 61;
+    const clotting = st.tube.fill > 0 && st.tube.kind === 'plain' && st.tube.clot < 1;
+    if (!spinning && !dropAging && !clotting) return;
 
     n += 1;
     // 확대 뷰가 열려 있으면 그쪽이 자기 화면만 칠한다 — 통째로 다시 그리면

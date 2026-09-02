@@ -134,13 +134,16 @@ test('잘된 조작도 말한다 — 마지막 것만 남는다', () => {
 
   // 같은 종류를 이어서 하면 **지금 사실**이 떠야 한다. 앞의 것이 줄을 지키면
   // 두 번째로 빨아올렸을 때도 첫 번째 기둥 길이가 뜬 채로 있게 된다.
-  const { root: r2, shown: s2 } = fakeDom();
+  // (예전에는 「66% 가 줄에 남지 않는가」로 물었다. 이제 잘된 말은 아예 줄을 안 서고
+  //  떠 있던 것을 곧장 갈아 끼우므로, **지금 떠 있는 것이 마지막 말인가**로 묻는다)
+  const { root: r2 } = fakeDom();
   const t2 = createToastQueue(r2, () => 1);
   t2.push('기둥이 관의 33% 입니다.', 'ok', 'blood-drawn');
   t2.push('기둥이 관의 66% 입니다.', 'ok', 'blood-drawn');
   t2.push('기둥이 관의 100% 입니다.', 'ok', 'blood-drawn');
-  assert.ok(!s2.includes('기둥이 관의 66% 입니다.'),
-    `지난 길이가 줄을 서 있습니다: ${JSON.stringify(s2)}`);
+  assert.equal(r2.children.length, 1, '잘된 말이 겹쳐 떠 있습니다');
+  assert.equal(r2.children[0].children[0].textContent, '기둥이 관의 100% 입니다.',
+    '지난 길이가 떠 있습니다');
 
   // 뜻대로 안 된 것은 그대로 줄을 지킨다 — 갈아 끼우면 슬라이더를 끄는 동안 쌓인 경고가
   // 손을 뗀 뒤에도 몇 분 동안 계속 뜬다.
@@ -271,4 +274,33 @@ test('두 상황이 같은 문장을 쓰지 않는다 — 거르기가 남의 �
   const dup = [...seen].filter(([, n]) => n > 1).map(([m, n]) => `${n}번 "${m.slice(0, 40)}…"`);
   assert.deepEqual(dup, [],
     '두 상황이 같은 문장을 씁니다 — 뒤엣것이 말풍선에서 삼켜집니다:\n  ' + dup.join('\n  '));
+});
+
+test('잘된 말은 태그가 달라도 줄을 서지 않는다 — 다음 말이 오면 곧장 내려간다', (t) => {
+  /*
+   * 플레이테스트에서 실제로 본 것: 소독 → 채혈 → 빨아올리기 → 밀봉을 사람 속도로 이어서
+   * 했더니, 모세관을 막고 있는데 화면에는 「손끝에 선홍색 핏방울이 맺혔습니다」가 떠 있었다.
+   * 같은 태그끼리만 갈아 끼우고 **다른 태그는 3.5초씩 줄을 섰기** 때문이다.
+   * 잘된 말은 「방금 한 것의 확인」이라 다음 말이 오는 순간 지난 사실이다.
+   */
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { root, shown } = fakeDom();
+  const toast = createToastQueue(root, () => 1);
+  toast.push('소독솜으로 손끝을 닦았습니다.', 'ok', 'finger-swabbed');
+  toast.push('손끝에 선홍색 핏방울이 맺혔습니다.', 'ok', 'pricked');
+  assert.equal(root.children.length, 1, '잘된 말이 겹쳐 떠 있습니다');
+  assert.equal(root.children[0].children[0].textContent, '손끝에 선홍색 핏방울이 맺혔습니다.',
+    `채혈했는데 소독 말이 떠 있습니다: ${JSON.stringify(shown)}`);
+
+  // 뜻대로 안 된 말도 잘된 말 뒤에 줄을 서지 않는다 — 곧장 뜬다.
+  toast.push('모세관을 너무 세워서 댔습니다.', 'happened', 'steep-angle');
+  assert.match(root.children[0].children[0].textContent, /너무 세워서/,
+    `경고가 잘된 말 뒤에 줄을 섰습니다: ${JSON.stringify(shown)}`);
+
+  // 반대로 **뜻대로 안 된 말은 잘된 말이 와도 내려가지 않는다** — 학생이 읽어야 할 말이다.
+  toast.push('바깥쪽 끝을 고무찰흙으로 막았습니다.', 'ok', 'sealed');
+  assert.match(root.children[0].children[0].textContent, /너무 세워서/,
+    '잘된 말이 경고를 밀어냈습니다');
+  t.mock.timers.tick(20000);
+  assert.ok(shown.includes('바깥쪽 끝을 고무찰흙으로 막았습니다.'), '경고 뒤에 잘된 말이 이어서 떠야 합니다');
 });

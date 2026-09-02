@@ -235,8 +235,15 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       reportSlot.querySelector('#make-report').addEventListener('click', () => onReport?.());
       return;
     }
+    /*
+     * **펼쳐 둔 것은 다시 그려도 펼쳐 둔다.** 이 자리는 상태가 바뀔 때마다 `innerHTML` 로
+     * 새로 만들어지는데, 회전판이 잦아드는 동안·핏방울이 굳는 동안은 0.3초마다 그린다.
+     * 펼친 목록이 0.3초 뒤에 도로 접히면 학생은 무엇이 남았는지 끝내 못 읽는다
+     * (플레이테스트에서 실제로 그랬다 — PLAYTEST-REVIEW #2). STEP 의 `manualOpen` 과 같은 이유다.
+     */
+    const wasOpen = reportSlot.querySelector('.report-todo')?.open ?? false;
     reportSlot.innerHTML = `
-      <details class="report-todo">
+      <details class="report-todo"${wasOpen ? ' open' : ''}>
         <summary>${N.reportLockedHint} (${missing.length})</summary>
         <ul>${missing.map((m) => `<li>${m}</li>`).join('')}</ul>
       </details>`;
@@ -430,7 +437,20 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const nowUnwritten = nowIdx >= 0 && !groupNotesWritten(st, groups[nowIdx], level);
     const openableUpTo = nowIdx < 0 ? groups.length : (nowUnwritten ? nowIdx : nowIdx + 1);
     // 잠긴 STEP 에게 「무엇을 적어야 열리는지」 알려 줄 STEP.
-    const blockingId = groups[Math.min(openableUpTo, groups.length - 1)].id;
+    const blockingIdx = Math.min(openableUpTo, groups.length - 1);
+    const blockingId = groups[blockingIdx].id;
+    /*
+     * **적으라는 칸이 이미 적혀 있으면 그 말은 거짓말이다.**
+     * 지금 STEP 을 적으면 다음 STEP 「하나만」 열린다. 그 다음 STEP 의 기록까지 적어도
+     * 지금 STEP 을 **실험대에서** 마치기 전에는 그 뒤가 안 열리는데, 안내는 여전히
+     * 「STEP n 의 관찰 기록을 적으면 열립니다」였다 — 적었는데도. 플레이테스트에서 실험대를
+     * 먼저 다 하고 온 학생이 여기서 막혔다 (PLAYTEST-REVIEW #3). 그때는 **무엇을 실험대에서
+     * 해야 하는지**를 말한다.
+     */
+    const blockingWritten = groupNotesWritten(st, groups[blockingIdx], level);
+    const lockedHint = blockingWritten && nowIdx >= 0
+      ? N.stepLockedNeedBench(groups[nowIdx].id)
+      : N.stepLockedHint(blockingId);
     const stepsHtml = groups.map((group, gi) => {
       const isDone = groupsDone[gi];
       const isNow = gi === nowIdx;
@@ -510,7 +530,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       // 잠긴 STEP 에는 **왜 안 열리는지**를 적는다 — 말 없는 회색 제목은 고장으로 읽힌다.
       const openHint = isNow ? ''
         : `<span class="step-open-hint"${locked ? ' tabindex="-1" role="status"' : ''}>${
-          locked ? N.stepLockedHint(blockingId)
+          locked ? lockedHint
             : (isDone ? N.stepReopenHint : N.stepPeekHint)}</span>`;
 
       return `

@@ -114,9 +114,18 @@ export function createZoom(root, store) {
   }
 
   function renderBody() {
+    /*
+     * **다시 그려도 손은 그 자리에 남는다.** 이 판은 조작 하나마다 `innerHTML` 로 통째로
+     * 새로 만들어지는데, Enter 로 링을 당기면 그 링이 새 요소로 바뀌면서 포커스가 `<body>`
+     * 로 떨어졌다 — 키보드로는 **한 번 당기고 나면 Tab 으로 되돌아와야** 다음을 당길 수
+     * 있어서 박자를 맞출 길이 없었다. 이 실험의 몸통이 마우스 전용이 되는 자리다
+     * (플레이테스트 키보드 경로 — PLAYTEST-REVIEW #8). 같은 id 의 새 요소로 되돌려 준다.
+     */
+    const focusedId = body.contains(document.activeElement) ? document.activeElement.id : null;
     if (mode === 'draw') renderDraw();
     else if (mode === 'seal') renderSeal();
     else if (mode === 'spin') renderSpin();
+    if (focusedId) body.querySelector(`#${CSS.escape(focusedId)}`)?.focus();
   }
 
   /* ---------------------------------------------------------------- */
@@ -440,8 +449,7 @@ export function createZoom(root, store) {
         ${row(UI.controls.strength, UI.units.percent(Math.round(pullNow * 100)))}
       </dl>
       <p class="zoom-note" id="spin-note">${esc(UI.zoom.pullCount(st.rotor.pulls))}</p>
-      <p class="zoom-note ${imbalance > 0.25 ? 'zoom-note--warn' : 'zoom-note--good'}">
-        ${esc(imbalance > 0.25 ? UI.zoom.pullWobble : UI.zoom.pullBalanced)}</p>
+      ${balanceNote(st, imbalance)}
       ${!st.rotor.slots.A && !st.rotor.slots.B ? `<p class="zoom-warn">${esc(UI.zoom.pullEmpty)}</p>` : ''}
 
       ${seatControls(st)}
@@ -476,6 +484,23 @@ export function createZoom(root, store) {
     bindPullRing(body.querySelector('#pull-ring'));
     bindCapture();
     paintSpin();
+  }
+
+  /**
+   * 균형 안내.
+   *
+   * **시료가 빠져 있을 때는 「흔들립니다」라고 하지 않는다.** 자는 실험대의 모세관에만 댈 수
+   * 있어서 학생은 재려고 시료를 꺼낸 뒤 이 화면에서 「결과 기록」을 누른다. 그때 빨대에는
+   * 빈 모세관만 남아 있어 `imbalanceOf` 가 1 이고, 화면은 균형을 맞춰 돌린 학생에게
+   * 주황으로 「반대쪽에 빈 모세관을 넣어 균형을 맞추세요」라고 했다 — 하지도 않은 잘못을
+   * 나무라는 자리였다 (플레이테스트 — PLAYTEST-REVIEW #5). 시료가 없으면 어디 있는지만 말한다.
+   */
+  function balanceNote(st, imbalance) {
+    if (sampleSlot(st.rotor) === null) {
+      return `<p class="zoom-note">${esc(UI.zoom.sampleOut)}</p>`;
+    }
+    return `<p class="zoom-note ${imbalance > 0.25 ? 'zoom-note--warn' : 'zoom-note--good'}">
+        ${esc(imbalance > 0.25 ? UI.zoom.pullWobble : UI.zoom.pullBalanced)}</p>`;
   }
 
   /**

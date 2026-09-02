@@ -68,6 +68,8 @@ export function createToastQueue(root, getLevel) {
    * (fermentation 세션이 잡아 허브가 넘겨 주었고, 여기도 같았다)
    */
   let showingShown = null;
+  /** 지금 떠 있는 것이 잘된 조작의 확인인가. 다음 말이 오면 곧장 내린다 (push 의 주석). */
+  let showingGood = false;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
 
@@ -81,6 +83,7 @@ export function createToastQueue(root, getLevel) {
     const { message, good, tag, shown } = queue.shift();
     showingTag = tag ?? null;
     showingShown = shown ?? null;
+    showingGood = Boolean(good);
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -111,6 +114,7 @@ export function createToastQueue(root, getLevel) {
       showing = false;
       showingTag = null;
       showingShown = null;   // 이것을 안 지우면 지나간 문장이 다음 것을 계속 삼킨다
+      showingGood = false;
       showNext();
     };
   }
@@ -160,6 +164,18 @@ export function createToastQueue(root, getLevel) {
       // 겹침 방지로 삼키면 더 나빠서, 두 번째 조작에도 첫 번째 문구가 뜬 채로 남는다 —
       // 손끝을 두 번 찌르면 두 번째에도 첫 번째 「맺혔습니다」가 떠 있는 식이다.
       // 지금 사실을 말해야 하므로 갈아 끼운다.
+      //
+      // ── 같은 태그만 갈아 끼우면 반쪽이다 ──────────────────────────────
+      // 앞서는 **같은 태그**끼리만 갈아 끼웠다. 그러면 소독 → 채혈 → 빨아올리기 → 밀봉처럼
+      // 태그가 다른 잘된 조작이 이어질 때 저마다 3.5초씩 줄을 서서, 학생이 모세관을 막고
+      // 있을 때 화면에는 「손끝에 선홍색 핏방울이 맺혔습니다」가 떠 있었다. 뜻대로 안 된
+      // 경고(「너무 세워서 댔습니다」)는 그 줄 맨 뒤에 서서 **회전판을 돌리는 도중**에야
+      // 도착했다 — 30초 전 일이라 학생은 무엇을 두고 하는 말인지 알 수 없다.
+      // (플레이테스트에서 실제로 그랬다 — PLAYTEST-REVIEW #1)
+      //
+      // 잘된 조작의 말은 「방금 한 것의 확인」이라, **다음 말이 오면 이미 지난 사실**이다.
+      // 그래서 새 말이 오면 떠 있던 잘된 말은 곧장 내리고, 줄을 선 잘된 말도 지운다.
+      // 뜻대로 안 된 말은 그대로 둔다 — 그건 확인이 아니라 학생이 읽어야 할 일이다.
       if (good && tag) {
         const at = queue.findIndex((q) => q.tag === tag);
         if (at >= 0) queue.splice(at, 1);
@@ -174,8 +190,11 @@ export function createToastQueue(root, getLevel) {
       // 조작을 되풀이한다. micrometer 파일럿에서 재어 보니 막힌 지 **12.7초** 뒤에 설명이
       // 도착했다 — 그 사이에 학생은 「안 되네」 하고 손을 뗀다.
       // 줄을 **비우지는 않는다.** 앞선 것들은 실제로 일어난 일이라 지우면 앞뒤를 못 듣는다.
+      // (잘된 말은 예외다 — 위 주석. 확인 문구는 지난 사실이 되는 순간 값이 없다)
+      for (let i = queue.length - 1; i >= 0; i--) if (queue[i].good) queue.splice(i, 1);
       queue.push({ message: shown, shown, good, tag });
-      showNext();
+      if (showing && showingGood) dismiss?.();   // 지우면 showNext 가 이어서 불린다
+      else showNext();
     },
   };
 }

@@ -558,7 +558,10 @@ export const ACTIONS = {
       return happened(state, '되돌릴 것이 없습니다.', 'undo-empty');
     }
     const prev = history[history.length - 1];
-    return happened({
+    // **되돌린 것은 뜻대로 된 조작이다.** `happened` 로 두었더니 3단계에서 「뜻대로 안 된 말」로
+    // 분류돼 「결과가 나오지 않았습니다」로 가려졌다 — 되돌리기는 됐는데 화면은 안 됐다고
+    // 말했다 (플레이테스트 — PLAYTEST-REVIEW #11).
+    return ok({
       ...prev,
       session: {
         ...prev.session,

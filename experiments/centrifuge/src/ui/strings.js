@@ -69,25 +69,38 @@ export const UI = {
     make: 'PDF로 저장하기',
     cancel: '취소',
 
+    /*
+     * 제출 문구. **`report.js` 가 읽는 열쇠와 같아야 한다** — `codeHint` · `needCode` ·
+     * `badCode` · `again`, 그리고 `done` 은 **함수**다. 앞서는 `done` 이 문자열이라 제출이
+     * 성공한 순간 `R.submit.done(name)` 이 던져서 catch 로 떨어져 **「제출하지 못했습니다」**가
+     * 떴을 것이다 — 보내 놓고 못 보냈다고 말하는 자리다. 제출 서버가 붙은 배포본에서만
+     * 드러나므로 개발 서버에서는 안 보였다. `tests/ui.contract.test.js` 가 열쇠를 맞대 본다.
+     */
     submit: {
       button: '선생님께 제출',
-      codeLabel: '수업 코드 (선생님이 알려 준 여섯 자리)',
-      codePlaceholder: '123456',
-      checking: '수업을 찾는 중…',
-      notFound: '그런 수업 코드가 없습니다. 숫자를 다시 확인해 주세요.',
-      found: (title) => (title ? `수업 「${title}」 에 냅니다.` : '수업을 찾았습니다.'),
-      needName: '이름과 학번을 먼저 적어 주세요.',
       sending: '보내는 중…',
-      done: '제출했습니다. 선생님 화면에서 볼 수 있습니다.',
-      failed: '제출하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
-      offline: '이 배포본에는 제출 기능이 켜져 있지 않습니다. PDF로 저장해 내세요.',
-      onceNote: '한 번 낸 것은 학생 화면에서 다시 볼 수 없습니다. PDF도 함께 저장해 두세요.',
+      codeLabel: '수업 코드',
+      codePlaceholder: '예: 482013',
+      codeHint: '선생님이 알려 준 여섯 자리 숫자입니다. 없으면 비워 두고 PDF로만 저장하세요.',
+      needName: '이름과 번호를 먼저 채워 주세요.',
+      needCode: '수업 코드 여섯 자리를 넣어 주세요.',
+      badCode: '그런 수업 코드가 없습니다. 선생님께 확인해 주세요.',
+      done: (name) => `${name} 학생의 보고서를 제출했습니다. PDF로도 저장해 두면 좋습니다.`,
+      failed: '제출하지 못했습니다. 잠시 뒤 다시 눌러 보세요.',
+      // 두 번 눌러 두 장이 가는 일이 실제로 생긴다. 막지는 않고 알려만 준다.
+      again: '이미 한 번 제출했습니다. 다시 누르면 한 장 더 갑니다.',
     },
 
     kindLabel: '활동지 종류',
+    /*
+     * `report.js` 는 `id`(`solo` | `group`) · `label` · `note` 를 읽는다.
+     * 여기가 `name` 이고 id 가 `individual` 이라, 보고서 창의 활동지 종류 단추 둘이
+     * **「undefined」** 로 찍히고 어느 쪽도 골라져 있지 않았다 (플레이테스트 — PLAYTEST-REVIEW #6).
+     * 열쇠 이름은 `tests/ui.contract.test.js` 가 `report.js` 와 맞대 본다.
+     */
     kinds: [
-      { id: 'individual', name: '개인 활동지' },
-      { id: 'group', name: '모둠 활동지' },
+      { id: 'solo', label: '개별 활동지', note: '내가 관찰하고 쓴 것만 싣습니다.' },
+      { id: 'group', label: '모둠 활동지', note: '토의 기록과 다른 모둠과의 비교를 함께 싣습니다.' },
     ],
     groupFields: [
       { key: 'team', label: '모둠 이름 (선택)', placeholder: '예: 3모둠' },
@@ -463,12 +476,16 @@ export const UI = {
     pullEmpty: '회전판이 비어 있습니다. 돌아가기는 하지만 갈릴 것이 없습니다.',
     pullWobble: '흔들립니다 — 반대쪽에 빈 모세관을 넣어 균형을 맞추세요',
     pullBalanced: '균형이 맞아 곧게 돕니다',
+    /** 시료를 꺼내 실험대에 둔 채 이 화면을 열었을 때. 「흔들립니다」는 시료가 있을 때의 말이다. */
+    sampleOut: '혈액이 든 모세관은 지금 실험대에 있습니다. 아래 그림은 그 모세관입니다.',
     stopButton: '손으로 감싸 멈추기',
     seatLabel: (slot) => `${slot}쪽 밀어 넣은 깊이`,
 
     /* ── 공통 ───────────────────────────────────────────────────── */
     capture: '결과 기록',
     captureSaved: (n) => `기록했습니다 (${n}번째). 탐구 노트 「5. 결과」 에서 볼 수 있습니다.`,
+    /** 보고서에 그림으로 구워 넣을 때의 대체 글. */
+    resultAlt: '원심분리한 모세관의 층',
     /** 방향은 **글자로 적는다.** 위/아래로 되돌려 생각하다 뒤집는 자리다. */
     outerNote: '왼쪽이 회전 바깥쪽 — 교과서 그림의 「아래」입니다.',
     innerNote: '오른쪽이 축 쪽 — 혈장이 모이는 곳입니다.',
@@ -595,6 +612,11 @@ export const UI = {
      * 이미 열어 본 STEP 은 계속 열린다 — 되돌아가 읽는 것까지 막지는 않는다.
      */
     stepLockedHint: (n) => `STEP ${n} 의 관찰 기록을 적으면 열립니다`,
+    /**
+     * 적으라는 칸은 이미 적혀 있고, 막고 있는 것이 **실험대**일 때.
+     * 「적으면 열립니다」를 적은 뒤에도 그대로 두면 화면이 거짓말을 한다 (notebook.js).
+     */
+    stepLockedNeedBench: (n) => `STEP ${n} 을 실험대에서 마치면 열립니다`,
 
     /** 몇 칸짜리 여정인지. 앞으로 올 STEP 을 지우지 않는 것과 같은 뜻이다. */
     stepProgress: (done, total) => `STEP ${done}/${total} 마침`,

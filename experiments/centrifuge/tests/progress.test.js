@@ -123,3 +123,38 @@ test('새 모세관을 꺼내도 「해 봤다」는 남는다', () => {
   assert.equal(stepDone(s, '4', 0), true, '해 본 것이 사라지면 노트가 학생을 거짓말쟁이로 만든다');
   assert.equal(stepDone(s, '4', 1), false, '다만 「지금 막혀 있는가」는 아니다');
 });
+
+test('실험대에 놓인 모세관을 그대로 써도 「모세관 고르기」는 끝난 것이다', () => {
+  /*
+   * 플레이테스트에서 실제로 막혔다. 통을 눌러 종류를 바꾼 적도, 새것을 꺼낸 적도 없이
+   * 놓인 모세관으로 끝까지 한 학생은 STEP 1 이 영영 「지금 할 차례」였고, 그래서
+   * 「한 번에 한 STEP」이 STEP 1 에 닻을 내려 STEP 3 부터 영영 안 열렸다.
+   */
+  let s = initialState(1);
+  const go = (t, p) => { s = run(s, t, p).state; };
+  go('SWAB_FINGER');
+  assert.equal(stepDone(s, '1', 1), false, '아직 아무 모세관도 쓰지 않았다');
+  go('PRICK_FINGER');
+  go('DRAW_BLOOD', { angleDeg: ANGLE_BEST_DEG, dwell: 0.9 });
+  assert.equal(stepDone(s, '1', 1), true, '손끝에 대어 빨아올린 모세관은 고른 것이다');
+  assert.equal(groupDone(s, '1'), true, 'STEP 1 이 영영 「지금 할 차례」로 남습니다');
+});
+
+test('재려고 시료를 꺼내도 「균형 맞추기」는 남는다', () => {
+  /*
+   * 자는 실험대의 모세관에만 댈 수 있어서 학생은 반드시 시료를 꺼내고 잰다.
+   * 그 순간 5b 가 도로 「아직」이 되면 STEP 6·7 이 잠긴다 — 플레이테스트에서 실제로 막혔다.
+   */
+  let s = initialState(1);
+  const go = (t, p) => { s = run(s, t, p).state; };
+  go('LOAD_ROTOR', { slot: SLOTS.A, what: SLOT_ITEMS.SAMPLE });
+  go('LOAD_ROTOR', { slot: SLOTS.B, what: SLOT_ITEMS.COUNTER });
+  assert.equal(stepDone(s, '5', 1), true);
+  go('UNLOAD', { slot: SLOTS.A });
+  assert.equal(s.rotor.slots.A, null, '시료를 꺼냈다');
+  assert.equal(stepDone(s, '5', 1), true, '시료를 꺼냈다고 균형을 맞춘 사실이 사라집니다');
+  // 빈 모세관 없이 시료만 넣은 것은 여전히 아니다.
+  let s2 = initialState(1);
+  s2 = run(s2, 'LOAD_ROTOR', { slot: SLOTS.A, what: SLOT_ITEMS.SAMPLE }).state;
+  assert.equal(stepDone(s2, '5', 1), false);
+});

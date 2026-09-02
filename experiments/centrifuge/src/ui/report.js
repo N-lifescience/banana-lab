@@ -289,7 +289,8 @@ async function bakeFovImages(sheet) {
     if (!url) return;
     const img = document.createElement('img');
     img.src = url;
-    img.alt = UI.zoom.scopeMode;
+    // `UI.zoom.scopeMode` 는 바나나(현미경)의 열쇠라 여기에는 없었다 — alt 가 undefined 로 나갔다.
+    img.alt = UI.zoom.resultAlt;
     svgs[i].replaceWith(img);
   });
 }

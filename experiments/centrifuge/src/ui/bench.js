@@ -652,13 +652,27 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     // focus() 가 focus 이벤트를 쏘고, 그 핸들러가 말풍선을 다시 낸다 — 여기서 또 부르지 않는다.
     // 놓은 물건이 화면에서 사라졌으면(재물대에 올라간 받침 유리) **놓은 자리**로 옮긴다.
     // 그냥 두면 포커스가 <body> 로 빠져, 키보드로 쓰는 사람은 처음부터 Tab 해 돌아와야 한다.
+    // **놓기가 확대 뷰를 열었으면 포커스를 뺏어 오지 않는다.** 확대 뷰는 열리면서 제 판에
+    // 포커스를 두는데, 여기서 도로 물건으로 가져오면 키보드 학생의 손이 덮개 뒤 실험대에
+    // 남는다 — Tab 을 눌러도 확대 뷰 안의 모세관·링에 영영 못 들어간다
+    // (플레이테스트 키보드 경로 — PLAYTEST-REVIEW #8).
+    if (document.activeElement?.closest?.('.zoom-panel')) return;
     (elFor(item.id) ?? elFor(target.id))?.focus();
   }
+
+  /**
+   * 지금 말풍선이 **키보드 포커스로** 떠 있는가 (놓기 단추가 들어 있는가).
+   * 물건에서 Tab 을 눌렀을 때 옆 물건이 아니라 그 단추로 들어가야 하는지를 이걸로 안다.
+   */
+  let tipFromKeyboard = false;
+  /** Esc 로 치운 물건. 다시 그려져 같은 물건에 포커스가 돌아와도 되살리지 않는다. */
+  let dismissedId = null;
 
   function showTip(item, withActions = false) {
     if (drag) return;
     clearTimeout(hideTimer);   // 옆 물건으로 옮겨 오는 중이었다면 예약된 닫기를 취소한다
     hideTimer = 0;
+    tipFromKeyboard = withActions;
     const level = store.getState().session.level;
     const lines = UI.bench.hints[item.kind]?.[level] ?? [];
     // 편집 모드에서는 놓을 곳 버튼을 내지 않는다. 그 버튼은 실제 조작을 일으키므로
@@ -713,8 +727,65 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   function hideTip() {
     clearTimeout(hideTimer);
     hideTimer = 0;
+    tipFromKeyboard = false;
     tipEl.hidden = true;
   }
+
+  /** 말풍선의 놓기 버튼들. 없으면 빈 배열. */
+  const tipButtons = () => [...tipEl.querySelectorAll('[data-onto]')];
+
+  /**
+   * **버튼까지 가는 다리.**
+   *
+   * `#bench-tip` 은 DOM 에서 `.bench-tokens` 뒤에 있다. 그래서 물건에서 Tab 하면 옆 물건으로
+   * 가고, 그 물건의 focus 가 말풍선을 제 것으로 갈아 끼워 **방금 열려 있던 버튼을 지운다.**
+   * 즉 「여기에 놓기」 단추는 화면에 떠 있는데 **키보드로는 아예 닿을 수 없었다** —
+   * 플레이테스트에서 소독솜에 Tab 으로 간 뒤 한 번 더 Tab 하니 자로 갔다
+   * (PLAYTEST-REVIEW #8). 마우스를 못 쓰는 학생에게 그 단추는 실험을 시작하는 유일한 길이다.
+   * 정본(banana)에는 있던 다리가 복제 때 빠져 있었다. 그대로 옮긴다.
+   */
+  function focusFirstPut() {
+    const [first] = tipButtons();
+    if (!first) return false;
+    first.focus();
+    return true;
+  }
+
+  /**
+   * 말풍선 안에서의 Tab. **양쪽 끝에서 실험대로 되돌려 준다.**
+   * 첫 버튼에서 Shift+Tab 은 원래 물건으로, 마지막 버튼에서 Tab 은 **그 물건의 다음 물건**으로.
+   * 그냥 두면 마지막 버튼에서 Tab 했을 때 탐구 노트로 튕긴다 — 실험대를 다 돌기도 전에.
+   */
+  tipEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const src = tipEl.querySelector('[data-put]')?.dataset.put;
+      e.preventDefault();
+      dismissedId = src ?? null;
+      hideTip();
+      if (src) elFor(src)?.focus();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const btns = tipButtons();
+    const at = btns.indexOf(document.activeElement);
+    if (at < 0) return;
+    const srcId = document.activeElement.dataset.put;
+    const tokens = [...layer.querySelectorAll('[data-id]')];
+    const srcAt = tokens.findIndex((t) => t.dataset.id === srcId);
+    if (e.shiftKey && at === 0) {
+      e.preventDefault();
+      tokens[srcAt]?.focus();
+      return;
+    }
+    if (!e.shiftKey && at === btns.length - 1) {
+      e.preventDefault();
+      // 다음 물건으로. 마지막 물건이었으면 실험대 밖으로 보낸다 —
+      // 여기서 첫 물건으로 감으면 키보드가 실험대에 갇힌다.
+      const next = tokens[srcAt + 1];
+      if (next) { dismissedId = null; next.focus(); }
+      else { hideTip(); tipEl.blur(); }
+    }
+  });
 
   function hideTipSoon() {
     clearTimeout(hideTimer);
@@ -986,7 +1057,12 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
       // :focus-visible 일 때만 낸다. 손가락으로 눌러도 <button> 은 포커스를 받는데,
       // 그때까지 이 말풍선을 띄우면 누를 때마다 떠서 안 사라지는 창이 된다.
-      el.addEventListener('focus', () => { if (el.matches(':focus-visible')) showTip(item, true); });
+      el.addEventListener('focus', () => {
+        // Esc 로 치운 물건에 포커스가 되돌아온 것이면(다시 그려진 뒤 등) 되살리지 않는다.
+        if (dismissedId === item.id) return;
+        dismissedId = null;
+        if (el.matches(':focus-visible')) showTip(item, true);
+      });
       // 포커스가 옮겨 갈 때 blur 가 focus 보다 먼저 온다. 여기서 곧바로 닫으면
       // 옆 물건으로 Tab 한 순간 말풍선이 닫혔다가 다시 열리며 서로를 지운다.
       // 닫기를 한 프레임 미루고, 그 사이 새 포커스가 오면 취소한다.
@@ -1003,6 +1079,21 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       // 브라우저는 <button> 에서 Enter/Space 를 click 으로도 바꿔 주지만, 그 전에
       // Space 가 페이지를 스크롤시킨다. preventDefault 하려면 keydown 을 직접 들어야 한다.
       el.addEventListener('keydown', (e) => {
+        // Tab 으로 **놓기 버튼에 들어간다.** 브라우저의 기본 Tab 은 옆 물건으로 가는데,
+        // 그러면 그 물건의 focus 가 말풍선을 갈아 끼워 여기 버튼이 사라진다 (focusFirstPut).
+        if (e.key === 'Tab' && !e.shiftKey && tipFromKeyboard && focusFirstPut()) {
+          e.preventDefault();
+          return;
+        }
+        // Esc 로 말풍선을 치운다 (WCAG 1.4.13). 놓을 곳이 다섯이면 Tab 을 다섯 번
+        // 눌러 빠져나가야 하는데, 그건 길이 아니다.
+        if (e.key === 'Escape') {
+          if (tipEl.hidden) return;
+          e.preventDefault();
+          dismissedId = item.id;
+          hideTip();
+          return;
+        }
         if (e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
         pointerTapAt = performance.now();   // 뒤따라올 click 을 삼킨다

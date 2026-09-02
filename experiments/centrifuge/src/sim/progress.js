@@ -40,7 +40,16 @@ export const STEP_DONE = {
   // 1. 준비
   '1': [
     (st) => didAction(st, 'SWAB_FINGER'),
-    (st) => didAction(st, 'PICK_CAPILLARY') || st.tools.tubesUsed > 0,
+    /*
+     * **실험대에 놓인 첫 모세관은 이미 골라진 것이다.** 통을 눌러 종류를 바꾸거나(PICK)
+     * 새것을 꺼낸 학생만 「골랐다」로 치면, 놓인 모세관을 그대로 써서 실험을 끝까지 한
+     * 학생은 STEP 1 이 **영영 「지금 할 차례」**로 남는다. 그러면 「한 번에 한 STEP」이
+     * STEP 1 에 닻을 내려 — 뒤 STEP 을 실험대에서 다 마쳤는데도 「STEP 2 의 관찰 기록을
+     * 적으면 열립니다」가 적은 뒤에도 그대로라 STEP 3 부터 영영 안 열렸다.
+     * 플레이테스트에서 실제로 막혔다 (PLAYTEST-REVIEW #3).
+     * 손끝에 대어 빨아올렸으면 그 모세관을 쓰기로 한 것이다.
+     */
+    (st) => didAction(st, 'PICK_CAPILLARY') || st.tools.tubesUsed > 0 || didAction(st, 'DRAW_BLOOD'),
   ],
   // 2. 채혈
   '2': [
@@ -62,7 +71,19 @@ export const STEP_DONE = {
   '5': [
     (st) => didAction(st, 'LOAD_ROTOR'),
     // 균형을 맞췄는가. 「했는가」가 아니라 「맞아 있는가」다 — 이건 상태로 봐야 맞다.
-    (st) => Boolean(st.rotor.slots.A && st.rotor.slots.B) && imbalanceOf(st.rotor) < 0.25,
+    //
+    // 다만 **재려고 시료를 꺼낸 뒤에도 남아 있어야 한다.** 자는 실험대의 모세관에만 댈 수
+    // 있어서 학생은 반드시 시료를 꺼내고 잰다. 그때 「두 자리가 다 찼는가」로만 보면
+    // 균형을 맞춰 돌린 학생의 5b 가 도로 「아직」이 되고, 그 뒤로 STEP 6·7 이 잠긴다
+    // (플레이테스트에서 실제로 막혔다 — PLAYTEST-REVIEW #4).
+    // 그래서 **빈 모세관이 들어 있는가**를 보고, 시료도 함께 들어 있을 때만 깊이를 견준다.
+    (st) => {
+      const r = st.rotor;
+      const hasCounter = Object.values(r.slots).includes('counter');
+      if (!hasCounter) return false;
+      const both = Boolean(r.slots.A && r.slots.B);
+      return !both || imbalanceOf(r) < 0.25;
+    },
   ],
   // 6. 당기기
   '6': [
