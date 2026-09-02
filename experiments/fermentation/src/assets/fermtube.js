@@ -103,17 +103,40 @@ const BUBBLE_SEEDS = [
   { x: 241, t: 0.88, r: 3 },
 ];
 
-/** `#bubbles` 안에 넣을 도형. 수면 아래에서만 올라온다. */
+/**
+ * 맹관부 안에서 올라오는 기포. **모이는 기체는 여기서 난 것이다.**
+ *
+ * 팽대부에서 올라온 기포는 수면에서 터져 솜마개를 지나 밖으로 나간다 — 맹관부로 건너가지
+ * 못한다. 맹관부에 고이는 기체는 **맹관부 안의 용액에서 생긴 기포**가 위로 올라가 갇힌 것이다.
+ * 기포를 팽대부에만 그리면 「팽대부의 거품이 맹관부로 옮겨 간다」는 틀린 그림이 된다
+ * (플레이테스트에서 교사 시점으로 짚은 것). 맹관부 관 안쪽은 x 118~144 다 (`GLASS_BORE`).
+ */
+const CLOSED_ARM_SEEDS = [
+  { x: 125, t: 0.15, r: 2.5 },
+  { x: 137, t: 0.5, r: 3 },
+  { x: 130, t: 0.82, r: 2.5 },
+];
+
+const bubble = (x, y, r) =>
+  `<circle cx="${x}" cy="${y}" r="${r}" fill="${EXP_PALETTE.bubble[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>`;
+
+/** `#bubbles` 안에 넣을 도형. 수면 아래에서만 올라온다 — 맹관부에서는 고인 기체 아래에서만. */
 export function bubbleMarkup(state = {}) {
   if (!state.bubbling) return '';
   const { surfaceY } = liquidGeometry(state);
   const bottom = 250;
   const top = clamp(surfaceY + 16, 172, 244);
-  if (top >= bottom) return '';
-  return BUBBLE_SEEDS.map(({ x, t, r }) => {
-    const y = (bottom - t * (bottom - top)).toFixed(1);
-    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${EXP_PALETTE.bubble[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>`;
-  }).join('');
+  const out = [];
+  if (top < bottom) {
+    for (const { x, t, r } of BUBBLE_SEEDS) out.push(bubble(x, (bottom - t * (bottom - top)).toFixed(1), r));
+  }
+  // 맹관부 — 이미 고인 기체의 아랫면보다 아래에서만 올라온다. 기체 속에 기포를 그리면 틀린 그림이다.
+  const gasBottom = GAS_TOP_Y + Number(gasGeometry(state).height);
+  const armTop = clamp(gasBottom + 10, 48, 240);
+  if (armTop < bottom) {
+    for (const { x, t, r } of CLOSED_ARM_SEEDS) out.push(bubble(x, (bottom - t * (bottom - armTop)).toFixed(1), r));
+  }
+  return out.join('');
 }
 
 /* ── 형태 ─────────────────────────────────────────────────────────── */

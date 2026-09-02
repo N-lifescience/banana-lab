@@ -659,10 +659,19 @@ export function createBench(root, store, { edit = false } = {}) {
     (elFor(item.id) ?? elFor(target.id))?.focus();
   }
 
+  /**
+   * 지금 말풍선이 **키보드 포커스로** 뜬 것인가 (놓기 단추가 들어 있는가).
+   * 물건에서 Tab 을 눌렀을 때 그 단추로 들어가게 하는 조건이다.
+   */
+  let tipFromKeyboard = false;
+  /** Esc 로 치운 물건. 그 물건에 포커스가 남아 있는 동안은 다시 띄우지 않는다. */
+  let dismissedId = null;
+
   function showTip(item, withActions = false) {
     if (drag) return;
     clearTimeout(hideTimer);   // 옆 물건으로 옮겨 오는 중이었다면 예약된 닫기를 취소한다
     hideTimer = 0;
+    tipFromKeyboard = withActions;
     const level = store.getState().session.level;
     const lines = UI.bench.hints[item.kind]?.[level] ?? [];
     // 편집 모드에서는 놓을 곳 버튼을 내지 않는다. 그 버튼은 실제 조작을 일으키므로
@@ -700,7 +709,65 @@ export function createBench(root, store, { edit = false } = {}) {
     clearTimeout(hideTimer);
     hideTimer = 0;
     tipEl.hidden = true;
+    tipFromKeyboard = false;
   }
+
+  /** 말풍선의 놓기 단추들. 없으면 빈 배열. */
+  const tipButtons = () => [...tipEl.querySelectorAll('[data-onto]')];
+
+  /**
+   * **단추까지 가는 다리.**
+   *
+   * `#bench-tip` 은 DOM 에서 `.bench-tokens` 뒤에 있다. 그래서 물건에서 Tab 하면 옆 물건으로
+   * 가고, 그 물건의 focus 가 말풍선을 제 것으로 갈아 끼워 **방금 열려 있던 단추를 지운다.**
+   * 물건 열여섯을 다 지나 말풍선에 닿을 즈음엔 마지막 물건(쓰레기통)의 말풍선만 남아 있다.
+   *
+   * 즉 **단추는 화면에 떠 있는데 키보드로는 아예 닿을 수 없었다.** 플레이테스트에서 진짜 Tab 을
+   * 쳐 보고서야 나왔다 — 앞선 검사는 `btn.focus()` 를 불러서 「거기까지 갈 수 있는가」를
+   * 못 봤다. 바나나랩이 같은 자리에서 물렸고, 그쪽 다리를 그대로 옮겨 왔다.
+   */
+  function focusFirstPut() {
+    const [first] = tipButtons();
+    if (!first) return false;
+    first.focus();
+    return true;
+  }
+
+  /**
+   * 말풍선 안에서의 키. **양쪽 끝에서 실험대로 되돌려 준다.**
+   * 첫 단추에서 Shift+Tab 은 원래 물건으로, 마지막 단추에서 Tab 은 그 물건의 **다음 물건**으로.
+   * Esc 는 말풍선을 치우고 포커스를 물건에 돌려준다.
+   */
+  tipEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const src = tipEl.querySelector('[data-put]')?.dataset.put;
+      e.preventDefault();
+      dismissedId = src ?? null;
+      hideTip();
+      if (src) elFor(src)?.focus();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const btns = tipButtons();
+    const at = btns.indexOf(document.activeElement);
+    if (at < 0) return;
+    const srcId = document.activeElement.dataset.put;
+    const tokens = [...layer.querySelectorAll('[data-id]')];
+    const srcAt = tokens.findIndex((t) => t.dataset.id === srcId);
+    if (e.shiftKey && at === 0) {
+      e.preventDefault();
+      tokens[srcAt]?.focus();
+      return;
+    }
+    if (!e.shiftKey && at === btns.length - 1) {
+      e.preventDefault();
+      // 다음 물건으로. 마지막 물건이었으면 실험대 밖으로 보낸다 —
+      // 여기서 첫 물건으로 감으면 키보드가 실험대에 갇힌다.
+      const next = tokens[srcAt + 1];
+      if (next) { dismissedId = null; next.focus(); }
+      else { hideTip(); tipEl.blur(); }
+    }
+  });
 
   function hideTipSoon() {
     clearTimeout(hideTimer);
@@ -923,7 +990,12 @@ export function createBench(root, store, { edit = false } = {}) {
       // 포커스로 뜬 말풍선에는 **놓을 곳 버튼**이 함께 나온다 — 키보드로 놓는 길이다.
       // :focus-visible 일 때만 낸다. 손가락으로 눌러도 <button> 은 포커스를 받는데,
       // 그때까지 이 말풍선을 띄우면 누를 때마다 떠서 안 사라지는 창이 된다.
-      el.addEventListener('focus', () => { if (el.matches(':focus-visible')) showTip(item, true); });
+      el.addEventListener('focus', () => {
+        // 다른 물건으로 옮겨 갔으면 「Esc 로 치웠다」는 기억을 푼다.
+        if (dismissedId && dismissedId !== item.id) dismissedId = null;
+        if (dismissedId === item.id) return;
+        if (el.matches(':focus-visible')) showTip(item, true);
+      });
       // 포커스가 옮겨 갈 때 blur 가 focus 보다 먼저 온다. 여기서 곧바로 닫으면
       // 옆 물건으로 Tab 한 순간 말풍선이 닫혔다가 다시 열리며 서로를 지운다.
       // 닫기를 한 프레임 미루고, 그 사이 새 포커스가 오면 취소한다.
@@ -940,6 +1012,20 @@ export function createBench(root, store, { edit = false } = {}) {
       // 브라우저는 <button> 에서 Enter/Space 를 click 으로도 바꿔 주지만, 그 전에
       // Space 가 페이지를 스크롤시킨다. preventDefault 하려면 keydown 을 직접 들어야 한다.
       el.addEventListener('keydown', (e) => {
+        // Tab 으로 **놓기 단추에 들어간다.** 브라우저의 기본 Tab 은 옆 물건으로 가는데,
+        // 그러면 그 물건의 focus 가 말풍선을 갈아 끼워 여기 단추가 사라진다 (`focusFirstPut` 주석).
+        if (e.key === 'Tab' && !e.shiftKey && tipFromKeyboard && focusFirstPut()) {
+          e.preventDefault();
+          return;
+        }
+        // Esc 로 말풍선을 치운다 (WCAG 1.4.13). 포커스는 물건에 그대로 남는다.
+        if (e.key === 'Escape') {
+          if (tipEl.hidden) return;
+          e.preventDefault();
+          dismissedId = item.id;
+          hideTip();
+          return;
+        }
         if (e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
         pointerTapAt = performance.now();   // 뒤따라올 click 을 삼킨다

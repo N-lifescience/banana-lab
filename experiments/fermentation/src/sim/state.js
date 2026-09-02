@@ -71,7 +71,17 @@ export const DEPENDENT_VARIABLE = 'gasMl';
 export function defaultControls() {
   return {
     glucosePct: GLUCOSE_STANDARD_PCT,
-    tempC: OPT_GROWTH_HIGH_C,
+    /*
+     * **실험대에 있는 항온기 온도여야 한다.** 앞서는 모형의 기준 온도(33 ℃)였는데,
+     * 항온기는 10·20·30·40·55 ℃ 뿐이라 **33 ℃ 는 어느 항온기로도 만들 수 없었다.**
+     * 포도당 농도를 조작변인으로 고른 학생은 통제변인 「발효 온도」 칩이 하나도
+     * 골라져 있지 않은 화면을 보고, 그대로 두면 **모든 시행이 「설계와 다름 — 발효 온도」**
+     * 가 되어 그래프가 한 점도 이어지지 않는다 (플레이테스트에서 실제로 그랬다).
+     * 1단계는 「통제변인은 기본값을 채워 놓고 시작합니다」라고 약속하므로, 기본값은
+     * `CHOICES.tempC` 안에 있어야 한다 — `tests/playtest-review.test.js` 가 지킨다.
+     * 모형의 규격화 기준(`OPT_GROWTH_HIGH_C`)은 그대로 33 ℃ 다. 이것은 설계의 기본값일 뿐이다.
+     */
+    tempC: 30,
     yeast: true,
     plugged: true,
   };

@@ -407,14 +407,18 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     if (st.trials.length === 0) {
       return `<h2>${UI.graph.title}</h2><p class="note-empty">${UI.graph.empty}</p>`;
     }
+    // 시행마다 「지우기」를 붙인다. 규칙(`DELETE_TRIAL`)은 처음부터 있었는데 화면에 단추가
+    // 없어서, 잘못 기록한 시행을 지울 길이 되돌리기(3단계는 1회)뿐이었다 — 막다른 길이다.
     const rows = st.trials.map((t) => `<tr class="${t.offDesign.length ? 'trial--off' : ''}">
       <td>${t.at + 1}</td><td>${escapeHtml(trialSummary(st, t))}</td>
+      <td><button type="button" class="trial-delete" data-delete-trial="${t.at}"
+        aria-label="${N.trialDeleteLabel(t.at + 1)}">${N.trialDelete}</button></td>
     </tr>`).join('');
     return `<h2>${UI.graph.title}</h2>
       <div class="note-graph">${renderGraph(st.trials, st.design, { idPrefix: 'nb' })}</div>
       <ul class="graph-notes">${graphNotes(st.trials, st.design).map((l) => `<li>${l}</li>`).join('')}</ul>
       <table class="trial-table">
-        <thead><tr><th>${N.trialNo}</th><th>${N.trialWhat}</th></tr></thead>
+        <thead><tr><th>${N.trialNo}</th><th>${N.trialWhat}</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p class="note-lead">${N.repeatCount(distinctConditions(st))}</p>`;
@@ -686,6 +690,8 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     }
     const tab = e.target.closest('[data-stage]');
     if (tab) { activeStage = tab.dataset.stage; render(); return; }
+    const del = e.target.closest('[data-delete-trial]');
+    if (del) { store.dispatch('DELETE_TRIAL', { at: Number(del.dataset.deleteTrial) }); return; }
     const opt = e.target.closest('[data-predict]');
     if (opt) { store.dispatch('SAVE_NOTE', { step: 'predict', text: opt.dataset.predict }); return; }
     const set = e.target.closest('[data-note-set]');
