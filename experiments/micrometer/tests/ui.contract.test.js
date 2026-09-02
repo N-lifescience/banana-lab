@@ -14,6 +14,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { observability } from '../src/sim/quality.js';
 import { initialState, UNDO_LIMITS } from '../src/sim/state.js';
 import { UI } from '../src/ui/strings.js';
+import { focusLineFor } from '../src/ui/zoom.js';
+import { NEGLIGIBLE_LOSS } from '../src/sim/quality.js';
 import { stripComments } from './strip-comments.js';
 
 const UI_DIR = new URL('../src/ui/', import.meta.url);
@@ -396,4 +398,56 @@ test('절차 그룹 수에 상한을 박아 두지 않는다', async () => {
     assert.equal(/\[1-6\]\[a-z\]/.test(code), false,
       `src/ui/${name} 에 절차 그룹 수 상한이 박혀 있습니다`);
   }
+});
+
+/* ---------------- 플레이테스트에서 잡은 것들 ---------------- */
+
+/**
+ * ★ 400배에서 미동나사가 끝에 닿았을 때 「조동나사로 크게 맞추세요」라고 하면 학생은
+ *   시키는 대로 조동나사를 돌리고 **유리에 금이 간다** (`rules.js` COARSE_FOCUS).
+ *   100배에서 미동을 끝까지 쓴 채 400배로 올리면 누구나 만나는 자리다.
+ */
+test('고배율에서 미동나사가 끝에 닿으면 조동나사로 보내지 않는다', () => {
+  const low = focusLineFor({ objective: 10, coarse: 0.3, fine: -0.2 }, false);
+  const high = focusLineFor({ objective: 40, coarse: 0.3, fine: -0.2 }, false);
+  assert.equal(low, UI.zoom.focusFineAtEnd);
+  assert.equal(high, UI.zoom.focusFineAtEndHighMag);
+  assert.ok(!/조동나사로 크게/.test(high), '고배율 안내가 조동나사를 돌리라고 합니다 — 유리가 깨집니다');
+  assert.ok(/10배|내려/.test(high), '고배율 안내에 빠져나갈 길(배율 내리기)이 없습니다');
+  assert.ok(/미동나사/.test(high), '무엇이 끝에 닿았는지 말해야 합니다');
+  // 맞았으면 끝에 닿았어도 그 말을 안 한다.
+  assert.equal(focusLineFor({ objective: 40, coarse: 0.2, fine: -0.2 }, true), UI.zoom.focusInRange);
+});
+
+/**
+ * ★ 첫 화면의 단계 설명이 「눈금에 5칸마다 숫자」·「숫자는 없습니다」라고 했는데,
+ *   눈금 렌더러(`reticleLayer`)는 난이도를 받지 않는다 — 세 단계가 똑같이 그린다.
+ *   설명은 화면이 실제로 다르게 하는 것만 말해야 한다.
+ */
+test('시작 화면의 단계 설명이 눈금 렌더러가 하지 않는 차이를 약속하지 않는다', () => {
+  const src = readFileSync(new URL('../src/render/fov.js', import.meta.url), 'utf8');
+  assert.ok(/export function reticleLayer\(fieldPx, \{[^)]*\}/.test(src), 'reticleLayer 시그니처를 못 찾았습니다');
+  assert.ok(!/reticleLayer\([^)]*level/.test(src), '눈금 렌더러가 난이도를 받게 됐다면 이 검사를 다시 쓰세요');
+  for (const { id, desc } of UI.start.levels) {
+    assert.ok(!/눈금에|굵은 선|숫자는 없|칸마다/.test(desc),
+      `${id}단계 설명이 눈금 그림의 차이를 약속합니다 — 렌더러는 단계를 모릅니다: "${desc}"`);
+  }
+});
+
+test('되돌리기 문구는 경고색이 아니다', () => {
+  assert.ok(UI.toast.neutral.includes('undo'), '「한 단계 되돌렸습니다」가 빨간색으로 뜹니다');
+});
+
+/**
+ * ★ 조리개 기본값(0.6)에서 점수 99 인데 화면이 늘 「조리개를 반쯤…」이라고 짚었다.
+ *   눈에 안 보이는 몫은 깎인 것이 아니다.
+ */
+test('거의 안 깎인 항목을 「가장 크게 깎이는 항목」으로 짚지 않는다', () => {
+  const near = observability({ hasReticle: true, on: 'stageMic', angleGapDeg: 0, focusErr: 0, contrast: 0.992, centerErr: 0, objective: 10 });
+  assert.equal(near.worst, null, `점수 ${near.score} 에서 '${near.worst}' 를 짚습니다`);
+  assert.ok(near.score >= 98);
+  // 눈에 띄게 깎였으면 여전히 짚는다.
+  const dim = observability({ hasReticle: true, on: 'stageMic', angleGapDeg: 0, focusErr: 0, contrast: 0.5, centerErr: 0, objective: 10 });
+  assert.equal(dim.worst, 'contrast');
+  assert.ok(NEGLIGIBLE_LOSS < 1 && NEGLIGIBLE_LOSS >= 0.95, '문턱이 너무 낮으면 진짜 깎인 것도 안 짚는다');
 });

@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stepPanelStates, stepLockedBy } from '../src/ui/notebook.js';
+import { stepPanelStates, stepLockedBy, stepNotesWritten, QUESTION_A_STEP } from '../src/ui/notebook.js';
 import { buildSheet } from '../src/ui/report.js';
 import { initialState } from '../src/sim/state.js';
 import { UI } from '../src/ui/strings.js';
@@ -207,9 +207,10 @@ test('그 검사가 자기 주석을 물지 않고, 진짜 코드는 문다', ()
  */
 test('질문 ⓐ 는 그 물음이 말하는 조작이 실제로 일어나는 STEP 에 붙어 있다', () => {
   const src = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8');
-  const m = src.match(/group\.id === '(\d+)' \? questionA\(st\)/);
-  assert.ok(m, 'renderStage4 에서 질문 ⓐ 를 붙이는 자리를 못 찾았습니다');
-  const hostId = m[1];
+  // 그리는 곳과 판정하는 곳(`stepNotesWritten`)이 **같은 상수**를 봐야 한다.
+  assert.ok(/group\.id === QUESTION_A_STEP \? questionA\(st\)/.test(src),
+    'renderStage4 에서 질문 ⓐ 를 붙이는 자리를 못 찾았습니다 (QUESTION_A_STEP 을 써야 합니다)');
+  const hostId = QUESTION_A_STEP;
   const hostAt = UI.protocol.findIndex((g) => g.id === hostId);
   assert.ok(hostAt >= 0, `STEP ${hostId} 이 없습니다`);
 
@@ -319,4 +320,32 @@ test('기록칸은 조작의 결과가 화면에 나타나는 자리에만 있�
   assert.ok(noteBoxes < total,
     '모든 세부 단계에 기록칸이 있습니다 — 「조작의 결과가 나타나는 자리만」 이라는 기준이 사라졌습니다');
   assert.equal(noteBoxes, 7, `기록칸이 ${noteBoxes}개입니다 — 기준을 바꿨다면 이 수와 보고서를 함께 고치세요`);
+});
+
+/* ---------------- 질문 ⓐ 를 적기 전에는 그 STEP 이 접히지 않는다 ---------------- */
+
+/**
+ * ★ 질문 ⓐ 는 STEP 3 의 관찰 기록 **아래**에 붙는다. 관찰 기록만 적으면 STEP 3 이
+ *   「다 적은 것」이 되어 접히고, **물음이 접힌 칸 속으로 사라진다.** 플레이해 보니
+ *   3b 를 적고 손을 떼자 질문 ⓐ 칸이 보이지 않았다. 되돌리면 첫 단언에서 빨간불이다.
+ */
+test('질문 ⓐ 를 적기 전에는 그 STEP 을 「다 적은 것」으로 치지 않는다', () => {
+  const host = UI.protocol.find((g) => g.id === QUESTION_A_STEP);
+  for (const level of [1, 2, 3]) {
+    const st = initialState(level);
+    const notes = {};
+    if (level >= 3) notes[host.id] = '초점을 맞추고 겹치는 곳 두 군데를 찍었다';
+    else host.steps.forEach((step, i) => { if (step.note) notes[`${host.id}${String.fromCharCode(97 + i)}`] = '40번과 60번에서 딱 맞았다'; });
+    const written = { ...st, session: { ...st.session, notes } };
+    assert.equal(stepNotesWritten(written, host), false,
+      `${level}단계: 관찰 기록만 적었는데 STEP ${host.id} 이 다 적은 것으로 접힙니다 — 질문 ⓐ 가 사라집니다`);
+    const answered = { ...st, session: { ...st.session, notes: { ...notes, 'q.a': '접안 눈금에는 단위가 없어서' } } };
+    assert.equal(stepNotesWritten(answered, host), true, `${level}단계: 질문 ⓐ 까지 적었는데 안 열립니다`);
+  }
+  // 다른 STEP 은 질문 ⓐ 와 무관하다 — 거기까지 잠그면 벽이 된다.
+  const other = UI.protocol.find((g) => g.id !== QUESTION_A_STEP && g.steps.some((s) => s.note));
+  const st = initialState(1);
+  const notes = {};
+  other.steps.forEach((step, i) => { if (step.note) notes[`${other.id}${String.fromCharCode(97 + i)}`] = '적었다'; });
+  assert.equal(stepNotesWritten({ ...st, session: { ...st.session, notes } }, other), true);
 });

@@ -392,9 +392,31 @@ export function isGroup(st) {
  *   STEP 이 영영 안 열린다. 이 한 줄이 이 저장소에서 갈리는 자리다.
  */
 export function stepNotesWritten(st, group) {
+  /**
+   * ★ **질문 ⓐ 가 붙은 STEP 은 그 답까지 적어야 「다 적은 것」이다.**
+   *
+   * 질문 ⓐ 는 STEP 3 의 관찰 기록 **아래**에 붙어 있다 (`questionA`). 그런데 관찰 기록만
+   * 적으면 그 순간 STEP 3 이 「다 적은 것」이 되어 아코디언이 접히고, **질문 ⓐ 가 접힌
+   * 칸 속으로 사라진다.** 학생은 위에서부터 읽어 내려오므로 관찰 기록을 먼저 적고,
+   * 그러면 물음을 보기도 전에 물음이 없어진다. 플레이해 보니 그랬다 — 3b 를 적고 손을
+   * 떼자 `#note-qa-step3` 이 보이지 않았다 (`isVisible() === false`).
+   *
+   * 「순서가 곧 논증이다」(설계도 §5.1) — 두 자를 겹쳐 본 **바로 그 순간**에 물어야 하는
+   * 물음이라, 6단계에서 다시 만나게 두는 것으로는 부족하다. 그래서 그 답을 적기 전에는
+   * STEP 3 을 「다 적은 것」으로 치지 않는다. 막는 것이 아니다 — STEP 3 이 펼쳐진 채로
+   * 남아 물음이 눈앞에 있을 뿐이고, 다음 STEP 을 손으로 열 수 있는 길은 그대로다.
+   */
+  if (group.id === QUESTION_A_STEP && !hasNote(st, 'q.a')) return false;
   if (st.session.level >= 3) return hasNote(st, group.id);
   return group.steps.every((step, i) => !step.note || hasNote(st, substepId(group, i)));
 }
+
+/**
+ * 질문 ⓐ 가 붙는 STEP. 「방금 두 눈금자를 겹쳐 보았습니다」라는 물음이라 겹치는 조작이
+ * 있는 STEP 이어야 한다 — `tests/notebook.steps.test.js` 가 절차와 맞대어 본다.
+ * 그리는 곳(`renderStage4`)과 판정하는 곳(`stepNotesWritten`)이 **같은 값**을 봐야 한다.
+ */
+export const QUESTION_A_STEP = '3';
 
 const PREDICT_STAGE = '3';
 const PREDICT_KEYS = N.predictItems.map((it) => it.key);
@@ -796,7 +818,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           </summary>
           <div class="step-body">
             ${body}
-            ${group.id === '3' ? questionA(st) : ''}
+            ${group.id === QUESTION_A_STEP ? questionA(st) : ''}
           </div>
         </details>`;
     }).join('');

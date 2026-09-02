@@ -104,6 +104,28 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** 재물대에 오르는 기구의 애셋 이름. 상태의 id 와 애셋 키가 다르다. */
 const ASSET_OF = { stageMic: 'stagemic', specimen: 'specimen' };
 
+/**
+ * 초점 안내 한 줄. **나사가 끝까지 갔으면 그것부터 말한다.**
+ *
+ * 100배로 올리면 초점이 풀리고, 그때 미동나사만 돌리면 끝에 닿고도 안 맞는다.
+ * 그 자리에서 「나사를 돌려 보세요」만 하면 학생은 자기가 잘못하는 줄 알고 계속 돌린다.
+ * 재어 보니 끝에 닿은 뒤 스무 번을 더 돌려도 값도 말도 그대로였다.
+ * 범위는 `dialHtml` 에 넘기는 span 과 같다 (조동 ±1 · 미동 ±0.2).
+ *
+ * ★ **고배율(대물 10배 초과)에서는 조동나사로 보내지 않는다** — 거기서 조동나사를 돌리면
+ *   유리에 금이 간다 (`rules.js` COARSE_FOCUS). 배율을 내려 맞추고 다시 올리는 길을 말한다.
+ *   DOM 없이 판정되도록 `createZoom` 밖에 둔다 — `tests/ui.contract.test.js` 가 잰다.
+ */
+export function focusLineFor(m, focused) {
+  if (focused) return UI.zoom.focusInRange;
+  const at = (v, span) => Math.abs(Math.abs(v) - span) < 1e-6;
+  if (at(m.fine ?? 0, 0.2)) {
+    return (m.objective ?? 4) > 10 ? UI.zoom.focusFineAtEndHighMag : UI.zoom.focusFineAtEnd;
+  }
+  if (at(m.coarse ?? 0, 1)) return UI.zoom.focusCoarseAtEnd;
+  return UI.zoom.focusOutOfRange;
+}
+
 export function createZoom(root, store) {
   root.className = 'zoom-overlay';
   root.hidden = true;
@@ -1021,14 +1043,6 @@ export function createZoom(root, store) {
    * 재어 보니 끝에 닿은 뒤 스무 번을 더 돌려도 값도 말도 그대로였다.
    * 범위는 `dialHtml` 에 넘기는 span 과 같다 (조동 ±1 · 미동 ±0.2).
    */
-  function focusLine(m, focused) {
-    if (focused) return UI.zoom.focusInRange;
-    const at = (v, span) => Math.abs(Math.abs(v) - span) < 1e-6;
-    if (at(m.fine ?? 0, 0.2)) return UI.zoom.focusFineAtEnd;
-    if (at(m.coarse ?? 0, 1)) return UI.zoom.focusCoarseAtEnd;
-    return UI.zoom.focusOutOfRange;
-  }
-
   /**
    * ★ **`role="slider"` 에는 범위가 있어야 한다.**
    *
@@ -1038,6 +1052,8 @@ export function createZoom(root, store) {
    * 이 저장소가 `disabled` 를 안 쓰는 것과 같은 이유다 — 그 길로 오는 학생을 안 버린다.
    * 범위는 `rules.js` 의 clamp 와 같다 (조동 ±1 · 미동 ±0.2).
    */
+  const focusLine = focusLineFor;
+
   function dialHtml(name, label, value, span, focused) {
     const arc = gaugeArc(value, span, focused);
     return `

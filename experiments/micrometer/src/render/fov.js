@@ -56,7 +56,7 @@ import { EXP_PALETTE } from '../style/palette.experiment.js';
 import { rng, hash, clamp } from '../assets/geometry.js';
 import {
   RETICLE_DIVS, MAJOR_EVERY_DIV, STAGE_DIV_UM, STAGE_RULED_UM,
-  STAGE_MICROMETER_FOCUS_EASE,
+  STAGE_MICROMETER_FOCUS_EASE, focusTolerance,
   eyepieceDivPx, stageDivPx, pxPerUm, magnification,
   canResolveEyepieceTicks, canResolveEyepieceMajor,
   canResolveStageTicks, canResolveStageMajor,
@@ -180,7 +180,21 @@ const PORE_MIN_PX = 2;
  */
 export function focusBlurPx(p) {
   const ease = p.on === 'stageMic' ? STAGE_MICROMETER_FOCUS_EASE : 1;
-  return ((p.focusErr || 0) * 22) / ease;
+  /**
+   * ★ **허용 범위 안은 초점 심도(depth of field) 안이다 — 흐리지 않는다.**
+   *
+   * 앞서는 오차에 그대로 비례해 흐렸다. 그러면 화면이 「초점이 맞았습니다」라고 말하고
+   * 게이지가 99 를 찍는 동안에도 상은 조금 흐렸고, **세는 띠(8배)에서는 그 「조금」이
+   * 여덟 배**가 되어 대물 눈금선이 뭉개졌다. 플레이해 보니 100배·오차 0.06 (허용 0.24 의
+   * 4분의 1)에서 띠의 대물 눈금이 회색 얼룩이었다 — 「맞았다」는 자리에서 셀 수가 없었다.
+   *
+   * 초점 허용 범위(`focusTolerance`)는 곧 초점 심도다. 그 안에서는 상이 또렷하고, 벗어난
+   * 만큼만 흐려진다. 그래서 「맞았습니다」·게이지 1.0·또렷한 그림이 **같은 경계**를 쓴다.
+   * 22 라는 기울기는 그대로다 — 벗어난 뒤 얼마나 빨리 흐려지는지는 바꾸지 않았다.
+   */
+  const tol = focusTolerance(p.objective ?? 10, p.on === 'stageMic' ? 'micrometer' : 'specimen');
+  const beyond = Math.max(0, (p.focusErr || 0) - tol);
+  return (beyond * 22) / ease;
 }
 
 /** 안개의 진하기 0~1. 대비를 다 잃어도 형체는 남긴다 — 무엇이 있었는지는 보여야 한다. */

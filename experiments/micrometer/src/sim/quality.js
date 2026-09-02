@@ -23,6 +23,9 @@ import { angleGap, centerErr, focusError, lineContrast, PAN_LIMIT } from './stat
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
+/** 이 위로는 「깎였다」고 말하지 않는다 — 화면에서 구별되지 않는 몫이다. */
+export const NEGLIGIBLE_LOSS = 0.98;
+
 /**
  * 기록에 남은 두 각도로 어긋남을 되짚는다. `state.js` 의 `angleGap` 과 같은 규칙이다 —
  * 표본에는 눈금이 없으므로 맞출 상대도 없다.
@@ -117,8 +120,17 @@ export function observability(p) {
    *
    * 「없는 것」과 「어긋난 것」은 크기를 견줄 수 있는 값이 아니다. 없으면 없다고 먼저 말한다.
    */
+  /**
+   * ★ **거의 안 깎인 것도 짚지 않는다.**
+   *
+   * 조리개 기본값(0.6)에서 대비 계수가 0.994 라 점수는 99 인데, `>= 1` 로 재면 그
+   * 0.006 이 「가장 크게 깎이는 항목」이 되어 화면이 늘 「조리개를 반쯤 열었을 때 가장
+   * 또렷합니다」라고 했다. 플레이해 보니 정렬·초점을 다 맞춘 99점 화면이 처음부터 끝까지
+   * 조리개를 만지라고 했다 — 없는 잘못을 지어내는 것과 같은 자리다. 눈에 보이지 않는
+   * 몫(2 %)은 깎인 것으로 치지 않는다.
+   */
   const worst = factors.equipped < 1 ? 'equipped'
-    : (ranked[0][1] >= 1 ? null : ranked[0][0]);
+    : (ranked[0][1] >= NEGLIGIBLE_LOSS ? null : ranked[0][0]);
   return { score, worst, factors };
 }
 

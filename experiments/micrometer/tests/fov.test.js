@@ -28,6 +28,7 @@ import {
   RETICLE_SPAN_FIELD_FRACTION, STAGE_MICROMETER_FOCUS_EASE,
   eyepieceDivPx, stageDivPx, guardCellLengthPx, guardCellDivs,
   canResolveStageTicks, magnification,
+  focusTolerance,
 } from '../src/sim/optics.js';
 
 /** `fieldParams()` 가 내주는 키 한 벌. 여기 없는 키를 렌더러가 읽으면 안 된다. */
@@ -324,11 +325,37 @@ test('접안 눈금 레이어가 흐림 그룹 밖에 있다', () => {
 test('대물 마이크로미터는 같은 focusErr 에서 표본보다 덜 흐리다', () => {
   // 크롬 선이라 두께가 없어 초점면이 하나뿐이다 (STAGE_MICROMETER_FOCUS_EASE).
   // 「100배에서 눈금에 먼저 초점을 맞춘다」는 절차가 성립하는 이유가 화면에 나와야 한다.
-  const mic = focusBlurPx(P({ on: 'stageMic', focusErr: 0.2 }));
-  const spec = focusBlurPx(P({ on: 'specimen', focusErr: 0.2 }));
-  NEAR(spec / mic, STAGE_MICROMETER_FOCUS_EASE, 1e-9, '완화 계수가 반영되지 않았습니다');
-  assert.equal(blurUsedBy(renderFOV(P({ on: 'stageMic', focusErr: 0.2 })), 'fov-scene').stdDeviation,
+  // 오차는 두 허용 범위(표본 0.12 · 눈금자 0.24)를 **다 벗어난** 값으로 잰다 —
+  // 허용 범위 안은 초점 심도라 둘 다 0 이기 때문이다 (아래 검사).
+  const mic = focusBlurPx(P({ on: 'stageMic', focusErr: 0.6 }));
+  const spec = focusBlurPx(P({ on: 'specimen', focusErr: 0.6 }));
+  assert.ok(mic > 0 && spec > 0, '허용 범위를 벗어났는데 흐리지 않습니다');
+  assert.ok(spec / mic >= STAGE_MICROMETER_FOCUS_EASE, '완화 계수가 반영되지 않았습니다');
+  assert.equal(blurUsedBy(renderFOV(P({ on: 'stageMic', focusErr: 0.6 })), 'fov-scene').stdDeviation,
     Number(mic.toFixed(2)), '렌더러가 focusBlurPx 와 다른 식을 씁니다');
+});
+
+/**
+ * ★ 허용 범위 안은 초점 심도다 — **「맞았습니다」와 또렷한 그림이 같은 경계를 쓴다.**
+ *
+ * 앞서는 오차에 그대로 비례해 흐렸다. 화면이 「초점이 맞았습니다」·게이지 99 를 말하는
+ * 동안에도 세는 띠(8배)에서는 대물 눈금선이 뭉개져 셀 수 없었다 (100배·오차 0.06 에서
+ * 띠 흐림 5.3 px). 되돌리면 첫 단언에서 빨간불이다.
+ */
+test('초점 허용 범위 안에서는 흐리지 않고, 벗어난 만큼만 흐려진다', () => {
+  for (const [on, target] of [['stageMic', 'micrometer'], ['specimen', 'specimen']]) {
+    for (const objective of [4, 10, 40]) {
+      const tol = focusTolerance(objective, target);
+      assert.equal(focusBlurPx(P({ on, objective, focusErr: tol * 0.99 })), 0,
+        `${on}·${objective}배: 허용 범위 안(${(tol * 0.99).toFixed(3)})인데 흐립니다`);
+      const a = focusBlurPx(P({ on, objective, focusErr: tol + 0.05 }));
+      const b = focusBlurPx(P({ on, objective, focusErr: tol + 0.10 }));
+      assert.ok(a > 0 && b > a, `${on}·${objective}배: 벗어날수록 더 흐려져야 합니다`);
+    }
+  }
+  // 세는 띠는 이 값에 ZOOM.scale 을 곱한다 (`zoom.js` countStrip) — 0 은 곱해도 0 이다.
+  assert.equal(focusBlurPx(P({ on: 'stageMic', objective: 10, focusErr: 0.12 })) * 8, 0,
+    '「맞았습니다」인 자리에서 세는 띠가 흐립니다');
 });
 
 test('대비를 잃으면 안개가 짙어지고, 접안 눈금 레이어는 그대로다', () => {
