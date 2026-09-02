@@ -30,6 +30,10 @@ create table if not exists classes (
   -- 어느 실험인가. 실험이 늘어도 표는 하나다 (src/manifest.js 의 id).
   exp           text not null default 'banana',
   title         text not null default '',
+  -- 봉인용 자물쇠(선생님 브라우저가 만든 ECDH 공개키, base64url). 열쇠는 여기 없다 —
+  -- 관리 링크의 # 뒤에만 있어 서버에 오지 않는다. 학생은 이 값으로 보고서를 잠가 보낸다.
+  -- 비어 있으면(봉인 이전에 연 수업) 학생이 그대로 보낸다. packages/lab-kit/net/seal.js
+  pubkey        text not null default '',
   created_at    timestamptz not null default now(),
   -- 기본 30일. 학기 말까지 두고 싶으면 교사가 늘려 잡는다. 최대 180일.
   expires_at    timestamptz not null default now() + interval '30 days'
@@ -50,18 +54,36 @@ create table if not exists reports (
 
   -- 누가 낸 것인가. 교사가 채점하려면 이만큼은 있어야 한다.
   -- **이 두 컬럼이 이 프로젝트에서 유일한 개인정보다.** 더 늘리지 말 것.
-  student_no   text not null check (length(student_no) between 1 and 12),
-  student_name text not null check (length(student_name) between 1 and 20),
+  -- ★ 봉인된 제출(아래 sealed)에서는 이 둘과 payload 가 **비어 있다** — 봉투 안에 들어 있다.
+  student_no   text check (student_no   is null or length(student_no)   between 1 and 12),
+  student_name text check (student_name is null or length(student_name) between 1 and 20),
 
   mode  text not null check (mode in ('solo', 'group')),
   level int  not null check (level between 1 and 3),
 
   -- 보고서를 그대로 다시 그리는 데 필요한 값 한 벌.
   -- 시야 이미지가 아니라 **시드와 파라미터**다 — 교사 화면이 같은 그림을 다시 그린다.
-  payload  jsonb not null,
+  payload  jsonb,
+
+  -- 봉인된 보고서 { v, epk, iv, ct }. 선생님 공개키로 잠근 것이라 **표를 여는 사람도 못 읽는다.**
+  -- 안에 student_no · student_name · payload 가 들어 있다. packages/lab-kit/net/seal.js
+  sealed   jsonb,
+
+  -- 봉인됐거나(sealed) 그대로거나(세 칸 다 있음) — 둘 중 하나여야 한다. 반쯤 빈 행은 없다.
+  constraint reports_sealed_or_plain check (
+    sealed is not null
+    or (student_no is not null and student_name is not null and payload is not null)
+  ),
 
   created_at timestamptz not null default now()
 );
+
+-- 봉인 이전에 만든 표에 칸을 더한다 (여러 번 실행해도 안전).
+alter table classes add column if not exists pubkey text not null default '';
+alter table reports add column if not exists sealed jsonb;
+alter table reports alter column student_no   drop not null;
+alter table reports alter column student_name drop not null;
+alter table reports alter column payload      drop not null;
 
 -- 이미지 컬럼을 추가하지 말 것. 시드로 재생성한다.
 comment on table reports is
@@ -146,14 +168,14 @@ create policy reports_teacher_delete on reports for delete using (
 -- 이것이 없으면 학생 브라우저가 `select=teacher_token` 을 물어 남의 반 관리 토큰을 가져간다.
 
 revoke all on table classes from anon;
-grant select (id, code, exp, title, created_at, expires_at) on classes to anon;
-grant insert (code, teacher_token, exp, title, expires_at)  on classes to anon;
+grant select (id, code, exp, title, created_at, expires_at, pubkey) on classes to anon;
+grant insert (code, teacher_token, exp, title, expires_at, pubkey)  on classes to anon;
 grant delete on classes to anon;
 
 revoke all on table reports from anon;
-grant select (id, class_id, exp, student_no, student_name, mode, level, payload, created_at)
+grant select (id, class_id, exp, student_no, student_name, mode, level, payload, sealed, created_at)
   on reports to anon;
-grant insert (class_id, exp, student_no, student_name, mode, level, payload) on reports to anon;
+grant insert (class_id, exp, student_no, student_name, mode, level, payload, sealed) on reports to anon;
 grant delete on reports to anon;
 
 -- ---------------------------------------------------------------- 만료 정리

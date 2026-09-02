@@ -35,6 +35,7 @@ import { qrSVG } from './ui/qr.js';
 import {
   enabled, createClass, findClassByToken, listReports, deleteReport, closeClass,
 } from './net/supabase.js';
+import { generateTeacherKeys, open as unseal, isSealed } from './net/seal.js';
 
 /*
  * 주입받은 것을 담는 자리. `mountTeacher()` 를 부르기 전에는 비어 있다 —
@@ -67,6 +68,12 @@ const $ = (sel, root = document) => root.querySelector(sel);
 
 /** 관리 토큰은 주소에만 있다. 브라우저 저장소에 넣지 않는다 — 공용 컴퓨터가 많다. */
 const tokenFromUrl = () => new URLSearchParams(location.search).get('t') ?? '';
+/**
+ * 봉인 열쇠는 주소의 **`#` 뒤**에만 있다 (`#k=…`). 브라우저는 `#` 뒤를 서버로 보내지 않으므로
+ * 서버 로그·표 어디에도 남지 않는다 — 그래서 사이트 주인이 학생 보고서를 못 읽는다 (seal.js).
+ */
+const secretFromUrl = () => new URLSearchParams(location.hash.replace(/^#/, '')).get('k') ?? '';
+const withSecret = (url, secret) => `${url}#k=${encodeURIComponent(secret)}`;
 
 /*
  * ── 주소 만들기는 **사이트**의 일이다 (합치기 4단계, 2026-08-30) ────────
@@ -157,13 +164,18 @@ function renderCreate(root) {
     go.textContent = T.create.working;
     go.setAttribute('aria-busy', 'true');
     try {
+      // 자물쇠·열쇠 한 쌍. 자물쇠(pub)만 서버로, 열쇠(secret)는 관리 링크의 # 뒤로.
+      const keys = await generateTeacherKeys();
       const made = await createClass({
         exp: manifest.id,
         title: $('#tc-title', root).value.trim(),
         days: Number($('#tc-days', root).value),
+        pubkey: keys.pub,
       });
-      // 주소를 바꿔 둔다. 새로고침해도 그 반으로 돌아온다.
-      history.replaceState(null, '', adminUrl(made.teacherToken));
+      made.secret = keys.secret;
+      made.pubkey = keys.pub;
+      // 주소를 바꿔 둔다. 새로고침해도 그 반으로 돌아온다 (열쇠까지 함께).
+      history.replaceState(null, '', withSecret(adminUrl(made.teacherToken), keys.secret));
       renderMade(root, made);
     } catch (e) {
       console.error(e);
@@ -190,12 +202,13 @@ function renderMade(root, made) {
         <p class="tc-hint">${T.made.qrHint}</p>
       </div>
       <hr class="tc-rule">
-      ${copyable('tc-admin', T.made.adminLabel, adminUrl(made.teacherToken))}
+      ${copyable('tc-admin', T.made.adminLabel, withSecret(adminUrl(made.teacherToken), made.secret))}
       <p class="tc-warn">${T.made.adminWarn}</p>
+      <p class="tc-duty">${T.made.sealed}</p>
       <button type="button" id="tc-open" class="tc-primary">${T.made.open}</button>
     </section>`;
   bindCopy(root);
-  $('#tc-open', root).addEventListener('click', () => renderBoard(root, made.teacherToken));
+  $('#tc-open', root).addEventListener('click', () => renderBoard(root, made.teacherToken, made.secret));
 }
 
 /* ------------------------------------------------------------------ */
@@ -240,7 +253,7 @@ function sheetOf(row) {
   }
 }
 
-async function renderBoard(root, token) {
+async function renderBoard(root, token, secret = secretFromUrl()) {
   root.innerHTML = `<section class="tc-card"><p class="tc-msg">불러오는 중…</p></section>`;
 
   let klass;
@@ -263,6 +276,29 @@ async function renderBoard(root, token) {
     console.error(e);
   }
 
+  /*
+   * 봉인된 행은 여기서 **연다.** 서버가 준 것은 봉투뿐이라 이름·학번·활동은 열어야 나온다.
+   * 열쇠가 없거나(링크를 # 앞까지만 복사한 경우) 맞지 않으면 그 행은 `opened=false` 로 두고
+   * 화면이 말한다 — 조용히 「빈 보고서」로 그리면 선생님이 학생 탓을 한다.
+   */
+  let sealedCount = 0;
+  let failedCount = 0;
+  rows = await Promise.all(rows.map(async (r) => {
+    if (!isSealed(r.sealed)) return { ...r, opened: true };
+    sealedCount++;
+    if (!secret || !klass.pubkey) return { ...r, opened: false, student_no: '', student_name: '' };
+    try {
+      const inner = await unseal(secret, klass.pubkey, r.sealed);
+      return { ...r, opened: true, student_no: inner.studentNo, student_name: inner.studentName, payload: inner.payload };
+    } catch (e) {
+      console.error(e);
+      failedCount++;
+      return { ...r, opened: false, student_no: '', student_name: '' };
+    }
+  }));
+  const keyProblem = sealedCount > 0 && !secret ? T.board.noKey
+    : failedCount > 0 ? T.board.openFailed : '';
+
   root.innerHTML = `
     <section class="tc-card">
       <div class="tc-board-head">
@@ -282,15 +318,16 @@ async function renderBoard(root, token) {
       </div>
       ${copyable('tc-link2', T.made.linkLabel, studentUrl(klass.code))}
       <div class="tc-qr-box tc-qr-box--small">${qrSVG(studentUrl(klass.code), { size: 132 })}</div>
+      ${keyProblem ? `<p class="tc-msg" data-kind="warn">${keyProblem}</p>` : ''}
 
       ${rows.length === 0 ? `<p class="tc-empty">${T.board.empty}</p>` : `
         <ul class="tc-list">
           ${rows.map((r) => `
             <li class="tc-item" data-id="${r.id}">
               <div class="tc-item-head">
-                <b class="tc-no">${escapeHtml(r.student_no)}</b>
-                <span class="tc-name">${escapeHtml(r.student_name)}</span>
-                <span class="tc-tag">${r.mode === 'group' ? '모둠' : '개인'} · ${r.level}단계</span>
+                <b class="tc-no">${escapeHtml(r.student_no ?? '')}</b>
+                <span class="tc-name">${escapeHtml(r.student_name ?? '')}</span>
+                <span class="tc-tag">${r.mode === 'group' ? '모둠' : '개인'} · ${r.level}단계${isSealed(r.sealed) ? ` · ${T.board.sealedBadge}` : ''}</span>
                 <span class="tc-when">${fmtWhen(r.created_at)}</span>
                 <button type="button" class="tc-toggle" data-open="${r.id}">${T.board.openOne}</button>
                 <button type="button" class="tc-remove" data-remove="${r.id}">${T.board.remove}</button>
@@ -313,7 +350,7 @@ async function renderBoard(root, token) {
       const body = $(`#body-${CSS.escape(btn.dataset.open)}`, root);
       const row = rows.find((r) => r.id === btn.dataset.open);
       if (body.hidden) {
-        if (!body.innerHTML) body.innerHTML = sheetOf(row);
+        if (!body.innerHTML) body.innerHTML = row.opened ? sheetOf(row) : `<p class="tc-warn">${T.board.openFailed}</p>`;
         body.hidden = false;
         btn.textContent = T.board.closeOne;
       } else {
@@ -338,11 +375,11 @@ async function renderBoard(root, token) {
 
   $('#tc-refresh', root).addEventListener('click', () => renderBoard(root, token));
   $('#tc-csv', root).addEventListener('click', () => {
-    download(`제출명단_${klass.code}.csv`, csvOf(rows));
+    download(`제출명단_${klass.code}.csv`, csvOf(rows.filter((r) => r.opened)));
   });
   $('#tc-print', root).addEventListener('click', () => {
     // 한 장씩 열어 인쇄하면 서른 번을 눌러야 한다. 전부 이어 붙여 한 번에 낸다.
-    $('#tc-print-area', root).innerHTML = rows.map((r) =>
+    $('#tc-print-area', root).innerHTML = rows.filter((r) => r.opened).map((r) =>
       `<div class="tc-print-one">${sheetOf(r)}</div>`).join('');
     setTimeout(() => window.print(), 60);
   });

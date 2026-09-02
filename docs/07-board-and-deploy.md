@@ -24,6 +24,17 @@ Vercel과 Netlify는 **호스팅**, Supabase는 **백엔드**다. 하나를 고�
 
 `supabase/schema.sql` 참조. **`submissions` 에 이미지 컬럼을 추가하지 말 것.**
 
+## 제출된 보고서는 봉인된다 (2026-09-03)
+
+선생님이 수업을 열면 브라우저가 ECDH P-256 키 쌍을 만든다. 공개키는 `classes.pubkey` 로 올라가고
+비밀키(`d`)는 **관리 링크의 `#k=…`** 에만 실린다 — 브라우저는 `#` 뒤를 서버로 보내지 않는다.
+학생 브라우저는 일회용 키 쌍 → ECDH → HKDF → AES-GCM-256 으로 `{studentNo, studentName, payload}` 를
+잠가 `reports.sealed` 에 넣고, `student_no`·`student_name`·`payload` 칸은 비운다. 선생님 화면이 연다.
+
+사이트 주인은 대시보드에서 봉투만 본다. `tests/seal.test.js` 가 「봉투에 원문이 없다 · 다른 열쇠로는
+안 열린다 · 열쇠가 서버로 가는 값에 없다」를 지킨다. `mode`·`level`·`created_at` 은 봉인 밖이다 —
+개인을 가리키지 않고, 열기 전에 표를 그리는 데 쓴다.
+
 ## 개인정보는 처음부터 받지 않는다
 
 - 로그인 없음. 교사가 발급한 **6자리 수업 코드 + 모둠 번호**만. 이름·학번·이메일 입력칸을 만들지 않는다

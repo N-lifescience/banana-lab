@@ -48,6 +48,8 @@
  * (웨이브 1 의 micrometer 세션이 배포 번들을 열어 보고 찾았고, osmosis·fermentation 이
  *  각자 사본에 덧붙여 둔 것을 여기로 합쳤다)
  */
+import { seal } from './seal.js';
+
 const { url: RAW_URL, key: RAW_KEY } = (() => {
   try {
     return { url: import.meta.env.VITE_SUPABASE_URL, key: import.meta.env.VITE_SUPABASE_ANON_KEY };
@@ -141,7 +143,7 @@ function randomToken() {
  * 수업을 연다. 코드가 겹치면 몇 번 다시 뽑는다 — 90만 개 중 하나라 실제로는 거의 안 겹친다.
  * @returns {Promise<{id:string, code:string, teacherToken:string, expiresAt:string}>}
  */
-export async function createClass({ exp, title = '', days = 30 } = {}) {
+export async function createClass({ exp, title = '', days = 30, pubkey = '' } = {}) {
   /*
    * ★ **기본값을 두지 않는다.** 앞서 여기는 `exp = 'banana'` 였다. 실험이 하나였을 때는
    *   편했지만, 공용이 된 지금 부르는 쪽이 한 번 빠뜨리면 **그 반이 통째로 banana 수업으로
@@ -159,7 +161,8 @@ export async function createClass({ exp, title = '', days = 30 } = {}) {
         method: 'POST',
         prefer: 'return=representation',
         teacherToken,
-        body: { code, teacher_token: teacherToken, exp, title, expires_at: expiresAt },
+        // `pubkey` 는 선생님 브라우저가 만든 자물쇠(seal.js). 열쇠는 여기로 오지 않는다.
+        body: { code, teacher_token: teacherToken, exp, title, expires_at: expiresAt, pubkey },
       });
       const row = rows?.[0];
       if (!row) throw new NetError('수업을 만들었는데 결과가 비어 있습니다.');
@@ -176,7 +179,7 @@ export async function createClass({ exp, title = '', days = 30 } = {}) {
 /** 학생이 코드를 확인한다. 없으면 null — "그런 수업이 없다" 와 "기한이 지났다" 를 구분하지 않는다. */
 export async function findClass(code) {
   const rows = await rest(
-    `/rest/v1/classes?select=id,code,exp,title,expires_at&code=eq.${encodeURIComponent(code)}`,
+    `/rest/v1/classes?select=id,code,exp,title,expires_at,pubkey&code=eq.${encodeURIComponent(code)}`,
     { classCode: code }
   );
   return rows?.[0] ?? null;
@@ -184,7 +187,7 @@ export async function findClass(code) {
 
 /** 교사가 관리 토큰으로 자기 수업을 연다. */
 export async function findClassByToken(teacherToken) {
-  const rows = await rest('/rest/v1/classes?select=id,code,exp,title,expires_at', { teacherToken });
+  const rows = await rest('/rest/v1/classes?select=id,code,exp,title,expires_at,pubkey', { teacherToken });
   return rows?.[0] ?? null;
 }
 
@@ -205,15 +208,24 @@ export async function closeClass(teacherToken, classId) {
  * 돌려받는 것이 없다(`return=minimal`). 학생은 자기가 낸 것조차 다시 읽지 못한다 —
  * 읽게 하면 같은 코드를 아는 다른 학생도 읽게 되고, 거기엔 이름이 들어 있다.
  */
-export async function submitReport({ classCode, classId, exp, studentNo, studentName, mode, level, payload }) {
+export async function submitReport({ classCode, classId, exp, studentNo, studentName, mode, level, payload, pubkey }) {
+  /*
+   * ── 봉인 (2026-09-03) ─────────────────────────────────────────────
+   * 수업에 자물쇠(`pubkey`)가 있으면 이름·학번·활동 내용을 **선생님 공개키로 잠가** 보낸다.
+   * 표에는 `sealed` 봉투만 들어가고 `student_no`·`student_name`·`payload` 는 비운다 —
+   * 사이트 주인이 대시보드를 열어도 암호문뿐이다. 자물쇠가 없는 수업(봉인 이전에 연 것)만
+   * 예전처럼 그대로 보낸다. `mode`·`level` 은 개인정보가 아니라 밖에 둔다 — 선생님 화면이
+   * 열기 전에 표를 그리는 데 쓴다.
+   */
   await rest('/rest/v1/reports', {
     method: 'POST',
     classCode,
     prefer: 'return=minimal',
     body: {
-      class_id: classId, exp,
-      student_no: studentNo, student_name: studentName,
-      mode, level, payload,
+      class_id: classId, exp, mode, level,
+      ...(pubkey
+        ? { sealed: await seal(pubkey, { studentNo, studentName, payload }) }
+        : { student_no: studentNo, student_name: studentName, payload }),
     },
   });
 }
@@ -221,7 +233,7 @@ export async function submitReport({ classCode, classId, exp, studentNo, student
 /** 교사가 자기 반 제출물을 받아 온다. 최근 것이 위로. */
 export function listReports(teacherToken, classId) {
   return rest(
-    `/rest/v1/reports?select=id,exp,student_no,student_name,mode,level,payload,created_at`
+    `/rest/v1/reports?select=id,exp,student_no,student_name,mode,level,payload,sealed,created_at`
     + `&class_id=eq.${encodeURIComponent(classId)}&order=created_at.desc`,
     { teacherToken }
   );

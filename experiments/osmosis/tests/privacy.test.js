@@ -107,6 +107,7 @@ const SUBMIT_COLUMNS = {
   payload: '관찰 결과',              // 위 data-sends 맞대기가 속을 따로 센다
   student_no: '학번',
   student_name: '이름',
+  sealed: '봉인',                    // 위 셋을 선생님 공개키로 잠근 봉투 (packages/lab-kit/net/seal.js)
 };
 
 /*

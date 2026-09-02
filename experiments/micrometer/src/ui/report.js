@@ -583,6 +583,7 @@ export function createReport(root, store) {
         await submitReport({
           classCode: code,
           classId: klass.id,
+          pubkey: klass.pubkey,   // 봉인용 자물쇠 — 선생님 브라우저만 열 수 있게 잠근다 (seal.js)
           exp: manifest.id,
           studentNo,
           studentName: name,
