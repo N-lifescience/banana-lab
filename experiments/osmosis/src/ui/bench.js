@@ -412,20 +412,63 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     return bad;
   }
 
+  /**
+   * 좌표 입력칸 하나. **끌어서도, 숫자로도 옮길 수 있어야 한다** (사장님 지시 2026-09-03).
+   *
+   * 끌기만 되면 1 mm 를 맞추려고 화면을 확대했다 줄였다 하게 된다. 숫자를 직접 치거나
+   * 위·아래 화살표로 1 mm 씩 미는 길을 함께 둔다 — y 도 x 와 똑같이.
+   * 이름표는 `x`·`y` 와 단위뿐이라 문자열 파일로 뺄 말이 없다.
+   */
+  function numCell(it, axis) {
+    return `<input type="number" class="edit-num" data-axis="${axis}" step="1"
+      value="${Math.round(it[axis])}" aria-label="${it.id} ${axis} (mm)"
+      style="width:5.2em;font:inherit;text-align:right;padding:1px 4px;border:1px solid currentColor;
+             border-radius:4px;background:transparent;color:inherit">`;
+  }
+
   function renderEditPanel() {
     if (!edit) return;
     const bad = overlaps();
     root.querySelector('#edit-rows').innerHTML = items.map((it) => {
       const d = drawnBoxMm(it.asset);
       return `
-      <tr${bad.has(it.id) ? ' class="edit-bad"' : ''}>
+      <tr data-id="${it.id}">
         <td>${it.id}</td>
-        <td>${Math.abs(it.bottom - SHELF_MM) < 1 ? UI.edit.shelf : UI.edit.surface}</td>
-        <td class="edit-x">${Math.round(it.x)}</td>
-        <td class="edit-span">~${Math.round(it.x + d.dx + d.w)}</td>
-        <td>${bad.has(it.id) ? UI.edit.overlap : ''}</td>
+        <td class="edit-line"></td>
+        <td class="edit-x">${numCell(it, 'x')}</td>
+        <td class="edit-x">${numCell(it, 'y')}</td>
+        <td class="edit-span"></td>
+        <td class="edit-flag"></td>
       </tr>`;
     }).join('');
+    syncEditPanel();
+  }
+
+  /** 표에 적는 선 이름. 칸을 다시 그릴 때와 값만 맞출 때가 같은 말을 해야 한다. */
+  function lineLabel(it) {
+    return `${Math.abs(it.bottom - SHELF_MM) < 1 ? UI.edit.shelf : UI.edit.surface}`;
+  }
+
+  /**
+   * 표의 **읽는 칸**만 다시 칠한다. 입력칸은 값만 맞추되 **지금 손이 가 있는 칸은 건드리지
+   * 않는다** — 타이핑 도중 값을 덮으면 커서가 튀어 두 자리 수를 칠 수가 없다.
+   */
+  function syncEditPanel() {
+    if (!edit) return;
+    const bad = overlaps();
+    for (const it of items) {
+      const tr = root.querySelector(`#edit-rows tr[data-id="${it.id}"]`);
+      if (!tr) continue;
+      const d = drawnBoxMm(it.asset);
+      tr.classList.toggle('edit-bad', bad.has(it.id));
+      tr.querySelector('.edit-line').textContent = lineLabel(it);
+      tr.querySelector('.edit-flag').textContent = bad.has(it.id) ? UI.edit.overlap : '';
+      tr.querySelector('.edit-span').textContent = `~${Math.round(it.x + d.dx + d.w)}`;
+      for (const axis of ['x', 'y']) {
+        const input = tr.querySelector(`input[data-axis="${axis}"]`);
+        if (input && document.activeElement !== input) input.value = String(Math.round(it[axis]));
+      }
+    }
     root.querySelector('#edit-warn').textContent = bad.size ? UI.edit.overlapWarn(bad.size) : '';
   }
 
@@ -434,6 +477,21 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       await navigator.clipboard.writeText(layoutCode(items));
       e.target.textContent = UI.edit.copied;
       setTimeout(() => { e.target.textContent = UI.edit.copy; }, 1500);
+    });
+    /*
+     * 숫자로 옮기기. `input` 으로 듣는다 — 화살표를 누르는 순간 물건이 따라 움직여야
+     * 「이만큼이 1 mm 구나」가 눈에 보인다. 값을 지우는 중(빈 칸)에는 아무 일도 하지 않는다.
+     */
+    root.querySelector('#edit-rows').addEventListener('input', (e) => {
+      const input = e.target.closest('.edit-num');
+      if (!input) return;
+      const item = items.find((it) => it.id === input.closest('tr')?.dataset.id);
+      const v = Number(input.value);
+      if (!item || input.value.trim() === '' || !Number.isFinite(v)) return;
+      item[input.dataset.axis] = v;
+      placeFreely(item);
+      renderTokens();
+      syncEditPanel();
     });
     root.querySelector('#edit-reset').addEventListener('click', () => {
       for (const [i, it] of defaultItems().entries()) Object.assign(items[i], it);
@@ -968,7 +1026,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
         `<i class="token-name" style="left:${((c.x0 + c.x1) / 2 / vw) * 100}%;`
         + `top:${(c.y1 / vh) * 100}%">${UI.bench.shortNames[item.labelKey] ?? item.label}</i>`);
       // 스크린샷 한 장으로 자리를 읽을 수 있어야 한다. 물건마다 x(mm)를 달아 둔다.
-      if (edit) el.insertAdjacentHTML('beforeend', `<i class="edit-x-tag">${Math.round(item.x)}</i>`);
+      if (edit) el.insertAdjacentHTML('beforeend', `<i class="edit-x-tag">${Math.round(item.x)}, ${Math.round(item.y)}</i>`);
 
       el.addEventListener('pointerdown', (e) => onPointerDown(e, item, el));
       el.addEventListener('pointermove', onPointerMove);
