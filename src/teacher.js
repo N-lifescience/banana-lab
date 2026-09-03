@@ -11,15 +11,10 @@
  *
  * ── 주소 ────────────────────────────────────────────────────────────
  *     /teacher                  실험 고르기 (아래 목록)
- *     /teacher?exp=banana       그 실험의 수업 열기
- *     /teacher?exp=banana&t=…   그 반의 제출물 보기
- *
- * `exp` 가 **관리 링크에도** 실려야 한다. 없으면 링크를 다시 열었을 때
- * 어느 실험의 종이로 그려야 할지 알 수 없다.
+ *     /teacher?exp=banana       그 실험의 학생용 링크·QR 만들기
  */
 
 import { mountTeacher } from '../packages/lab-kit/teacher.js';
-import { enabled } from '../packages/lab-kit/net/supabase.js';
 
 /*
  * 이 사이트에서 실험이 사는 주소의 앞자리. `vercel.json` 의 되쓰기가 이 값을
@@ -45,12 +40,9 @@ const $ = (sel) => document.querySelector(sel);
 
 /** 실험을 아직 안 골랐을 때. 골라야 화면이 무엇을 그릴지 정해진다. */
 async function renderPicker() {
-  // 제출 서버가 꺼져 있으면(기본 — B안, 2026-09-03) 이 화면은 링크·QR 만 만든다. 말도 그렇게 한다.
-  const on = enabled();
   $('#tc-title-h').textContent = '선생님 화면';
-  $('#tc-lead').innerHTML = on
-    ? '수업을 열 <b>실험</b>을 먼저 고르세요. 반마다 다른 실험으로 여러 수업을 열 수 있습니다.'
-    : '링크·QR 을 만들 <b>실험</b>을 먼저 고르세요. 이 사이트는 학생 정보를 저장하지 않습니다 — 학생은 PDF 로 냅니다.';
+  $('#tc-lead').innerHTML = '링크·QR 을 만들 <b>실험</b>을 먼저 고르세요. '
+    + '이 사이트는 학생 정보를 저장하지 않습니다 — 학생은 보고서를 PDF 로 저장해 냅니다.';
 
   const cards = await Promise.all(EXPERIMENTS.map(async (id) => {
     const { manifest } = await import(`../experiments/${id}/src/manifest.js`);
@@ -58,14 +50,14 @@ async function renderPicker() {
       <li class="tc-item">
         <div class="tc-item-head">
           <span class="tc-name">${manifest.title}</span>
-          <a class="tc-when" href="?exp=${encodeURIComponent(id)}">${on ? '수업 열기' : '링크 · QR 만들기'} →</a>
+          <a class="tc-when" href="?exp=${encodeURIComponent(id)}">링크 · QR 만들기 →</a>
         </div>
       </li>`;
   }));
 
   $('#tc-app').innerHTML = `
     <section class="tc-card">
-      <h2>${on ? '어느 실험의 수업인가요?' : '어느 실험인가요?'}</h2>
+      <h2>어느 실험인가요?</h2>
       <ul class="tc-list">${cards.join('')}</ul>
     </section>`;
 }
@@ -88,22 +80,20 @@ if (!exp) {
 } else if (!EXPERIMENTS.includes(exp)) {
   renderUnknown();
 } else {
-  const [{ UI }, { manifest }, { buildSheet }, { escapeHtml }] = await Promise.all([
+  const [{ UI }, { manifest }, { escapeHtml }] = await Promise.all([
     import(`../experiments/${exp}/src/ui/strings.js`),
     import(`../experiments/${exp}/src/manifest.js`),
-    import(`../experiments/${exp}/src/ui/report.js`),
     import(`../experiments/${exp}/src/ui/notebook.js`),
   ]);
 
   mountTeacher({
     UI,
     manifest,
-    buildSheet,
     escapeHtml,
     links: {
       /**
-       * **서버 없이** 나눠 주는 학생 링크 — 실험의 교과 주소에 단계·방식만 붙인다 (B안, 2026-09-03).
-       * 수업 코드가 없으므로 아무것도 서버에 남지 않는다. 학생은 PDF 로 낸다.
+       * 나눠 주는 학생 링크 — 실험의 교과 주소에 단계·방식만 붙인다.
+       * 보내는 곳이 없으므로 아무것도 서버에 남지 않는다. 학생은 PDF 로 낸다.
        */
       plain: ({ level, mode } = {}) => {
         const q = new URLSearchParams();
@@ -112,17 +102,6 @@ if (!exp) {
         const qs = q.toString();
         return `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}${qs ? `?${qs}` : ''}`;
       },
-      /** 학생이 여는 곳 — 그 실험의 교과 주소. 반 코드를 달아 준다. */
-      student: (code) =>
-        `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}`
-        + `?code=${encodeURIComponent(code)}`,
-      /**
-       * 선생님만 갖는 곳. **`exp` 를 함께 싣는다** — 이 링크를 다시 열었을 때
-       * 어느 실험의 종이로 그려야 할지가 여기서만 나온다.
-       */
-      admin: (token) =>
-        `${location.origin}/teacher`
-        + `?exp=${encodeURIComponent(manifest.id)}&t=${encodeURIComponent(token)}`,
     },
   });
 }

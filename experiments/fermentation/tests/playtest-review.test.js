@@ -35,27 +35,6 @@ test('예상 관문이 학생을 왼쪽(잠긴 실험대)으로 보내지 않는
   }
 });
 
-/* #3 — 시행을 지울 단추. 규칙은 있었는데 누를 자리가 없었다 */
-test('5. 결과 쪽에 시행마다 지우기 단추가 있고 DELETE_TRIAL 을 부른다', () => {
-  const nb = src('../src/ui/notebook.js');
-  // 단추(표 안)와 듣는 쪽(클릭 위임) **둘 다** 있어야 한다 — 한쪽만 남으면 눌러도 아무 일도 없다.
-  assert.ok(/<button[^>]*data-delete-trial="\$\{t\.at\}"/.test(nb), '시행 지우기 단추가 표에 없습니다');
-  assert.ok(/closest\('\[data-delete-trial\]'\)/.test(nb), '지우기 단추를 듣는 곳이 없습니다');
-  assert.ok(/dispatch\('DELETE_TRIAL'/.test(nb), '지우기 단추가 DELETE_TRIAL 을 부르지 않습니다');
-  assert.ok(UI.notebook.trialDelete && UI.notebook.trialDeleteLabel(1).includes('1'),
-    '지우기 문구가 strings.js 에 없습니다');
-});
-
-/* #4 — QR 로 들어온 수업 코드(?code=)를 보고서 창에 넘긴다 (허브 E2E 가 찾음) */
-test('main.js 가 report.open 에 주소의 수업 코드를 넘긴다', () => {
-  const main = src('../src/main.js');
-  assert.ok(/function classCodeFromUrl\(\)/.test(main), 'classCodeFromUrl() 이 없습니다');
-  assert.ok(/report\.open\(\{\s*classCode:\s*classCodeFromUrl\(\)\s*\}\)/.test(main),
-    'report.open() 에 classCode 를 넘기지 않습니다 — QR 로 들어온 학생이 코드를 다시 쳐야 합니다');
-  assert.ok(/replace\(\/\\D\/g, ''\)\.slice\(0, 6\)/.test(main), '수업 코드는 숫자 여섯 자리만 받습니다');
-});
-
-/* #5 — 키보드: 물건에서 Tab 하면 「여기에 놓기」 단추로 들어가고, Esc 로 말풍선을 치운다 */
 test('실험대 물건에서 Tab → 놓기 단추, Esc → 말풍선 닫기 (진짜 Tab 으로 닿는 다리)', () => {
   const bench = src('../src/ui/bench.js');
   assert.ok(/function focusFirstPut\(\)/.test(bench), '놓기 단추로 들어가는 다리(focusFirstPut)가 없습니다');

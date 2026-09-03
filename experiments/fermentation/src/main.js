@@ -91,18 +91,6 @@ function createClock(store) {
   return { stop };
 }
 
-/**
- * 선생님이 나눠 준 수업 코드. `?code=482013` 또는 QR 로 들어온다.
- *
- * 상태(store)에 넣지 않는다. 실험의 일부가 아니라 **보고서를 낼 곳**일 뿐이고,
- * 상태에 넣으면 되돌리기 기록에 쌓이고 화면 곳곳으로 흘러 다닌다.
- * 다른 여섯 실험과 같은 모양이다 — 이 실험만 이것이 빠져 있어서 QR 로 들어온 학생이
- * 보고서 창에서 코드를 손으로 다시 쳐야 했다 (허브 E2E 가 잡았다).
- */
-function classCodeFromUrl() {
-  const raw = new URLSearchParams(location.search).get('code') ?? '';
-  return raw.replace(/\D/g, '').slice(0, 6);
-}
 
 /** 주소로 난이도·방식을 정하는 길은 그대로 둔다 — 교사가 반마다 링크를 나눠 준다. */
 function fromQuery() {
@@ -146,7 +134,7 @@ function start(level, mode) {
   createClock(store);
   const report = createReport($('#report'), store);
   createNotebook($('#notebook'), store, {
-    onReport: () => report.open({ classCode: classCodeFromUrl() }),
+    onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간을 알린다 — 탭을 안 보고 있어도 알아야 한다.
     onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),
   });

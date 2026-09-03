@@ -104,16 +104,6 @@ test('화면 코드는 저장소에도 네트워크에도 손대지 않는다', 
  * 보내는 것은 **관찰 조건 값들뿐**이고 이미지가 아니다. 목록을 여기서 고정한다 —
  * 무언가 더하면 잡히게.
  */
-test('제출 대상 값에 개인을 가리키는 것이 없다', () => {
-  const c = beakerConditions(initialState(1, 12345).bench.beaker);
-  const allowed = new Set(['tempC', 'ph', 'h2o2Pct', 'extractPct', 'extractBoiled', 'buffered']);
-  for (const key of Object.keys(c)) {
-    assert.ok(allowed.has(key), `조건 한 벌에 예상 못 한 값이 있습니다: ${key}`);
-  }
-  for (const v of Object.values(c)) {
-    assert.ok(['number', 'boolean'].includes(typeof v), `조건 값이 숫자·참거짓이 아닙니다: ${v}`);
-  }
-});
 
 /* ---------------- 방침이 실제로 보내는 것과 같은가 ---------------- */
 
@@ -131,57 +121,6 @@ test('제출 대상 값에 개인을 가리키는 것이 없다', () => {
  * `privacy.html` 의 `data-sends` 에 적힌 키와, `payloadOf()` 가 실제로 내는 키가
  * **정확히 같아야** 한다. 한쪽만 늘면 빨간불이다.
  */
-test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', async () => {
-  const { payloadOf } = await import('../src/ui/report.js');
-  const { reduce } = await import('../src/sim/rules.js');
-  const { PH_METHODS } = await import('../src/sim/state.js');
-
-  // 한 시행을 실제로 끝낸 상태로 잰다. 빈 상태로 재면 아직 안 생긴 칸을 놓친다.
-  let st = initialState(2);
-  const run = (type, payload = {}) => { st = reduce(st, { type, payload }).state; };
-  run('SET_INDEPENDENT', { variable: 'temp' });
-  run('MAKE_EXTRACT', { pct: 100 }); run('PUNCH_DISC'); run('SOAK_DISC');
-  run('POUR_H2O2', { pct: 3 }); run('SET_PH', { ph: 7, method: PH_METHODS.BUFFER });
-  run('PUT_IN_BATH', { tempC: 37 }); run('DROP_DISC');
-  for (let i = 0; i < 300 && !st.bench.beaker.floated; i++) run('TICK', { seconds: 1 });
-  run('RECORD_TRIAL');
-  run('SAVE_NOTE', { step: 'q2', text: '빨라졌다' });
-
-  const payload = payloadOf(st, { school: '', team: '' }, 'group');
-  const sent = new Set();
-  for (const key of Object.keys(payload.state)) {
-    if (key === 'session') continue;
-    sent.add(key);
-  }
-  for (const key of Object.keys(payload.state.session)) sent.add(`session.${key}`);
-  assert.ok(sent.size > 0, '보내는 것이 하나도 없다고 나옵니다 — 검사가 헛돌고 있습니다');
-
-  /*
-   * ★ **`<dt>` 마다 하나씩, 여럿이다.** 앞서 여기는 `html.match(/data-sends="…"/)` 로
-   *   **맨 앞 하나만** 읽고 공백으로 쪼갰다. 따로 서 있던 시절 방침은 목록이 한 줄이라
-   *   맞아떨어졌는데, 사이트 방침은 항목마다 `<dt>` 가 따로다 —
-   *   그대로 두면 `student_no,student_name` 만 읽고 **나머지를 전부 「안 적혔다」**로 센다.
-   *   (합치기 5단계, 2026-08-30)
-   */
-  const html = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
-  const declared = new Set();
-  for (const [, list] of html.matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) declared.add(k.trim());
-  }
-  assert.ok(declared.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  const undeclared = [...sent].filter((k) => !declared.has(k));
-  assert.deepEqual(undeclared, [],
-    `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')} — privacy.html 을 고치세요`);
-
-  /*
-   * ★ **반대 방향(「방침이 받는다는데 안 보낸다」)은 여기서 재지 않는다.**
-   *   방침은 사이트에 하나뿐이라 실험 여덟이 보내는 것의 **합집합**을 적는다.
-   *   `slides` 는 banana 만, `design`·`trials` 는 이 실험만 보낸다 — 여기서
-   *   「나는 안 보내니 지워라」고 하면 **남의 고지를 지우게 된다.**
-   *   그 방향은 사이트가 갖는다 (`tests/site.test.js`).
-   */
-});
 
 /**
  * 되돌리기 기록은 제출물에 안 들어간다.
@@ -196,29 +135,7 @@ test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', a
  * 눌렀는지**(`session.log`)와 **실험대에 마지막으로 놓여 있던 것**(`bench`)이 함께 나갔다.
  * 종이 어디에도 안 실리는 것들이다.
  */
-test('보고서에 안 실리는 것은 제출물에 들어가지 않는다', async () => {
-  const { payloadOf } = await import('../src/ui/report.js');
-  const { reduce } = await import('../src/sim/rules.js');
-  let st = initialState(2);
-  st = reduce(st, { type: 'PUNCH_DISC' }).state;
-  const json = JSON.stringify(payloadOf(st, {}, 'solo'));
-  for (const key of ['bench', 'log', 'history', 'seed', 'readStages', 'trialSeq', 'undosLeft']) {
-    assert.ok(!json.includes(`"${key}"`), `제출물에 ${key} 가 들어 있습니다`);
-  }
-});
 
-test('되돌리기 기록은 제출물에 들어가지 않는다', async () => {
-  const { payloadOf } = await import('../src/ui/report.js');
-  const { reduce } = await import('../src/sim/rules.js');
-  let st = initialState(2);
-  st = reduce(st, { type: 'PUNCH_DISC' }).state;
-  st = reduce(st, { type: 'SAVE_NOTE', payload: { step: 'q2', text: '지울 글' } }).state;
-  assert.ok(st.session.history.length > 0, '되돌리기 기록이 쌓이지도 않았습니다');
-
-  const payload = payloadOf(st, {}, 'solo');
-  assert.equal(payload.state.session.history, undefined, 'history 가 제출물에 있습니다');
-  assert.ok(!JSON.stringify(payload).includes('"history"'));
-});
 
 /*
  * ── 「방침에 이 실험에 없는 기구가 적혀 있지 않다」는 **사이트로 옮겼다** ──
@@ -265,4 +182,40 @@ test('방침의 조항 번호가 빠짐없이 이어지고, 본문이 가리키�
     assert.ok(headings.includes(Number(m[1])),
       `본문이 제${m[1]}조를 가리키는데 그런 조항이 없습니다 — 번호를 밀 때 본문도 함께 밀어야 합니다`);
   }
+});
+
+/**
+ * **보낼 길 자체가 없는가.**
+ *
+ * 앞서 이 자리에는 「방침에 적힌 항목 = 실제로 보내는 것」 맞대기가 있었다. 제출 기능이
+ * 있던 때의 검사다. 그 기능을 걷어낸 지금(사장님 결정 2026-09-03) 재야 할 것은 하나로 바뀐다:
+ * **이 실험의 코드가 바깥으로 무엇을 보낼 수 있는가.** 보낼 길이 없으면 고지와 어긋날 일도 없다.
+ */
+test('이 실험은 바깥으로 아무것도 보내지 않는다', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const walk = (u) => readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(`${d.name}/`, u)) : [new URL(d.name, u)]);
+  const files = walk(dir).filter((u) => u.pathname.endsWith('.js'));
+  assert.ok(files.length > 0, '소스를 하나도 못 읽었습니다 — 검사가 헛돌고 있습니다');
+  for (const u of files) {
+    const src = readFileSync(u, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const name = u.pathname.split('/src/')[1];
+    for (const [re, what] of [
+      [/\bfetch\s*\(/, 'fetch'],
+      [/\bXMLHttpRequest\b/, 'XMLHttpRequest'],
+      [/sendBeacon\s*\(/, 'sendBeacon'],
+      [/\bnew WebSocket\b/, 'WebSocket'],
+      [/\bnew EventSource\b/, 'EventSource'],
+    ]) {
+      assert.equal(re.test(src), false,
+        `src/${name} 이 ${what} 을 씁니다 — 이 앱은 학생 데이터를 바깥으로 보내지 않습니다.`
+        + ' 보내야 할 이유가 생겼다면 개인정보처리방침부터 고치세요.');
+    }
+  }
+});
+
+test('방침이 「수집하지 않는다」고 말한다', () => {
+  const policy = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
+  assert.match(policy, /수집하지 않습니다/);
+  assert.match(policy, /전송할 서버가 없습니다|서버도 없습니다|받는 서버도/);
 });

@@ -375,32 +375,3 @@ test('회전 확대 뷰는 관만 보고 점수를 매긴다 — 기록 여부�
 
 /* ---------------- 보고서 창이 읽는 열쇠가 문자열 표에 있는가 ---------------- */
 
-test('보고서 창의 활동지 종류·제출 문구는 report.js 가 읽는 열쇠로 적혀 있다', () => {
-  /*
-   * `report.js` 는 바나나랩 것을 그대로 물려받았는데 `strings.js` 의 `report.kinds` 는
-   * `name` · `individual` 이었다. 화면에는 활동지 종류 단추가 **「undefined」** 둘로 찍히고
-   * 어느 쪽도 골라져 있지 않았다 (플레이테스트 — PLAYTEST-REVIEW #6).
-   * 제출 문구도 `done` 이 문자열이라 성공한 순간 던져서 「제출하지 못했습니다」가 뜬다.
-   * 문자열 표는 검사가 못 보는 자리라 여기서 `report.js` 의 소스와 맞대 본다.
-   */
-  const src = stripComments(readFileSync(new URL('report.js', UI_DIR), 'utf8'));
-  const R = UI.report;
-  assert.deepEqual(R.kinds.map((k) => k.id).sort(), ['group', 'solo'],
-    'report.js 는 kind 를 solo | group 으로 고른다');
-  for (const k of R.kinds) {
-    assert.equal(typeof k.label, 'string', `report.kinds.${k.id}.label 이 없습니다 — 단추에 undefined 가 찍힙니다`);
-    assert.equal(typeof k.note, 'string', `report.kinds.${k.id}.note 가 없습니다`);
-  }
-  // report.js 가 `R.submit.xxx` 로 읽는 열쇠 전부
-  const used = new Set([...src.matchAll(/R\.submit\.(\w+)/g)].map((m) => m[1]));
-  assert.ok(used.size >= 6, `report.js 에서 submit 열쇠를 ${used.size}개밖에 못 찾았습니다 — 검사가 헛돕니다`);
-  for (const key of used) {
-    assert.ok(key in R.submit, `UI.report.submit.${key} 가 없습니다 — 화면에 undefined 가 뜹니다`);
-  }
-  assert.equal(typeof R.submit.done, 'function', 'report.js 는 R.submit.done(name) 을 부른다');
-  // 확대 뷰의 열쇠도 같은 방식으로 — `UI.zoom.scopeMode` 가 바나나 것이었다.
-  const zoomKeys = new Set([...src.matchAll(/UI\.zoom\.(\w+)/g)].map((m) => m[1]));
-  for (const key of zoomKeys) {
-    assert.ok(key in UI.zoom, `UI.zoom.${key} 가 없습니다 (report.js 가 읽습니다)`);
-  }
-});

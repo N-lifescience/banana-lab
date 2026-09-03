@@ -22,60 +22,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { initialState, ENDS, SLOTS, SLOT_ITEMS, ANGLE_BEST_DEG } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
 import { payloadOf, buildSheet } from '../src/ui/report.js';
 
 const html = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
 
-/** 실제로 나가는 키를 `a.b` 꼴로 편다. 두 겹까지만 본다 — 방침이 그 깊이로 적혀 있다. */
-function sentKeys() {
-  const p = payloadOf(initialState(1), { school: '', team: '' }, 'individual');
-  const out = new Set();
-  for (const [k, v] of Object.entries(p)) {
-    if (k === 'state') continue;
-    out.add(k);
-  }
-  for (const [k, v] of Object.entries(p.state)) {
-    if (k !== 'session') { out.add(k); continue; }
-    for (const sub of Object.keys(v)) out.add(`session.${sub}`);
-  }
-  return out;
-}
-
-/** 방침이 받는다고 적어 둔 키. */
-function declaredKeys() {
-  const out = new Set();
-  for (const [, list] of html.matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) out.add(k.trim());
-  }
-  return out;
-}
-
-test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', () => {
-  const sent = sentKeys();
-  const said = declaredKeys();
-  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  // 방침이 다루지 않는 전달 봉투. 값이 아니라 그릇이라 고지 대상이 아니다.
-  const envelope = new Set(['kind', 'app']);
-
-  const undeclared = [...sent].filter((k) => !said.has(k) && !envelope.has(k));
-  assert.deepEqual(undeclared, [],
-    `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')}\n`
-    + '  → privacy.html 제2조를 고치세요. **받는 것을 안 적은 것도 틀린 고지입니다.**');
-
-  /*
-   * ★ **반대 방향(「방침이 받는다는데 안 보낸다」)은 여기 두지 않는다.**
-   *   방침은 사이트에 하나뿐이고, 거기 적힌 것은 **실험 여덟이 보내는 것의 합집합**이다.
-   *   이 실험만 보고 재면 `slides`(banana 만) · `design`·`trials`(catalase 만)를 보고
-   *   「안 보내니 지워라」고 말한다 — **실험이 늘 때마다 고지가 깎여 나간다.**
-   *   합집합을 아는 자리가 갖는다: `tests/site.test.js` 의
-   *   「방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다」.
-   *   (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
-   */
-});
 
 /**
  * 몇 가지를 실제로 한 상태 하나. **빈 상태로는 아무것도 검증되지 않는다** —
@@ -111,14 +64,6 @@ const WHO = { school: '○○고등학교', team: '3모둠' };
  * 눈이 아니라 이 등식이 증명한다. 「눈으로 보니 안 쓰는 것 같다」로 줄이면
  * 나중에 종이가 조용히 깨진다.
  */
-test('보낸 값만으로 같은 종이가 나온다 — 빠진 것이 없다', () => {
-  const st = played();
-  assert.equal(
-    buildSheet(payloadOf(st, WHO, 'group').state, WHO, 'group'),
-    buildSheet(st, WHO, 'group'),
-    '보낸 값으로 다시 그린 종이가 원본과 다릅니다 — 무언가 빠졌습니다'
-  );
-});
 
 /**
  * **군더더기가 없는가.**
@@ -127,52 +72,8 @@ test('보낸 값만으로 같은 종이가 나온다 — 빠진 것이 없다', 
  * 상태를 통째로 보내도 저 등식은 통과한다. **키를 하나씩 빼 보며 종이가 달라지는지**까지
  * 봐야 보내는 것이 전부 쓰인다는 것이 증명된다.
  */
-test('보내는 값 가운데 하나라도 빼면 종이가 달라진다 — 군더더기가 없다', () => {
-  const st = played();
-  const full = payloadOf(st, WHO, 'group');
-  const want = buildSheet(full.state, WHO, 'group');
-  const keys = Object.keys(full.state.session);
-  assert.ok(keys.length > 0, 'session 이 비어 있으면 이 검사가 아무것도 안 봅니다');
-  for (const key of keys) {
-    const { [key]: _dropped, ...rest } = full.state.session;
-    let got;
-    try {
-      got = buildSheet({ ...full.state, session: rest }, WHO, 'group');
-    } catch {
-      // 없으면 종이가 아예 안 그려지는 값도 「쓰이고 있다」는 증거다.
-      continue;
-    }
-    assert.notEqual(got, want,
-      `session.${key} 를 빼도 종이가 같습니다 — 활동지에 실리지도 않는 것을 보내고 있습니다`);
-  }
-});
 
-test('되돌리기 기록은 보내지 않는다', () => {
-  // history 는 이전 상태를 통째로 쌓아 둔 것이라, 그대로 보내면
-  // **학생이 지운 글까지 따라간다.** 방침도 그렇게 약속하고 있다.
-  const p = payloadOf(played(), WHO, 'group');
-  assert.equal(p.state.session.history, undefined,
-    '되돌리기 기록이 제출 자료에 들어 있습니다 — 학생이 지운 글이 따라갑니다');
-  // 낱말이 아니라 **약속**을 확인한다. `history` 라는 영문 낱말이 적혀 있는지 보면
-  // 문장을 한국어로 다듬는 순간 헛발질한다 — 바나나랩에서 실제로 그랬다.
-  // 「전송하지 않습니다」로 여는 목록 안에 「되돌리기 기록」이 있으면 약속한 것이다.
-  const notSentBlock = html.slice(html.indexOf('전송하지 않습니다'));
-  assert.ok(notSentBlock.includes('되돌리기 기록'),
-    '방침이 되돌리기 기록을 보내지 않는다고 말하지 않습니다');
-});
 
-test('학생이 무엇을 어떤 차례로 눌렀는지도 보내지 않는다', () => {
-  // 바나나랩에서 `session.log` 가 방침에 적히지도 않은 채 나갔다. 여기서는 아예 안 보낸다 —
-  // 활동지에 실리지 않는 것을 보내 놓고 고지하는 것은 고지가 아니라 수집이다.
-  const p = payloadOf(played(), WHO, 'group');
-  assert.equal(p.state.session.log, undefined);
-  const notSentBlock = html.slice(html.indexOf('전송하지 않습니다'));
-  assert.ok(notSentBlock.includes('조작 기록'),
-    '방침이 조작 기록을 보내지 않는다고 말하지 않습니다');
-  // 실험대와 기구의 마지막 상태도 안 나간다.
-  assert.deepEqual(Object.keys(p.state), ['session'],
-    `state 에 session 말고 다른 것이 있습니다: ${Object.keys(p.state).join(', ')}`);
-});
 
 /*
  * ── 「방침에 다른 실험의 말이 없다」는 **사이트로 옮겼다** ─────────────
@@ -229,6 +130,47 @@ test('본문이 가리키는 조항이 그 내용의 조항이다', () => {
       bad.push(`제${m[1]}조${tail.trim().slice(0, 12)}… → 「${head ?? '없는 조항'}」 (「${cue[1]}」 이어야 함)`);
     }
   }
-  assert.ok(checked >= 3, `상호참조를 하나도 못 봤습니다 — 검사가 헛돌고 있습니다 (본 것 ${checked}개)`);
+  /*
+   * 앞 조건은 **하나 이상**이다. 제출 기능을 걷어내면서 방침이 짧아졌고(보관 기간·위탁 조항이
+   * 「없다」로 바뀌었다), 조를 가리키는 문장이 셋에서 하나로 줄었다. 셋을 요구하면 검사가
+   * 「방침이 짧다」는 이유로 빨간불을 내는데, 그건 이 검사가 잡으려는 것이 아니다 —
+   * 잡으려는 것은 **가리키는 곳이 틀린 것**이고 그건 아래 줄이 본다.
+   */
+  assert.ok(checked >= 1, `상호참조를 하나도 못 봤습니다 — 검사가 헛돌고 있습니다 (본 것 ${checked}개)`);
   assert.deepEqual(bad, [], '본문이 엉뚱한 조항을 가리킵니다:\n  ' + bad.join('\n  '));
+});
+
+/**
+ * **보낼 길 자체가 없는가.**
+ *
+ * 앞서 이 자리에는 「방침에 적힌 항목 = 실제로 보내는 것」 맞대기가 있었다. 제출 기능이
+ * 있던 때의 검사다. 그 기능을 걷어낸 지금(사장님 결정 2026-09-03) 재야 할 것은 하나로 바뀐다:
+ * **이 실험의 코드가 바깥으로 무엇을 보낼 수 있는가.** 보낼 길이 없으면 고지와 어긋날 일도 없다.
+ */
+test('이 실험은 바깥으로 아무것도 보내지 않는다', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const walk = (u) => readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(`${d.name}/`, u)) : [new URL(d.name, u)]);
+  const files = walk(dir).filter((u) => u.pathname.endsWith('.js'));
+  assert.ok(files.length > 0, '소스를 하나도 못 읽었습니다 — 검사가 헛돌고 있습니다');
+  for (const u of files) {
+    const src = readFileSync(u, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const name = u.pathname.split('/src/')[1];
+    for (const [re, what] of [
+      [/\bfetch\s*\(/, 'fetch'],
+      [/\bXMLHttpRequest\b/, 'XMLHttpRequest'],
+      [/sendBeacon\s*\(/, 'sendBeacon'],
+      [/\bnew WebSocket\b/, 'WebSocket'],
+      [/\bnew EventSource\b/, 'EventSource'],
+    ]) {
+      assert.equal(re.test(src), false,
+        `src/${name} 이 ${what} 을 씁니다 — 이 앱은 학생 데이터를 바깥으로 보내지 않습니다.`
+        + ' 보내야 할 이유가 생겼다면 개인정보처리방침부터 고치세요.');
+    }
+  }
+});
+
+test('방침이 「수집하지 않는다」고 말한다', () => {
+  assert.match(html, /수집하지 않습니다/);
+  assert.match(html, /전송할 서버가 없습니다|서버도 없습니다|받는 서버도/);
 });

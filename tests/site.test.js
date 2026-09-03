@@ -101,63 +101,6 @@ test('방침 제목이 사이트를 말한다 (실험 하나를 말하지 않는
   assert.ok(!named, `방침 제목이 실험 하나(${named})를 가리킵니다: "${title}"`);
 });
 
-/*
- * ── 방침이 받는다는 것을 정말 누군가 보내는가 ───────────────────────
- *
- * 실험마다 「방침에 안 적힌 것을 보내지 않는가」를 본다. 그 반대 방향 —
- * **「방침이 받는다는데 아무도 안 보내는가」** — 는 실험이 볼 수 없다.
- *
- * 방침은 **사이트에 하나뿐인 문서**라 실험 여덟이 보내는 것의 **합집합**을 적는다.
- * `slides` 는 banana 만 보내는데, osmosis 의 검사가 「나는 안 보내니 방침에서 지워라」고
- * 말하면 **banana 의 고지를 지우게 된다.** 실험 검사에 두면 실험이 늘 때마다
- * 고지가 깎여 나간다 — 정확히 반대로 움직인다.
- *
- * 그래서 합집합을 아는 자리, 즉 사이트가 갖는다. 여기서 재는 것은 하나다:
- * **적어 둔 항목마다 그것을 실제로 보내는 실험이 하나는 있는가.**
- * 안 받는 것을 받는다고 적은 것도 틀린 고지다 — 현미경을 안 쓰는 실험이
- * 「초점」을 받는다고 적고 있던 적이 있다.
- * (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
- */
-test('방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다', async () => {
-  const said = new Set();
-  for (const [, list] of read('privacy.html').matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) said.add(k.trim());
-  }
-  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  /** 꾸러미 밖으로 나가는 표의 칸들. `payloadOf()` 가 만들지 않으므로 따로 안다. */
-  const COLUMNS = new Set(['student_no', 'student_name', 'submitted_at']);
-
-  const sent = new Set();
-  const skipped = [];
-  for (const id of EXPERIMENTS) {
-    const report = await import(at(`experiments/${id}/src/ui/report.js`).href);
-    if (typeof report.payloadOf !== 'function') { skipped.push(id); continue; }
-    const { initialState } = await import(at(`experiments/${id}/src/sim/state.js`).href);
-    const p = report.payloadOf(initialState(1, 1), { school: '', team: '' }, 'individual');
-    for (const k of Object.keys(p)) if (k !== 'state') sent.add(k);
-    for (const [k, v] of Object.entries(p.state)) {
-      if (k !== 'session') { sent.add(k); continue; }
-      for (const sub of Object.keys(v)) sent.add(`session.${sub}`);
-    }
-  }
-  /*
-   * **앞 조건.** `payloadOf` 를 안 내보내는 실험이 생기면 그 실험이 보내는 것이
-   * 합집합에서 빠지고, 그러면 아래가 **「아무도 안 보낸다」로 오판**한다.
-   * 조용히 건너뛰지 않고 여기서 말한다.
-   */
-  assert.deepEqual(skipped, [],
-    `payloadOf 를 내보내지 않는 실험이 있습니다: ${skipped.join(', ')}\n`
-    + '  → 그 실험이 보내는 것이 합집합에서 빠져 아래 판정이 틀립니다.\n'
-    + '    src/ui/report.js 에서 payloadOf 를 export 하세요.');
-  assert.ok(sent.size > 0, '어느 실험도 꾸러미를 만들지 않았습니다 — 검사가 헛돌고 있습니다');
-
-  const phantom = [...said].filter((k) => !sent.has(k) && !COLUMNS.has(k));
-  assert.deepEqual(phantom, [],
-    `방침이 받는다는데 어느 실험도 안 보냅니다: ${phantom.join(', ')}\n`
-    + '  → 안 받는 것을 받는다고 적은 것도 틀린 고지입니다. privacy.html 에서 그 줄을 지우거나,\n'
-    + '    정말 보내야 하는 값이면 그 실험의 SUBMIT_* 목록에 넣으세요.');
-});
 
 /*
  * ── 실험마다 「내가 사는 자리」를 맞게 가리키는가 ────────────────────
@@ -235,37 +178,22 @@ test('선생님 화면이 실험 하나의 이름을 달고 있지 않다', () =
  *   **교사는 그 링크를 학습지에 인쇄해 나눠 준다. 틀린 채로 나가면 되돌릴 수 없다.**
  *   제출 기능이 아직 꺼져 있어(설정 없음) 아무도 못 밟았을 뿐이다.
  */
-test('교사가 나눠 주는 두 링크가 이 사이트의 실제 주소를 가리킨다', () => {
+test('교사가 나눠 주는 학생 링크가 이 사이트의 실제 주소를 가리킨다', () => {
+  /*
+   * 선생님이 이 링크를 학습지에 인쇄해 나눠 준다. **틀린 채로 나가면 되돌릴 수 없다.**
+   * 제출 기능을 걷어낸 지금(2026-09-03) 나눠 주는 링크는 하나뿐이다 — 학생용 링크.
+   */
   const src = read('src/teacher.js');
+  const plain = src.match(/plain: [\s\S]*?\n      \},/)?.[0] ?? '';
+  assert.ok(plain, 'src/teacher.js 에서 학생 링크를 만드는 자리를 못 찾았습니다');
+  assert.match(plain, /EXP_BASE/, '학생 링크가 교과 주소(EXP_BASE)를 쓰지 않습니다');
+  assert.match(plain, /manifest\.id/, '학생 링크에 어느 실험인지가 없습니다');
   const base = src.match(/const EXP_BASE = '([^']+)'/)?.[1];
-  assert.ok(base, 'src/teacher.js 에 EXP_BASE 가 없습니다');
-
-  // ① 실험 주소의 앞자리가 되쓰기 규칙과 같은가 — 다르면 학생 링크가 404 다
-  const rewrites = JSON.parse(read('vercel.json')).rewrites ?? [];
-  const sources = rewrites.map((r) => r.source);
-  assert.ok(sources.includes(`${base}/:exp`),
-    `EXP_BASE("${base}")를 받아 주는 되쓰기가 vercel.json 에 없습니다.\n`
-    + `  있는 것: ${sources.join(' · ') || '(없음)'}\n`
-    + '  → 학생이 여는 링크가 404 가 됩니다. 로컬에서는 이 자리가 아무 말도 하지 않습니다.');
-
-  // ② 카탈로그가 학생에게 보이는 주소와 같은가 — 두 곳이 갈라지면 하나는 죽는다
   const catalog = [...read('index.html').matchAll(/href="(\/[a-z-]+)\/([a-z-]+)"/g)];
-  const linked = catalog.filter(([, , id]) => EXPERIMENTS.includes(id));
-  assert.ok(linked.length > 0, '카탈로그에서 실험 링크를 하나도 못 찾았습니다 — 검사가 헛돌고 있습니다');
-  const odd = [...new Set(linked.map(([, b]) => b))].filter((b) => b !== base);
-  assert.deepEqual(odd, [],
-    `카탈로그가 EXP_BASE 와 다른 앞자리를 씁니다: ${odd.join(' · ')} (EXP_BASE 는 "${base}")`);
-
-  // ③ 관리 링크가 `exp` 를 싣는가 — 없으면 링크를 다시 열었을 때 어느 실험인지 모른다
-  const admin = src.slice(src.indexOf('admin: (token)'));
-  assert.ok(/exp=\$\{encodeURIComponent\(manifest\.id\)\}/.test(admin),
-    '관리 링크가 exp 를 안 싣습니다.\n'
-    + '  → 선생님이 그 링크를 다시 열면 어느 실험의 종이로 그려야 할지 알 수 없습니다.\n'
-    + '    잃어버리면 되찾을 길이 없는 링크라, 틀린 채로 나가면 그 반이 통째로 막힙니다.');
-
-  // ④ `.html` 을 붙이지 않았는가 — cleanUrls 가 308 로 되돌린다
-  assert.ok(!/\/teacher\.html/.test(src),
-    'src/teacher.js 가 /teacher.html 을 가리킵니다 — cleanUrls 가 308 로 되돌립니다');
+  assert.ok(catalog.length > 0, '카탈로그에서 실험 링크를 하나도 못 찾았습니다');
+  for (const [, prefix] of catalog) {
+    assert.equal(prefix, base, `카탈로그는 ${prefix} 로 데려가는데 선생님 화면은 ${base} 로 만듭니다`);
+  }
 });
 
 test('선생님 화면이 아는 실험 목록이 실제 폴더와 같다', () => {

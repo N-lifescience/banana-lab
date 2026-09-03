@@ -31,7 +31,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { payloadOf, buildSheet, SUBMIT_SESSION_KEYS } from '../src/ui/report.js';
 import { initialState, MODES } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
@@ -77,15 +77,6 @@ function sentKeys() {
   return out;
 }
 
-/** 방침이 받는다고 적어 둔 키. */
-function declaredKeys() {
-  const out = new Set();
-  for (const [, list] of PRIVACY.matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) out.add(k.trim());
-  }
-  return out;
-}
-
 /*
  * **표에 직접 들어가는 칸도 세어야 한다.**
  *
@@ -99,17 +90,6 @@ function declaredKeys() {
  *
  * `src/net/` 은 손대지 않는다(이미 돌아간다). **읽어서 세기만 한다.**
  */
-const SUBMIT_COLUMNS = {
-  class_id: null,                    // 어느 수업인지. 개인을 가리키지 않는다
-  exp: null,                         // 어느 실험인지
-  mode: null,                        // 개인/모둠
-  level: null,                       // 활동 설정
-  payload: '관찰 결과',              // 위 data-sends 맞대기가 속을 따로 센다
-  student_no: '학번',
-  student_name: '이름',
-  sealed: '봉인',                    // 위 셋을 선생님 공개키로 잠근 봉투 (packages/lab-kit/net/seal.js)
-};
-
 /*
  * **방침에 있어야 하는 표제가 다 있는가 — 회귀 방지용이다.**
  *
@@ -150,70 +130,8 @@ test('조 번호를 가리키는 본문이 실제 그 조를 가리킨다', () =
   }
 });
 
-test('제출이 표에 채우는 칸이 방침에 다 적혀 있다', () => {
-  const src = readFileSync(new URL('../../../packages/lab-kit/net/supabase.js', import.meta.url), 'utf8');
-  const fn = src.slice(src.indexOf('export async function submitReport'));
-  // `body: {` **다음**부터 자른다 — 여는 자리를 포함하면 `body` 자신이 칸으로 세어진다.
-  const open = fn.indexOf('body: {') + 'body: {'.length;
-  const body = fn.slice(open, fn.indexOf('},', open));
-  const keys = [...body.matchAll(/(\w+):/g)].map((m) => m[1]);
-  assert.ok(keys.length > 0, 'submitReport 의 body 를 못 읽었습니다 — 검사가 헛돌고 있습니다');
-
-  const policy = PRIVACY;
-  const unknown = keys.filter((k) => !(k in SUBMIT_COLUMNS));
-  assert.deepEqual(unknown, [],
-    `제출 칸이 늘었는데 아무 데도 안 적혀 있습니다: ${unknown.join(', ')}. `
-    + 'privacy.html 에 한 줄을 늘리고 SUBMIT_COLUMNS 에 적으세요.');
-
-  /*
-   * **문서 전체에서 낱말을 찾으면 안 된다.** 처음엔 `policy.includes('이름')` 로 짰는데,
-   * 「이름」은 방침 여기저기에 나오므로 **수집 항목에서 지워도 통과했다**(되돌려 보고 알았다).
-   * 그래서 「필수 항목」 줄만 잘라서 그 안을 본다.
-   */
-  const must = policy.match(/<dt[^>]*>필수 항목<\/dt>\s*<dd>([^<]*)<\/dd>/)?.[1] ?? '';
-  assert.ok(must.trim(), '방침에서 「필수 항목」 줄을 못 찾았습니다 — 검사가 헛돌고 있습니다');
-  for (const [key, phrase] of Object.entries(SUBMIT_COLUMNS)) {
-    if (!phrase) continue;
-    const where = (key === 'student_no' || key === 'student_name') ? must : policy;
-    assert.ok(where.includes(phrase),
-      `제출 칸 ${key} 를 덮는 말(「${phrase}」)이 방침의 ${where === must ? '「필수 항목」' : ''} 자리에 없습니다`);
-  }
-  // 개인을 가리키는 두 칸은 **반드시** 있어야 한다. 표가 비면 위 반복문이 통째로 헛돈다.
-  for (const k of ['student_no', 'student_name']) {
-    assert.ok(keys.includes(k), `${k} 가 제출에서 사라졌습니다 — 검사를 고치세요`);
-  }
-});
-
 const payload = payloadOf(playedState(), { school: '○○중학교', team: '3모둠' }, 'individual');
 
-test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', () => {
-  const sent = sentKeys();
-  const said = declaredKeys();
-  // 앞 조건 — `data-sends` 가 하나도 없으면 아래 둘이 **아무것도 안 재고 통과**한다.
-  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  /*
-   * 방침이 다루지 않는 **전달 봉투.** 값이 아니라 그릇이라 고지 대상이 아니다 —
-   * `kind` 는 개인/모둠 활동지 중 어느 종이를 그릴지, `app` 은 어느 실험의 종이인지다.
-   * 둘 다 학생에 대한 정보가 아니라 **종이를 다시 그리는 데 필요한 서식 이름**이다.
-   */
-  const envelope = new Set(['kind', 'app']);
-
-  const undeclared = [...sent].filter((k) => !said.has(k) && !envelope.has(k));
-  assert.deepEqual(undeclared, [],
-    `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')}\n`
-    + '  → privacy.html 제2조를 고치세요. **받는 것을 안 적은 것도 틀린 고지입니다.**');
-
-
-  /*
-   * ★ **반대 방향(「방침이 받는다는데 안 보낸다」)은 여기서 재지 않는다.**
-   *   방침은 **사이트에 하나뿐인 문서**라, 실험 여덟이 보내는 것의 **합집합**을 적는다.
-   *   banana 만 `slides` 를 보내는데 여기서 「osmosis 가 안 보내니 방침에서 지워라」고
-   *   말하면 **banana 의 고지를 지우게 된다.** 그래서 그 방향은 사이트가 갖는다 —
-   *   `tests/site.test.js` 의 「방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다」.
-   *   (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
-   */
-});
 
 test('보고서에 안 실리는 것은 아예 보내지 않는다', () => {
   // **「빼야 할 것을 뺀다」 가 아니라 「보낼 것만 적는다」 다** (`src/ui/report.js`).
@@ -239,11 +157,6 @@ test('학생 이름은 payload 에 들어가지 않는다', () => {
     '이름이 제출 payload 안에 들어갔습니다');
 });
 
-test('방침이 이미지를 저장하지 않는다고 밝힌다', () => {
-  assert.ok(PRIVACY.includes('이미지는 저장하지 않습니다'), '방침에 그 문장이 없습니다');
-  assert.equal(JSON.stringify(payload).includes('data:image'), false,
-    '제출 payload 에 이미지가 들어갔습니다');
-});
 
 /* ---------------- 줄여도 되는 근거 ---------------- */
 
@@ -293,4 +206,39 @@ test('보내는 것 가운데 종이에 안 쓰이는 것이 없다', () => {
   }
   assert.deepEqual(useless, [],
     `종이에 안 쓰이는데 보내고 있습니다: ${useless.join(' · ')} — SUBMIT_SESSION_KEYS 에서 빼세요`);
+});
+
+/**
+ * **보낼 길 자체가 없는가.**
+ *
+ * 앞서 이 자리에는 「방침에 적힌 항목 = 실제로 보내는 것」 맞대기가 있었다. 제출 기능이
+ * 있던 때의 검사다. 그 기능을 걷어낸 지금(사장님 결정 2026-09-03) 재야 할 것은 하나로 바뀐다:
+ * **이 실험의 코드가 바깥으로 무엇을 보낼 수 있는가.** 보낼 길이 없으면 고지와 어긋날 일도 없다.
+ */
+test('이 실험은 바깥으로 아무것도 보내지 않는다', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const walk = (u) => readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(`${d.name}/`, u)) : [new URL(d.name, u)]);
+  const files = walk(dir).filter((u) => u.pathname.endsWith('.js'));
+  assert.ok(files.length > 0, '소스를 하나도 못 읽었습니다 — 검사가 헛돌고 있습니다');
+  for (const u of files) {
+    const src = readFileSync(u, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const name = u.pathname.split('/src/')[1];
+    for (const [re, what] of [
+      [/\bfetch\s*\(/, 'fetch'],
+      [/\bXMLHttpRequest\b/, 'XMLHttpRequest'],
+      [/sendBeacon\s*\(/, 'sendBeacon'],
+      [/\bnew WebSocket\b/, 'WebSocket'],
+      [/\bnew EventSource\b/, 'EventSource'],
+    ]) {
+      assert.equal(re.test(src), false,
+        `src/${name} 이 ${what} 을 씁니다 — 이 앱은 학생 데이터를 바깥으로 보내지 않습니다.`
+        + ' 보내야 할 이유가 생겼다면 개인정보처리방침부터 고치세요.');
+    }
+  }
+});
+
+test('방침이 「수집하지 않는다」고 말한다', () => {
+  assert.match(PRIVACY, /수집하지 않습니다/);
+  assert.match(PRIVACY, /전송할 서버가 없습니다|서버도 없습니다|받는 서버도/);
 });

@@ -54,17 +54,6 @@ function createStore(initial, onMessage) {
 }
 
 /**
- * 선생님이 나눠 준 수업 코드. `?code=482013` 또는 QR 로 들어온다.
- *
- * 상태(store)에 넣지 않는다. 실험의 일부가 아니라 **보고서를 낼 곳**일 뿐이고,
- * 상태에 넣으면 되돌리기 기록에 쌓이고 화면 곳곳으로 흘러 다닌다.
- */
-export function classCodeFromUrl() {
-  const raw = new URLSearchParams(location.search).get('code') ?? '';
-  return raw.replace(/\D/g, '').slice(0, 6);
-}
-
-/**
  * 난이도는 주소로 정한다 — `?level=2`.
  *
  * 교사가 반이나 모둠에 따라 다른 링크를 나눠 주는 것이 교실에서 가장 간단하다.
@@ -163,7 +152,7 @@ function boot(level, mode = MODES.GROUP) {
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {
     onOpenZoom: openZoom,
-    onReport: () => report.open({ classCode: classCodeFromUrl() }),
+    onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간은 탐구 노트 위쪽에서 조용히 일어난다.
     // 그때 학생은 대개 실험대를 보고 있다 — 알려 주지 않으면 한참 뒤에야 안다.
     onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),

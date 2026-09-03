@@ -24,52 +24,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { initialState } from '../src/sim/state.js';
+import { readFileSync, readdirSync } from 'node:fs';
 import { payloadOf, SUBMIT_SESSION_KEYS, SUBMIT_TOP_KEYS } from '../src/ui/report.js';
 
 /** 방침은 **사이트 것**이라 뿌리에 있다. 실험이 여덟이어도 문서는 하나다. */
 const PRIVACY = readFileSync(new URL('../../../privacy.html', import.meta.url), 'utf8');
 
-/** 실제로 나가는 키를 `a.b` 꼴로 편다. 두 겹까지만 본다 — 방침이 그 깊이로 적혀 있다. */
-function sentKeys() {
-  const p = payloadOf(initialState(1, 1), { school: '', team: '' }, 'individual');
-  const out = new Set();
-  for (const k of Object.keys(p)) {
-    if (k !== 'state') out.add(k);
-  }
-  for (const [k, v] of Object.entries(p.state)) {
-    if (k !== 'session') { out.add(k); continue; }
-    for (const sub of Object.keys(v)) out.add(`session.${sub}`);
-  }
-  return out;
-}
-
-/** 방침이 받는다고 적어 둔 키. */
-function declaredKeys() {
-  const out = new Set();
-  for (const [, list] of PRIVACY.matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) out.add(k.trim());
-  }
-  return out;
-}
-
-test('방침에 안 적힌 것을 보내지 않는다', () => {
-  const said = declaredKeys();
-  // 앞 조건 — `data-sends` 가 하나도 없으면 아래가 **아무것도 안 재고 통과**한다.
-  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  /*
-   * 방침이 다루지 않는 **전달 봉투.** 값이 아니라 그릇이라 고지 대상이 아니다 —
-   * `kind` 는 개인/모둠 활동지 중 어느 종이를 그릴지, `app` 은 어느 실험의 종이인지다.
-   */
-  const envelope = new Set(['kind', 'app']);
-  const undeclared = [...sentKeys()].filter((k) => !said.has(k) && !envelope.has(k));
-  assert.deepEqual(undeclared, [],
-    `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')}\n`
-    + '  → privacy.html 제2조를 고치세요. **받는 것을 안 적은 것도 틀린 고지입니다.**\n'
-    + '    (반대 방향은 사이트가 봅니다 — tests/site.test.js)');
-});
 
 /*
  * **「뺄 것을 뺀다」로 돌아가는 것을 막는다.**
@@ -108,4 +68,39 @@ test('종이가 읽는 session 칸은 전부 보낸다', () => {
   assert.deepEqual(missing, [],
     `종이가 읽는데 안 보내는 칸이 있습니다: ${missing.join(', ')}\n`
     + '  → 선생님 화면이 그 자리를 빈칸으로 그립니다. SUBMIT_SESSION_KEYS 에 넣으세요.');
+});
+
+/**
+ * **보낼 길 자체가 없는가.**
+ *
+ * 앞서 이 자리에는 「방침에 적힌 항목 = 실제로 보내는 것」 맞대기가 있었다. 제출 기능이
+ * 있던 때의 검사다. 그 기능을 걷어낸 지금(사장님 결정 2026-09-03) 재야 할 것은 하나로 바뀐다:
+ * **이 실험의 코드가 바깥으로 무엇을 보낼 수 있는가.** 보낼 길이 없으면 고지와 어긋날 일도 없다.
+ */
+test('이 실험은 바깥으로 아무것도 보내지 않는다', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const walk = (u) => readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(`${d.name}/`, u)) : [new URL(d.name, u)]);
+  const files = walk(dir).filter((u) => u.pathname.endsWith('.js'));
+  assert.ok(files.length > 0, '소스를 하나도 못 읽었습니다 — 검사가 헛돌고 있습니다');
+  for (const u of files) {
+    const src = readFileSync(u, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const name = u.pathname.split('/src/')[1];
+    for (const [re, what] of [
+      [/\bfetch\s*\(/, 'fetch'],
+      [/\bXMLHttpRequest\b/, 'XMLHttpRequest'],
+      [/sendBeacon\s*\(/, 'sendBeacon'],
+      [/\bnew WebSocket\b/, 'WebSocket'],
+      [/\bnew EventSource\b/, 'EventSource'],
+    ]) {
+      assert.equal(re.test(src), false,
+        `src/${name} 이 ${what} 을 씁니다 — 이 앱은 학생 데이터를 바깥으로 보내지 않습니다.`
+        + ' 보내야 할 이유가 생겼다면 개인정보처리방침부터 고치세요.');
+    }
+  }
+});
+
+test('방침이 「수집하지 않는다」고 말한다', () => {
+  assert.match(PRIVACY, /수집하지 않습니다/);
+  assert.match(PRIVACY, /전송할 서버가 없습니다|서버도 없습니다|받는 서버도/);
 });

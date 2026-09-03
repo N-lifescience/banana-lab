@@ -25,7 +25,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { UI } from '../src/ui/strings.js';
-import { initialState } from '../src/sim/state.js';
 import { reduce } from '../src/sim/rules.js';
 import { payloadOf, buildSheet, SUBMIT_SESSION_KEYS } from '../src/ui/report.js';
 
@@ -146,30 +145,6 @@ function filled(kind = 'group') {
   return { st, kind, who: { school: '○○고', team: '3모둠' } };
 }
 
-/** 실제로 나가는 키를 `a.b` 꼴로 편다. 두 겹까지만 본다 — 방침이 그 깊이로 적혀 있다. */
-function sentKeys() {
-  const { st, who, kind } = filled();
-  const p = payloadOf(st, who, kind);
-  const out = new Set();
-  for (const k of Object.keys(p)) {
-    if (k !== 'state') out.add(k);
-  }
-  for (const [k, v] of Object.entries(p.state)) {
-    if (k !== 'session') { out.add(k); continue; }
-    for (const sub of Object.keys(v)) out.add(`session.${sub}`);
-  }
-  return out;
-}
-
-/** 방침이 받는다고 적어 둔 키. */
-function declaredKeys() {
-  const out = new Set();
-  for (const [, list] of html.matchAll(/<dt[^>]+data-sends="([^"]+)"/g)) {
-    for (const k of list.split(',')) out.add(k.trim());
-  }
-  return out;
-}
-
 /**
  * **방침이 갖춰야 할 항목이 다 있는가.**
  *
@@ -221,28 +196,6 @@ test('방침의 조항 번호가 건너뛰지 않는다', () => {
   assert.deepEqual(bad, [], `본문이 없는 조항을 가리킵니다: ${bad.map((n) => `제${n}조`).join(', ')}`);
 });
 
-test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', () => {
-  const sent = sentKeys();
-  const said = declaredKeys();
-  assert.ok(said.size > 0, 'privacy.html 에 data-sends 가 하나도 없습니다');
-
-  // 방침이 다루지 않는 전달 봉투. 값이 아니라 그릇이라 고지 대상이 아니다.
-  const envelope = new Set(['kind', 'app']);
-
-  const undeclared = [...sent].filter((k) => !said.has(k) && !envelope.has(k));
-  assert.deepEqual(undeclared, [],
-    `방침에 안 적힌 것을 보내고 있습니다: ${undeclared.join(', ')}\n`
-    + '  → privacy.html 제2조를 고치세요. **받는 것을 안 적은 것도 틀린 고지입니다.**');
-
-  /*
-   * ★ **반대 방향(「방침이 받는다는데 안 보낸다」)은 여기 두지 않는다.**
-   *   방침은 사이트에 하나뿐이고 거기 적힌 것은 **실험 여덟이 보내는 것의 합집합**이다.
-   *   이 실험만 보고 재면 `slides`(banana 만)·`design`·`trials`(catalase·fermentation 만)를
-   *   「지워라」고 말한다 — 실험이 늘 때마다 고지가 깎여 나간다. 합집합을 아는 자리가
-   *   갖는다: `tests/site.test.js` 의 「방침이 받는다는 것은 적어도 한 실험이 실제로 보낸다」.
-   *   (합치기 4단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
-   */
-});
 
 /**
  * **보내는데 종이에 안 실리는 것이 없는가.**
@@ -251,47 +204,7 @@ test('방침에 적힌 항목이 실제로 보내는 것과 정확히 같다', (
  * 키를 하나씩 빼 보며 종이가 달라지는지로 본다 — 안 달라지면 그 키는 군더더기다.
  * 실제로 `session.mode` 가 여기서 잡혔다 (표의 제 칸으로 따로 가고 있었다).
  */
-test('보내는 것 가운데 종이에 안 실리는 것이 없다', () => {
-  for (const kind of ['solo', 'group']) {
-    const { st, who } = filled(kind);
-    const paper = buildSheet(st, who, kind);
-    const p = payloadOf(st, who, kind);
-    assert.equal(buildSheet(p.state, who, kind), paper,
-      `${kind} — 보낸 것만으로는 같은 종이가 안 나옵니다. 빠뜨린 것이 있습니다`);
 
-    for (const key of SUBMIT_SESSION_KEYS) {
-      const less = { ...p.state, session: { ...p.state.session } };
-      delete less.session[key];
-      let changed;
-      try { changed = buildSheet(less, who, kind) !== paper; } catch { changed = true; }
-      assert.ok(changed,
-        `${kind} — session.${key} 를 빼도 종이가 그대로입니다. 안 쓰는 것을 보내고 있습니다`);
-    }
-  }
-});
-
-test('되돌리기 기록과 조작 기록은 보내지 않는다', () => {
-  // history 는 이전 상태를 통째로 쌓아 둔 것이라 **학생이 지운 글까지 따라간다.**
-  // log 는 학생이 무엇을 어떤 차례로 눌렀는지다 — 보고서에 실리지 않는다.
-  const { st, who, kind } = filled();
-  const p = payloadOf(st, who, kind);
-  for (const key of ['history', 'log', 'readStages', 'tidy', 'step', 'seed', 'undosLeft']) {
-    assert.equal(p.state.session[key], undefined, `session.${key} 가 제출 자료에 들어 있습니다`);
-  }
-  assert.equal(p.state.chambers, undefined, '챔버의 마지막 상태가 제출 자료에 들어 있습니다');
-  /*
-   * ★ **낱말이 아니라 약속을 본다.** 따로 서 있던 시절 방침에는 `<code>history</code>` 가
-   *   적혀 있었지만 사이트 방침은 **한국어로** 적혀 있다 — 고지의 내용은 똑같은데
-   *   `html.includes('history')` 만 운다. 그런 검사는 곧 꺼진다.
-   *   「전송하지 않습니다」로 여는 목록 안에 그 둘이 있으면 약속한 것이다.
-   *   (합치기 5단계, 2026-08-30 — `MERGE-AND-DEPLOY.md` §4)
-   */
-  const notSentBlock = html.slice(html.indexOf('전송하지 않습니다'));
-  assert.ok(notSentBlock.includes('되돌리기 기록'),
-    '방침이 되돌리기 기록을 보내지 않는다고 말하지 않습니다');
-  assert.ok(notSentBlock.includes('조작 기록'),
-    '방침이 조작 기록을 보내지 않는다고 말하지 않습니다');
-});
 
 /* ---------------- 보고서가 이름을 어디로도 흘리지 않는가 ---------------- */
 
@@ -304,4 +217,39 @@ test('보고서가 개인정보를 상태에도 저장소에도 보내지 않는
   for (const sink of ['localStorage', 'sessionStorage', 'indexedDB']) {
     assert.ok(!src.includes(sink), `report.js 가 ${sink} 를 씁니다 — 이름이 남습니다`);
   }
+});
+
+/**
+ * **보낼 길 자체가 없는가.**
+ *
+ * 앞서 이 자리에는 「방침에 적힌 항목 = 실제로 보내는 것」 맞대기가 있었다. 제출 기능이
+ * 있던 때의 검사다. 그 기능을 걷어낸 지금(사장님 결정 2026-09-03) 재야 할 것은 하나로 바뀐다:
+ * **이 실험의 코드가 바깥으로 무엇을 보낼 수 있는가.** 보낼 길이 없으면 고지와 어긋날 일도 없다.
+ */
+test('이 실험은 바깥으로 아무것도 보내지 않는다', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const walk = (u) => readdirSync(u, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? walk(new URL(`${d.name}/`, u)) : [new URL(d.name, u)]);
+  const files = walk(dir).filter((u) => u.pathname.endsWith('.js'));
+  assert.ok(files.length > 0, '소스를 하나도 못 읽었습니다 — 검사가 헛돌고 있습니다');
+  for (const u of files) {
+    const src = readFileSync(u, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const name = u.pathname.split('/src/')[1];
+    for (const [re, what] of [
+      [/\bfetch\s*\(/, 'fetch'],
+      [/\bXMLHttpRequest\b/, 'XMLHttpRequest'],
+      [/sendBeacon\s*\(/, 'sendBeacon'],
+      [/\bnew WebSocket\b/, 'WebSocket'],
+      [/\bnew EventSource\b/, 'EventSource'],
+    ]) {
+      assert.equal(re.test(src), false,
+        `src/${name} 이 ${what} 을 씁니다 — 이 앱은 학생 데이터를 바깥으로 보내지 않습니다.`
+        + ' 보내야 할 이유가 생겼다면 개인정보처리방침부터 고치세요.');
+    }
+  }
+});
+
+test('방침이 「수집하지 않는다」고 말한다', () => {
+  assert.match(html, /수집하지 않습니다/);
+  assert.match(html, /전송할 서버가 없습니다|서버도 없습니다|받는 서버도/);
 });
