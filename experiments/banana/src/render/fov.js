@@ -86,6 +86,19 @@ function reactionStage(reactionT) {
  * @param {{idPrefix?: string}} [opts]
  * @returns {string} SVG 문자열
  */
+/*
+ * ★ **시야 SVG 안에 주석을 넣지 않는다.**
+ *
+ * 보고서는 인쇄 직전에 이 SVG 를 `<img>` 로 **구워서** 넣는다 (`report.js` 의 `svgToPng`).
+ * 주석이 섞이면 그 이미지가 **로드에 실패하고**, 굽기가 조용히 포기되어 SVG 그대로 남는다 —
+ * 화면에서는 멀쩡하고, 모바일 인쇄에서만 시야가 까맣게 나온다. 아무도 못 본다.
+ * `scripts/check-bench.mjs` 의 「보고서의 시야가 그림으로 구워진다」가 이것을 잡았다 (2026-09-03).
+ * 설명할 것이 있으면 **여기 코드 쪽에** 적는다.
+ *
+ * 시야 지름 글자는 원 **바깥**, 패널 바탕 위에 앉는다. 검정을 박아 두면 다크 모드에서
+ * 어두운 바탕에 어두운 글자가 되어 안 읽힌다 — 배율을 읽는 유일한 눈금이 사라진다.
+ * 그래서 `currentColor` 다: 화면에서는 `--ink` 를, 인쇄(body color 검정)에서는 검정을 따른다.
+ */
 export function renderFOV(p, { idPrefix = '' } = {}) {
   /** 이 시야만의 id. 같은 문서 안 다른 시야와 겹치지 않는다. */
   const id = (name) => `${idPrefix}${name}`;
@@ -340,6 +353,6 @@ export function renderFOV(p, { idPrefix = '' } = {}) {
     <circle cx="${CX}" cy="${CY}" r="${R}" fill="${ref('fov-vig')}"/>
   </g>
   <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="4"/>
-  <text x="${CX}" y="${FS - 6}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="rgba(0,0,0,.42)">시야 지름 약 ${Math.round(fieldDiameterUm(p.objective))} µm</text>
+  <text x="${CX}" y="${FS - 6}" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="currentColor" opacity="0.55">시야 지름 약 ${Math.round(fieldDiameterUm(p.objective))} µm</text>
 </svg>`;
 }

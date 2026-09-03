@@ -25,6 +25,23 @@ import { UI } from './strings.js';
 const holdFor = (text) => Math.min(8000, Math.max(3500, 2200 + text.length * 90));
 
 /**
+ * **잘된 말은 뒤에 줄이 서 있으면 이만큼만 머물고 비켜 준다.**
+ *
+ * 잘된 조작마다 초록 말풍선이 하나씩 나오는데, 한 번에 하나씩 3.5~8초를 머문다. 학생은
+ * 그 사이에 조작을 서너 개 더 한다 — 그러면 화면은 **한참 전에 한 일**을 읽어 준다.
+ * 2026-09-03 플레이테스트에서 1단계 정상 경로를 그대로 밟았더니, 아이오딘 병에 스포이트를
+ * 댈 때까지도 화면에는 **「바나나 껍질을 벗겼습니다」**가 떠 있었다 — **여섯 조작 전** 말이다.
+ * 「지금 무엇이 바뀌었나」를 말하려던 문장이 지금 사실이 아닌 것을 읽힌다.
+ *
+ * 같은 태그를 큐에서 갈아 끼우는 것만으로는 못 막는다 — 여기서 밀린 것들은 **저마다 다른
+ * 태그**였다(껍질·문지르기·채우기·헹구기). 그래서 초록 말풍선은 **뒤에 기다리는 것이
+ * 있으면** 이 시간만 채우고 다음에 자리를 준다. 아무것도 안 기다리면 원래 시간(`holdFor`)을
+ * 다 머문다. 빨간 말풍선(뜻대로 안 된 것)은 건드리지 않는다 — 그건 읽어야 하는 말이라
+ * 시간을 줄이지 않는다. (osmosis·centrifuge 세션이 자기 저장소에서 먼저 고친 자리다)
+ */
+const OK_YIELD_MS = 1500;
+
+/**
  * 난이도별로 화면에 보일 메시지를 만든다. 표에 없는 tag 는 원인만 보여 준다(undefined 를 내지 않는다).
  *
  * 3단계에서 숨기는 것은 **뜻대로 안 됐을 때의 원인**이다 (스스로 찾으라는 단계이므로).
@@ -58,6 +75,41 @@ export function createToastQueue(root, getLevel) {
   let showingShown = null;
   /** 지금 떠 있는 것을 지우는 함수. 막힘이 새치기할 때 쓴다. */
   let dismiss = null;
+  /** 지금 떠 있는 것이 잘된 말인가, 언제 떴는가 — 비켜 줄지 정할 때 쓴다 (`OK_YIELD_MS`). */
+  let showingGood = false;
+  let shownAt = 0;
+  let yieldTimer = 0;
+
+  /**
+   * 초록 말풍선이 떠 있고 뒤에 줄이 있으면, 최소 시간을 채운 뒤 비켜 준다.
+   * **새 말이 줄에 설 때마다** 부른다 — 뜰 때 줄이 비어 있었어도 나중에 찰 수 있다.
+   */
+  function yieldIfCrowded() {
+    if (!showing || !showingGood || queue.length === 0) return;
+    clearTimeout(yieldTimer);
+    const left = Math.max(0, OK_YIELD_MS - (Date.now() - shownAt));
+    yieldTimer = setTimeout(() => {
+      if (showing && showingGood && queue.length > 0) dismiss?.();
+    }, left);
+  }
+
+  /**
+   * 겹침 방지의 열쇠 — **숫자만 다른 말은 같은 말로 본다.**
+   *
+   * 「액이 받침 유리 밖으로 흘러넘쳐 실험대에 고였습니다 (5방울)」과 (6방울)…(11방울) 은
+   * 학생에게 **한 가지 사실**이다. 그런데 글자로만 걸러 두면 저마다 다른 말이라 큐에
+   * 일곱 개가 쌓이고, 하나가 8초씩 머물러 **손을 뗀 뒤 거의 1분 동안** 지난 수를 읽어 준다.
+   * 2026-09-03 플레이테스트에서 스포이트를 열한 번 눌러 재현했다 — 그다음 조작 둘의 답이
+   * 그 줄에 파묻혀 아예 안 나왔다. `PLAYTEST.md §4-2` 가 「같은 말이 줄줄이 쌓이면 버그」로
+   * 적어 둔 자리다.
+   *
+   * **태그로 걸러서는 안 된다** — 한 태그가 아주 다른 말 둘을 내는 자리가 있다
+   * (`cross-contamination`). 숫자만 지우고 견주면 그 둘은 여전히 다른 말이다.
+   */
+  const sameSaying = (t) => String(t).replace(/\d+/g, '#');
+
+  /** 지금 떠 있는 말의 **글자만** 갈아 끼운다. 머무는 시간은 건드리지 않는다. */
+  let repaint = null;
 
   function reducedMotion() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -69,6 +121,8 @@ export function createToastQueue(root, getLevel) {
     const { message, shown, good, tag } = queue.shift();
     showingTag = tag ?? null;
     showingShown = shown ?? message;
+    showingGood = good;
+    shownAt = Date.now();
 
     const el = document.createElement('div');
     // 색은 잘됐나/안 됐나 둘뿐이다. outcome 이름을 그대로 클래스로 쓰면 셋이 된다.
@@ -97,6 +151,7 @@ export function createToastQueue(root, getLevel) {
     const text = document.createElement('span');
     text.className = 'toast-text';
     text.textContent = message;
+    repaint = (next) => { text.textContent = next; showingShown = next; };
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'toast-x';
@@ -109,13 +164,18 @@ export function createToastQueue(root, getLevel) {
     const timer = setTimeout(() => { dismiss?.(); }, holdFor(message));
     dismiss = () => {
       clearTimeout(timer);
+      clearTimeout(yieldTimer);
       el.remove();
       dismiss = null;
       showing = false;
       showingTag = null;
       showingShown = null;
+      showingGood = false;
+      repaint = null;
       showNext();
     };
+    // 뜨는 순간 이미 줄이 있으면(연달아 조작한 뒤) 이것도 최소 시간만 머문다.
+    yieldIfCrowded();
   }
 
   return {
@@ -155,7 +215,15 @@ export function createToastQueue(root, getLevel) {
       if (good && tag) {
         const at = queue.findIndex((q) => q.tag === tag);
         if (at >= 0) queue.splice(at, 1);
-      } else if (showingShown === shown || queue.some((q) => q.shown === shown)) {
+      } else if (showingShown !== null && sameSaying(showingShown) === sameSaying(shown)) {
+        /*
+         * 지금 떠 있는 것과 **같은 말**이다. 새 말풍선을 띄우지 않고 **글자만 갈아 끼운다** —
+         * 숫자가 늘어난 것을 학생이 바로 보되, 깜빡이지도 줄을 서지도 않는다.
+         * 글자가 완전히 같으면 아무것도 안 바뀐다(예전 동작 그대로).
+         */
+        repaint?.(shown);
+        return;
+      } else if (queue.some((q) => sameSaying(q.shown) === sameSaying(shown))) {
         /*
          * **같은 말을 쌓지 않는다.**
          * 조리개·초점 슬라이더는 끄는 동안 수십 번 디스패치된다. 그때마다 같은 문장이 큐에
@@ -168,7 +236,12 @@ export function createToastQueue(root, getLevel) {
          * 섞였습니다」 둘을 내고, `cracked` 도 둘이다. 그러면 **둘째가 통째로 삼켜져**
          * 학생은 왜 그렇게 됐는지를 못 듣는다.
          * (웨이브 3 의 fermentation 세션이 희석 안내가 삼켜지는 것으로 잡았다)
+         *
+         * ★ 숫자만 다른 것은 **삼키지 않고 갈아 끼운다.** 삼키면 (5방울) 에서 멈춘 채
+         *   마지막 수(11방울)를 영영 못 듣는다 — 지금 사실을 말해야 한다.
          */
+        const at = queue.findIndex((q) => sameSaying(q.shown) === sameSaying(shown));
+        queue[at] = { message: shown, shown, good, tag };
         return;
       }
 
@@ -200,6 +273,7 @@ export function createToastQueue(root, getLevel) {
 
       queue.push({ message: shown, shown, good, tag });
       showNext();
+      yieldIfCrowded();
     },
   };
 }

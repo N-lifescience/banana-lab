@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STEP_DONE, stepDone, groupDone, resultsDone } from '../src/sim/progress.js';
-import { reduce } from '../src/sim/rules.js';
+import { reduce, MOUNT_COARSE } from '../src/sim/rules.js';
 import { initialState, REAGENTS, SLIDE_IDS } from '../src/sim/state.js';
 import { UI } from '../src/ui/strings.js';
 
@@ -62,7 +62,9 @@ test('절차를 끝까지 밟으면 여섯 단계가 모두 끝난 것으로 판
   for (const id of SLIDE_IDS) {
     go('SET_OBJECTIVE', { objective: 4 });
     go('MOUNT', { slide: id });
-    go('COARSE_FOCUS', { delta: 0 });
+    // 올리면 초점이 흐트러진다(`MOUNT_COARSE`). 조동나사로 **맞춰야** 저배율 초점이 선다 —
+    // delta 0 으로 두면 「돌리기는 했지만 흐린 채」라 STEP 6 이 끝나지 않는다.
+    go('COARSE_FOCUS', { delta: -MOUNT_COARSE });
     go('SET_OBJECTIVE', { objective: 40 });
     go('CAPTURE');
   }

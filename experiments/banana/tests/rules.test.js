@@ -11,7 +11,7 @@ import {
   initialState, coverage, excess, isFloating, fieldParams,
   REAGENTS, SLIDE_IDS, HISTORY_LIMIT,
 } from '../src/sim/state.js';
-import { reduce, ACTIONS, bubblesFromAngle, BLOCKING_REASONS } from '../src/sim/rules.js';
+import { reduce, ACTIONS, bubblesFromAngle, BLOCKING_REASONS, MOUNT_COARSE } from '../src/sim/rules.js';
 import { observability } from '../src/sim/quality.js';
 import { renderFOV } from '../src/render/fov.js';
 import { PALETTE } from '../src/style/tokens.js';
@@ -247,7 +247,9 @@ test('정상 경로: 껍질부터 캡처 세 장까지 경고 하나 없이 끝�
   const captureResults = SLIDE_IDS.map((id) => {
     step('SET_OBJECTIVE', { objective: 4 });
     step('MOUNT', { slide: id });
-    step('COARSE_FOCUS', { delta: 0 });
+    // 올리면 초점이 흐트러진다(`MOUNT_COARSE`). 정상 경로는 **조동나사로 맞추고** 올린다 —
+    // 안 맞추고 40배로 올리면 `skipped-low-mag` 가 붙는다(그게 이 검사가 지키는 것이다).
+    step('COARSE_FOCUS', { delta: -MOUNT_COARSE });
     step('SET_OBJECTIVE', { objective: 40 });
     return step('CAPTURE');
   });
@@ -816,8 +818,10 @@ test('막힌 결과에는 tag 가 없다 — 태그로 막힘을 다루려는 �
   s = run(s, 'SMEAR', { slide: 'A', thickness: 0.3 }).state;
   s = run(s, 'PICK_COVERSLIP').state;
   s = run(s, 'PLACE_COVERSLIP', { slide: 'A', angleDeg: 45 }).state;
-  s = run(s, 'SET_OBJECTIVE', { objective: 40 }).state;
+  // **올리고 나서 올린다.** MOUNT 는 대물렌즈를 저배율로 내린다(새 유리를 넣을 자리를 만든다) —
+  // 먼저 40배로 올려 두면 그 순서가 지워져 조동나사가 안전해진다.
   s = run(s, 'MOUNT', { slide: 'A' }).state;
+  s = run(s, 'SET_OBJECTIVE', { objective: 40 }).state;
   s = run(s, 'COARSE_FOCUS', { delta: 0.5 }).state;   // 고배율에서 조동 → 금이 간다
   const again = reduce(s, { type: 'MOUNT', payload: { slide: 'A' } });
 

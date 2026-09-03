@@ -22,6 +22,14 @@ import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
 
 const N = UI.notebook;
 
+/**
+ * 질문 ⓐ 를 어느 STEP 밑에 붙이는가 — **STEP 4 ((다) 수단 Ⅲ 처리)**.
+ * (가) 대조군과 (나)(다)의 색이 셋 다 나온 **직후**의 자리다 (`docs/06`).
+ * 그리는 곳(`renderStage4`)과 「다 적었는가」(`qaEmpty`)가 **같은 번호를 본다** —
+ * 따로 적으면 언젠가 갈리고, 그때 ⓐ 는 다시 안 보인 채 사라진다.
+ */
+export const QUESTION_A_STEP = '4';
+
 /** 흐림 판정 기준 점수. observability().score 가 이보다 낮으면 성찰 문항이 붙는다. */
 // ponytail: 임계값 추정치. docs/06 에 정확한 수치가 없다 — 체감상 어긋나면 이 숫자만 바꾸면 된다.
 const LOW_OBSERVABILITY = 60;
@@ -168,8 +176,31 @@ const benchLocked = (st) =>
  * 무엇을 적었는지는 보지 않는다. 채점이 아니다.
  */
 export function stepNotesWritten(st, group) {
+  if (qaEmpty(st, group)) return false;
   if (st.session.level >= 3) return hasNote(st, group.id);
   return group.steps.every((_, i) => hasNote(st, substepId(group, i)));
+}
+
+/**
+ * 질문 ⓐ 가 붙은 STEP 은 **ⓐ 까지 적어야 「다 적은 것」이다.**
+ *
+ * ── 플레이테스트에서 잡은 것 (2026-09-03) ───────────────────────────
+ * STEP 4 의 관찰 기록 세 칸(4a·4b·4c)을 적고 손을 떼는 순간 **STEP 4 가 접혔다.**
+ * 그 밑에 붙어 있던 질문 ⓐ 는 **한 번도 보지 못한 채** 사라졌다 — (가)(나)(다) 세 색을
+ * 눈으로 본 직후에 물어야 한다고 자리까지 정해 두었는데(`QUESTION_A_STEP`), 접히면서
+ * 그 자리가 통째로 지나가 버린다. 1단계·3단계 둘 다 그랬고 콘솔 에러는 없었다.
+ * 6쪽에 같은 칸이 있어 결국 답할 수는 있지만, 그때는 「눈앞의 관찰」이 아니라 기억을
+ * 더듬는 문제가 된다.
+ *
+ * 그래서 ⓐ 를 그 STEP 의 관찰 기록 칸 하나로 센다. ⓐ 를 비워 두면 STEP 4 는 펼쳐진 채
+ * 남고 다음 STEP 은 잠겨 있다 — 다른 관찰 기록 칸과 똑같다. **막는 것이 아니다**
+ * (AGENTS.md §2.1): 이미 관찰 기록에 걸려 있던 자물쇠에 칸 하나가 더해질 뿐이고,
+ * 실험대 조작은 아무것도 막지 않는다.
+ * (일곱 실험 가운데 osmosis·germination·micrometer·chromatography 에서 같은 자리가
+ *  나왔고, 정본인 여기에도 그대로 있었다)
+ */
+function qaEmpty(st, group) {
+  return group.id === QUESTION_A_STEP && !hasNote(st, 'q.a');
 }
 const wrapupDone = (st) =>
   ['q.a', 'q2', ...(isGroup(st) ? ['q3'] : [])].every((k) => hasNote(st, k));
@@ -403,19 +434,36 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
    * (웨이브 2 의 chromatography 세션이 잠금 안내도 같이 갈아야 한다고 짚었다)
    */
   function patchStepHints() {
+    /*
+     * ★ **「지금 할 차례」 표시를 찾아서는 안 된다 — 그 표시는 없을 때가 있다.**
+     *
+     * 앞서는 `details[data-state="now"]` 를 찾아 그 **다음 형제**를 손봤다. 그런데
+     * `stepShell` 은 상태를 `isDone ? 'done' : (isNow ? 'now' : 'later')` 로 정한다 —
+     * **실험대 일을 마쳤고 기록만 안 적은 STEP** 은 `done` 이 이겨서 `now` 가 하나도 없다.
+     * 정상 경로가 정확히 그 모양이다(실험대를 다 하고 노트로 돌아온다). 그래서 이 함수는
+     * **한 번도 일한 적이 없었고**, 학생이 STEP 1 을 다 적어 놓은 순간에도 잠긴 STEP 2 는
+     * 계속 「앞 STEP 을 먼저 적으세요」 라고 했다. 눌러 보면 한 번에 열리는데도 말이다.
+     * (`PLAYTEST.md §1` — 「다 적어 놓았는데 아직 「먼저 적으세요」라고 하면 버그입니다」)
+     *
+     * 이제 **잠긴 STEP 이 스스로 누구를 기다리는지 말한다**(`data-locked-by`). 표시가 아니라
+     * 상태를 보므로 `stepShell` 의 표시 규칙이 바뀌어도 안 끊긴다.
+     * 손보는 것은 **맨 앞의 잠긴 STEP 하나뿐**이다 — 실제로 열리는 것은 그것 하나이고,
+     * 뒤엣것까지 「눌러서 여세요」 로 바꾸면 눌러도 안 열리는 거짓말이 새로 생긴다.
+     */
+    const next = panelEl.querySelector('.note-step--locked[data-locked-by]');
+    if (!next) return;
+    const by = next.dataset.lockedBy;
+    const group = UI.protocol.find((g) => g.id === by);
+    if (!group) return;
     const st = store.getState();
     const typed = {};
     panelEl.querySelectorAll('[data-note]').forEach((el) => { typed[el.dataset.note] = el.value; });
     const merged = { ...st, session: { ...st.session, notes: { ...st.session.notes, ...typed } } };
-    const nowGroup = panelEl.querySelector('details[data-step-group][data-state="now"]');
-    const next = nowGroup?.nextElementSibling;
-    if (!next?.classList.contains('note-step--locked')) return;
-    const idx = UI.protocol.findIndex((g) => g.id === nowGroup.dataset.stepGroup);
-    const ready = idx >= 0 && stepNotesWritten(merged, UI.protocol[idx]);
+    const ready = stepNotesWritten(merged, group);
     const hint = next.querySelector('.step-open-hint');
     const why = next.querySelector('.step-locked-why');
     if (hint) hint.textContent = ready ? N.stepReadyHint : N.stepLockedHint;
-    if (why) why.textContent = ready ? N.stepReadyWhy : N.stepLockedWhy(nowGroup.dataset.stepGroup);
+    if (why) why.textContent = ready ? N.stepReadyWhy : N.stepLockedWhy(by);
   }
 
   /**
@@ -470,12 +518,23 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const lockedBy = gi > openableUpTo && !everOpened.has(group.id)
         ? UI.protocol[Math.min(openableUpTo, UI.protocol.length - 1)].id : null;
       if (lockedBy) return stepShell(group, gi, groupsDone, '', lockedBy, nowIdx);
+      /*
+       * 질문 ⓐ 는 **난이도와 상관없이** 이 STEP 밑에 붙는다.
+       *
+       * 앞서는 1·2단계 갈래에만 붙어 있어서 **3단계 학생은 4쪽에서 ⓐ 를 아예 못 봤다.**
+       * 「눈앞에서 본 직후에 묻는다」는 자리 자체가 3단계에서만 없었던 셈이고, ⓐ 를
+       * 「다 적었는가」에 넣는 순간(`qaEmpty`) 그 갈래는 **답할 칸이 없는 채로 잠기는**
+       * 자리가 된다 — 없는 칸을 채우라는 벽은 이 저장소가 가장 하면 안 되는 것이다.
+       * ⓐ 는 절차 안내가 아니라 물음이라, 3단계가 감추기로 한 것("어떻게 하는가")에
+       * 들어가지 않는다.
+       */
+      const qa = group.id === QUESTION_A_STEP ? questionA(st) : '';
       if (level >= 3) {
         // 3단계 — 목표만, 절차 없음
         const val = st.session.notes[group.id] ?? '';
         return stepShell(group, gi, groupsDone, `
           <label class="notes-label" for="note-${group.id}">${N.goalOnlyLabel(group.title)}</label>
-          <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>`,
+          <textarea data-note="${group.id}" id="note-${group.id}">${escapeHtml(val)}</textarea>${qa}`,
         null, nowIdx);
       }
       // 읽는 순서가 아니라 하는 순서를 따라간다 — 그게 이 쪽에서 하려는 일이다.
@@ -513,7 +572,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           </li>`;
       }).join('');
       return stepShell(group, gi, groupsDone,
-        `<ul class="substep-list">${items}</ul>${group.id === '4' ? questionA(st) : ''}`,
+        `<ul class="substep-list">${items}</ul>${qa}`,
         null, nowIdx);
     }).join('');
     const tally = nowIdx === -1
@@ -542,7 +601,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     if (lockedBy) {
       return `
         <div class="note-step note-step--locked" data-step-group="${group.id}"
-          data-state="locked" data-done="false">
+          data-state="locked" data-done="false" data-locked-by="${lockedBy}">
           <div class="step-summary">
             <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
             <span class="step-open-hint">${N.stepLockedHint}</span>

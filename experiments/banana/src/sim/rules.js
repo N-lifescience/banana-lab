@@ -17,7 +17,7 @@ import {
   REAGENTS, SLIDE_IDS, coverage, excess, focusError, brightness, isTooThick, fieldParams,
   isStaining, initialSlide, HISTORY_LIMIT, PAN_LIMIT,
 } from './state.js';
-import { focusTolerance, EYEPIECE } from './optics.js';
+import { focusTolerance, EYEPIECE, OBJECTIVES } from './optics.js';
 
 export { PAN_LIMIT };
 
@@ -115,6 +115,25 @@ export function bubblesFromAngle(angleDeg) {
   return Math.round(6 * Math.max(0, Math.min((off - 10) / 45, 1)));
 }
 
+/**
+ * 슬라이드를 재물대에 올린 직후의 **조동나사 자리**.
+ *
+ * 4배 허용 범위(`focusTolerance(4)` = 0.30)보다 커서 **저배율에서도 흐리게 시작한다** —
+ * 조동나사로 맞추는 것이 첫 일이 되게 하려는 것이다. 조동나사 범위(±1) 안쪽이라 어느 쪽으로
+ * 돌려도 닿는다.
+ *
+ * ── 왜 0 이 아니어야 하는가 (2026-09-03 플레이테스트) ──────────────
+ * 앞서는 올린 순간 `coarse = 0` 이라 **이미 초점이 맞아 있었다.** 2·3단계 학생이 나사를
+ * 한 번도 안 돌리고 곧장 400배로 올려도 **관찰 가능성 100** 이 나왔고, 그러면서 화면은
+ * 빨간 글씨로 「저배율에서 초점을 맞추지 않고 올렸습니다. 초점 맞는 범위가 매우 좁습니다」
+ * 라고 나무랐다 — **화면이 저 스스로와 다른 말을 한다.** 시작 화면의 「현미경은 저배율부터
+ * 직접 맞춥니다」(2단계 설명)도 사실이 아니었다.
+ * 1단계는 실험대(`ui/bench.js`)가 올린 직후 이 값을 도로 0 으로 돌려 초점을 맞춰 준다 —
+ * 「1단계는 초점과 배율을 맞춰 놓고 시작합니다」가 그 약속이므로 그대로다.
+ * (osmosis 세션이 자기 저장소에서 먼저 고친 자리다)
+ */
+export const MOUNT_COARSE = 0.45;
+
 /* ------------------------------------------------------------------ */
 /* 액션                                                                */
 /* ------------------------------------------------------------------ */
@@ -188,12 +207,40 @@ export const ACTIONS = {
     if (contaminated) {
       return happened(next, '씻지 않은 스포이트를 썼습니다. 두 용액이 섞였습니다.', 'cross-contamination');
     }
-    if (drops === 1) return happened(next, '한 방울이 떨어졌습니다. 용액이 시료 전체에 닿지는 않았습니다.', 'partial');
+    /*
+     * **첫 방울은 실패가 아니다.**
+     *
+     * 화면의 스포이트는 고무를 누를 때마다 **한 방울씩** 떨어뜨린다 (`src/ui/zoom.js`).
+     * 그러니 「두 방울」을 제대로 하는 학생도 **반드시 한 번은 한 방울인 상태**를 지난다.
+     * 앞서는 여기서 `happened`(빨강)를 돌려줘서, 정상 경로 한가운데에 빨간 말풍선
+     * 「한 방울이 떨어졌습니다. 용액이 시료 전체에 닿지는 않았습니다」가 떴다 —
+     * **제대로 하고 있는데 「뜻대로 안 됐다」는 색**을 본다. PLAYTEST.md 가 「회색 문구가
+     * 빨간색으로 뜨면 버그」라고 적어 둔 바로 그 모양이다.
+     * 2026-09-03 플레이테스트에서 잡았다 (osmosis 가 자기 저장소에서 먼저 고친 자리다).
+     *
+     * 한 방울에서 **멈추면** 그것은 시야가 답한다 (`coverage` — 절반만 염색된 시야).
+     * 다음에 할 일은 `UI.toast.nextAction` 이 아니라 문장 안에 넣는다 — 그 표는 빨간 말에만
+     * 붙기 때문이다 (`ui/toast.js` 의 `detail`).
+     */
+    if (drops === 1) {
+      const dn1 = REAGENT_NAME[reagent] ?? '용액';
+      return ok(next, `${SLIDE_NAME[slide]}에 ${dn1}${eul(dn1)} 한 방울 떨어뜨렸습니다. `
+        + '한 방울 더 떨어뜨려야 시료 전체에 닿습니다.', 'partial');
+    }
     if (drops >= 5) {
       return happened(next, `액이 받침 유리 밖으로 흘러넘쳐 실험대에 고였습니다 (${drops}방울). `
         + '덮개 유리가 뜨고, 현미경으로는 색만 짙게 깔려 알갱이가 잘 보이지 않습니다.', 'overflow');
     }
-    if (drops >= 3) return happened(next, '용액이 넉넉히 퍼졌습니다.', 'excess');
+    /*
+     * **빨간 말풍선인데 글이 칭찬처럼 읽히면 안 된다.**
+     * 「용액이 넉넉히 퍼졌습니다」만 적어 두었더니, 색은 「뜻대로 안 됐다」인데 문장은
+     * 잘된 일처럼 읽혔다 — 학생은 색과 글 중 어느 쪽을 믿어야 할지 모른다
+     * (`PLAYTEST.md §2` 「회색 문구가 빨간색으로 뜨면 버그」). 색은 그대로 두고,
+     * **무슨 일이 일어났는지**를 적는다. 세 방울은 실제로 `excess` 를 올려 시야를 깎는다.
+     */
+    if (drops >= 3) {
+      return happened(next, `${drops}방울이라 용액이 넉넉히 퍼졌습니다. 색이 짙게 깔려 알갱이가 덜 또렷합니다.`, 'excess');
+    }
     const dn = REAGENT_NAME[reagent] ?? '용액';
     return ok(next, `${SLIDE_NAME[slide]}에 ${dn}${eul(dn)} ${drops}방울 떨어뜨렸습니다.`, 'dropped');
   },
@@ -255,7 +302,24 @@ export const ACTIONS = {
     if (s.cracked) {
       return blocked(state, '이 슬라이드는 금이 갔습니다. 새로 만들어야 합니다.', BLOCKING_REASONS.BROKEN);
     }
-    const next = withScope(state, { stage: slide });
+    /*
+     * 새 슬라이드를 올리면 **초점이 흐트러지고, 대물렌즈는 저배율로 내려온다.**
+     *
+     * · 초점(`MOUNT_COARSE`) — 새 유리는 두께도 놓인 자리도 다르다. 맞출 것이 있어야
+     *   「저배율부터 직접 맞춥니다」(2단계 설명)가 사실이 된다.
+     * · 배율 — **저배율로 내리지 않으면 새 유리를 넣을 자리가 없다.** 400배 대물렌즈는
+     *   덮개 유리에 거의 닿아 있어서, 그 상태로 유리를 갈아 끼우면 렌즈를 친다
+     *   (이 실험은 그 닿음을 `lens-touched` 로 이미 모형화하고 있다).
+     *   이것을 안 하면 **덫이 생긴다** — 앞 유리를 400배로 보다가 다음 유리를 올리면
+     *   화면은 흐리고, 학생은 조동나사를 돌리고, R-12 로 **올리자마자 깨진다.**
+     *   2·3단계 학생은 슬라이드 둘째·셋째마다 그 덫을 밟는다. 1단계는 실험대가
+     *   이 순서를 대신 밟아 주고 있었고(`ui/bench.js`), 그 주석이 이미 「저배율로 먼저
+     *   내리고, 초점을 맞추고, 그다음 올린다」고 적어 두었다 — 그 순서를 여기로 옮긴다.
+     * 미동나사는 그대로 둔다 — 학생이 맞춰 둔 미세 조정까지 지우면 「내가 한 것이 사라졌다」가 된다.
+     */
+    const next = withScope(state, {
+      stage: slide, coarse: MOUNT_COARSE, objective: OBJECTIVES[0], lowMagFocused: false,
+    });
     if (!s.coverslip.placed) {
       return happened(next, '덮개 유리 없이 올렸습니다. 고배율로 올리면 대물렌즈가 시료에 닿습니다.', 'no-coverslip');
     }

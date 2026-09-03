@@ -367,7 +367,7 @@ export function createBench(root, store, { onOpenZoom, edit: editStart = false }
     root.querySelector('#edit-rows').innerHTML = items.map((it) => {
       const d = drawnBoxMm(it.asset);
       return `
-      <tr data-id="${it.id}">
+      <tr data-row="${it.id}">
         <td>${it.id}</td>
         <td class="edit-line"></td>
         <td class="edit-x">${numCell(it, 'x')}</td>
@@ -392,7 +392,7 @@ export function createBench(root, store, { onOpenZoom, edit: editStart = false }
     if (!edit) return;
     const bad = overlaps();
     for (const it of items) {
-      const tr = root.querySelector(`#edit-rows tr[data-id="${it.id}"]`);
+      const tr = root.querySelector(`#edit-rows tr[data-row="${it.id}"]`);
       if (!tr) continue;
       const d = drawnBoxMm(it.asset);
       tr.classList.toggle('edit-bad', bad.has(it.id));
@@ -440,7 +440,7 @@ export function createBench(root, store, { onOpenZoom, edit: editStart = false }
     box.querySelector('#edit-rows').addEventListener('input', (e) => {
       const input = e.target.closest('.edit-num');
       if (!input) return;
-      const item = items.find((it) => it.id === input.closest('tr')?.dataset.id);
+      const item = items.find((it) => it.id === input.closest('tr')?.dataset.row);
       const v = Number(input.value);
       if (!item || input.value.trim() === '' || !Number.isFinite(v)) return;
       item[input.dataset.axis] = v;
