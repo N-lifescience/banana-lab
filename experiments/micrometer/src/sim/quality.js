@@ -18,13 +18,10 @@
  * `tasks/DESIGN-rules.md` §2.3 참조.
  */
 
-import { focusTolerance, GAP_MAX_DEG } from './optics.js';
+import { focusToleranceOn, GAP_MAX_DEG } from './optics.js';
 import { angleGap, centerErr, focusError, lineContrast, PAN_LIMIT } from './state.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-/** 이 위로는 「깎였다」고 말하지 않는다 — 화면에서 구별되지 않는 몫이다. */
-export const NEGLIGIBLE_LOSS = 0.98;
 
 /**
  * 기록에 남은 두 각도로 어긋남을 되짚는다. `state.js` 의 `angleGap` 과 같은 규칙이다 —
@@ -49,9 +46,14 @@ export function alignFactor(gapDeg) {
 /**
  * 초점. 눈금선은 크롬으로 새겨진 것이라 두께가 없다 —
  * 시료보다 초점에 관대하다 (`focusTolerance` 의 'micrometer' 갈래).
+ *
+ * ★ **재물대에 무엇이 올라가 있는지를 받는다.** 앞서는 늘 `'micrometer'` 로 쟀는데,
+ *   `zoom.js` 의 「초점이 맞았습니다」와 `progress.js` 의 ✓ 는 표본일 때 2배 엄격한
+ *   `'specimen'` 을 썼다. 그래서 표본에서 **게이지는 100 인데 바로 밑줄은 「아직 초점이
+ *   맞지 않았습니다」**였다. 갈래를 `focusToleranceOn` 한 곳으로 모아 다시 갈라질 수 없게 했다.
  */
-export function focusFactor(focusErr, objective) {
-  const tol = focusTolerance(objective, 'micrometer');
+export function focusFactor(focusErr, objective, on = 'stageMic') {
+  const tol = focusToleranceOn(objective, on);
   if (focusErr <= tol) return 1;
   return clamp01(1 - (focusErr - tol) / (tol * 6));
 }
@@ -101,7 +103,7 @@ export function observability(p) {
   const factors = {
     equipped: equippedFactor(p.hasReticle ?? false, p.on ?? null),
     align: alignFactor(gapDeg),
-    focus: focusFactor(p.focusErr ?? 0, p.objective ?? 10),
+    focus: focusFactor(p.focusErr ?? 0, p.objective ?? 10, p.on ?? 'stageMic'),
     contrast: contrastFactor(p.contrast ?? 1),
     span: spanFactor(centerError),
   };
@@ -121,16 +123,19 @@ export function observability(p) {
    * 「없는 것」과 「어긋난 것」은 크기를 견줄 수 있는 값이 아니다. 없으면 없다고 먼저 말한다.
    */
   /**
-   * ★ **거의 안 깎인 것도 짚지 않는다.**
+   * ★ **100 이 아니면 100 이 될 방법을 말한다** (사장님 지시 2026-09-03).
    *
-   * 조리개 기본값(0.6)에서 대비 계수가 0.994 라 점수는 99 인데, `>= 1` 로 재면 그
-   * 0.006 이 「가장 크게 깎이는 항목」이 되어 화면이 늘 「조리개를 반쯤 열었을 때 가장
-   * 또렷합니다」라고 했다. 플레이해 보니 정렬·초점을 다 맞춘 99점 화면이 처음부터 끝까지
-   * 조리개를 만지라고 했다 — 없는 잘못을 지어내는 것과 같은 자리다. 눈에 보이지 않는
-   * 몫(2 %)은 깎인 것으로 치지 않는다.
+   * 앞서는 2 % 안쪽(`NEGLIGIBLE_LOSS = 0.98`)을 「안 깎인 것」으로 쳤다. 그래서 99·98 점
+   * 화면이 「지금 조건에서 볼 수 있는 만큼 잘 보입니다」라고만 했고, **학생은 남은 2점을
+   * 어디서 잃고 있는지 알 길이 없었다.** 조리개 기본값에서 늘 같은 말이 뜨던 것을 고치려던
+   * 문턱이었는데, 고치려던 것보다 큰 것을 가렸다.
+   *
+   * 이제 **점수로 가른다.** 100 일 때만 나무랄 것이 없다고 말하고, 그 밑에서는 언제나
+   * 가장 크게 깎인 항목과 고치는 법을 댄다. 조리개 기본값 문제는 다른 방식으로 답한다 —
+   * 그 말이 뜨는 것이 사실이기 때문이다 (조리개를 0.55 로 옮기면 100 이 된다).
    */
   const worst = factors.equipped < 1 ? 'equipped'
-    : (ranked[0][1] >= NEGLIGIBLE_LOSS ? null : ranked[0][0]);
+    : (score >= 100 ? null : ranked[0][0]);
   return { score, worst, factors };
 }
 

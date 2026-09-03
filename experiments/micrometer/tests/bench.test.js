@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { stripComments } from './strip-comments.js';
-import { dropTable, tapTable, BENCH_KINDS, benchLayout } from '../src/ui/bench.js';
+import { dropTable, tapTable, BENCH_KINDS, benchLayout, unmountLayout, benchItems } from '../src/ui/bench.js';
 import { UI } from '../src/ui/strings.js';
 import { initialState } from '../src/sim/state.js';
 
@@ -130,19 +130,61 @@ test('끼우는 방향은 실험대에서 정하지 않는다', () => {
   assert.deepEqual(store.calls, [], '실험대에서 곧장 끼우면 안 된다');
 });
 
-test('금 간 기구를 새것으로 바꿀 길이 있다', () => {
-  // 대물 마이크로미터는 이 실험에서 유일한 기준자다. 깨지고 새것을 꺼낼 길이 없으면
-  // 실험이 거기서 끝난다 — 그건 결과가 아니라 막다른 길이다.
+test('상자에 끌어다 놓는 것은 넣는 일이다 — 새것이 튀어나오지 않는다', () => {
+  // ★ 앞서는 상자에 놓으면 `NEW_ITEM`(새것 꺼내기)이었다. 그러면 **다 쓴 것을 정리하려고
+  //   상자에 넣었는데 새것이 나온다** — 넣는 손짓이 꺼내는 일이 된다.
+  //   넣는 것은 넣는 것이고, 꺼내는 것은 상자를 눌러 연 화면의 「꺼내기」다.
   //
   // **저마다 제자리가 다르다.** 대물 마이크로미터는 자기 보관함으로, 표본은 표본 상자로 간다.
-  // 한때는 둘 다 표본 상자였는데, 대물 마이크로미터를 표본 상자에서 꺼내는 그림은 거짓말이고
-  // 학생은 그 거짓말을 실험 순서로 배운다.
+  // 대물 마이크로미터를 표본 상자에서 꺼내는 그림은 거짓말이고, 학생은 그 거짓말을 순서로 배운다.
   const home = { stageMic: 'stageMicBox', specimen: 'specimenBox' };
   for (const [kind, box] of Object.entries(home)) {
     const store = fakeStore();
     dropTable(store)[kind][box]({ item: kind });
-    assert.deepEqual(store.calls, [{ type: 'NEW_ITEM', payload: { item: kind } }]);
+    assert.deepEqual(store.calls, [{ type: 'PUT_AWAY_ITEM', payload: { item: kind } }]);
   }
+});
+
+/**
+ * ★ **쓰레기통** (사장님 지시 2026-09-03) — 깨진 표본·대물 마이크로미터를 버리는 곳.
+ *
+ * 깨진 유리는 이제 재물대에 그대로 남고, 학생이 내려서 여기로 가져온다.
+ * 버릴 길이 없으면 금 간 유리가 실험대에 영영 남고, 그건 결과가 아니라 막다른 길이다.
+ */
+test('깨진 것을 버릴 곳이 실험대에 있다', () => {
+  for (const kind of ['stageMic', 'specimen']) {
+    const store = fakeStore();
+    dropTable(store)[kind].bin({ item: kind });
+    assert.deepEqual(store.calls, [{ type: 'DISCARD_ITEM', payload: { item: kind } }],
+      `${kind} 을(를) 쓰레기통에 끌어다 놓을 수 없습니다`);
+  }
+  // 접안 마이크로미터에는 쓰레기통이 없다 — 렌즈 안에 있어 깨지지 않는다.
+  // 끌어다 놓는 곳은 둘뿐이어야 한다 (사장님 지시: 「통 · 현미경」).
+  assert.deepEqual(Object.keys(dropTable(fakeStore()).ocular).sort(),
+    ['microscope', 'ocularBox'], '접안 마이크로미터가 갈 수 있는 곳이 둘이 아닙니다');
+});
+
+/**
+ * ★ 재물대에서 내린 물건은 **현미경 옆**에 놓인다 (사장님 지시 2026-09-03) —
+ *   선반의 제자리로 되돌리면 금 간 유리를 상자에 도로 꽂는 그림이 된다.
+ *   그 자리도 다른 물건과 겹치면 안 된다. 겹치면 집으려는 순간 옆엣것이 잡힌다.
+ */
+test('재물대에서 내려놓는 자리가 현미경 왼쪽이고 아무와도 안 겹친다', () => {
+  const scope = benchLayout().find((it) => it.id === 'microscope');
+  const others = benchLayout();
+  const hit = (a, b) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  const spots = unmountLayout();
+  assert.equal(spots.length, 2, '내려놓는 자리가 물건마다 있어야 합니다');
+  for (const spot of spots) {
+    assert.ok(spot.x + spot.w <= scope.x,
+      `${spot.id} 가 현미경(x ${scope.x}) 왼쪽에 있지 않습니다`);
+    for (const it of others) {
+      if (it.id === spot.id.split('@')[0]) continue;   // 자기 선반 자리와는 견주지 않는다
+      assert.ok(!hit(spot, it), `${spot.id} 가 ${it.id} 와 겹칩니다`);
+    }
+  }
+  assert.ok(!hit(spots[0], spots[1]), '내려놓는 자리 둘이 서로 겹칩니다');
 });
 
 test('상자를 누르면 조작이 일어나지 않고 들여다본다', () => {
@@ -187,20 +229,75 @@ test('남긴 물건은 여전히 무언가를 한다 — 말없이 먹통인 물
     const acts = store.calls.length;
     const opens = opened.length;
     taps[kind]?.({ item: kind }, null);
-    const dropsTo = Object.keys(dropTable(fakeStore(), () => {})[kind] ?? {});
-    const doesSomething = store.calls.length > acts || opened.length > opens || dropsTo.length > 0;
+    const table = dropTable(fakeStore(), () => {});
+    const dropsTo = Object.keys(table[kind] ?? {});
+    // **받기만 하는 물건도 무언가를 한다.** 쓰레기통은 끌어다 놓는 것을 받을 뿐
+    // 스스로 끌리지도 눌리지도 않는다 — 누르면 버려지게 하면 스쳐 누른 것 하나로
+    // 표본이 사라진다. 「출발점이 되는가」만 보면 그런 물건을 먹통으로 잘못 짚는다.
+    const receives = Object.values(table).some((t) => Boolean(t[kind]));
+    const doesSomething =
+      store.calls.length > acts || opened.length > opens || dropsTo.length > 0 || receives;
     assert.ok(doesSomething,
       `${kind} 은 눌러도 끌어도 아무 일이 안 납니다 — 말없이 먹통인 물건입니다`);
   }
 });
 
 test('통에 넣는 길이 있으면 꺼내는 길도 있다', () => {
-  // 넣기만 있고 꺼내기가 없으면 원판이 통 속으로 사라진 채 돌아오지 못한다.
+  // 넣기만 있고 꺼내기가 없으면 물건이 통 속으로 사라진 채 돌아오지 못한다.
+  // 이제 셋 다 상자에 넣을 수 있으므로 셋 다 꺼내는 길이 있어야 한다.
   const dir = new URL('../src/ui/', import.meta.url);
   const src = readdirSync(dir)
     .filter((f) => f.endsWith('.js'))
     .map((f) => readFileSync(new URL(f, dir), 'utf8'))
     .join('\n');
-  assert.ok(src.includes("'TAKE_OUT_OCULAR'"),
-    '통에서 꺼내는 길이 화면 어디에도 없습니다 — 넣으면 돌아올 수 없습니다');
+  for (const [put, take] of [['PUT_AWAY_OCULAR', 'TAKE_OUT_OCULAR'], ['PUT_AWAY_ITEM', 'TAKE_OUT_ITEM']]) {
+    assert.ok(src.includes(`'${put}'`), `${put} 을 부르는 자리가 없습니다`);
+    assert.ok(src.includes(`'${take}'`),
+      `${put} 은 있는데 ${take} 가 화면 어디에도 없습니다 — 넣으면 돌아올 수 없습니다`);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* 사장님이 잡아 주신 배치 — 옮겨 적기가 틀리지 않았는지                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ★ 아래 일곱은 **사장님이 편집 모드(`?edit=1`)에서 직접 잡아 보내신 좌표**다
+ *   (2026-09-03). 편집 표의 두 칸(x, y)에 뜨는 값과 **글자 그대로** 같아야 한다 —
+ *   화면이 말한 숫자와 코드가 받는 숫자가 다르면 옮겨 적기가 성립하지 않는다.
+ *   실제로 `at()` 이 y 가 아니라 bottom 을 받고 있어서 애셋 높이만큼 어긋났다.
+ *
+ *   「준비물들 위치 가능한 포지션을 너가 정해두지마. 내가 미세하게 조정할거야.」
+ *   보기 좋게 다시 정렬하거나 선에 붙이면 이 검사가 걸린다.
+ */
+test('실험대 배치가 사장님이 잡아 주신 좌표 그대로다', () => {
+  const want = {
+    ocularCase: [312, 203],
+    ocular: [455, 199],
+    stageMicBox: [679, 175],
+    stageMic: [837, 198],
+    specimenBox: [1089, 169],
+    specimen: [1232, 199],
+    microscope: [880, 337],
+  };
+  const got = Object.fromEntries(benchItems().map((it) => [it.id, it]));
+  for (const [id, [x, y]] of Object.entries(want)) {
+    assert.ok(got[id], `${id} 이(가) 실험대에서 사라졌습니다`);
+    assert.equal(Math.round(got[id].x), x, `${id} 의 x 가 다릅니다`);
+    assert.equal(Math.round(got[id].y), y, `${id} 의 y 가 다릅니다 — 편집 표의 둘째 칸과 같아야 합니다`);
+  }
+});
+
+/** 쓰레기통은 실험대 **작업면**에 있고 현미경과 멀리 떨어져 있다 (겹침은 위 검사가 본다). */
+test('쓰레기통이 실험대에 있고 현미경과 겹치지 않는다', () => {
+  const items = benchItems();
+  const bin = items.find((it) => it.id === 'bin');
+  assert.ok(bin, '쓰레기통이 실험대에 없습니다 — 깨진 것을 버릴 곳이 없습니다');
+  assert.equal(bin.kind, 'bin');
+  const box = benchLayout().find((it) => it.id === 'bin');
+  const scope = benchLayout().find((it) => it.id === 'microscope');
+  assert.ok(box.x + box.w < scope.x, '쓰레기통이 현미경 왼쪽에 있지 않습니다');
+  assert.equal(typeof UI.bench.items.bin, 'string');
+  assert.ok(/깨진|버리/.test(UI.bench.items.bin),
+    '이름이 무엇을 버리는 곳인지 말하지 않습니다 — 통이 넷이라 그냥 「쓰레기통」이면 모릅니다');
 });

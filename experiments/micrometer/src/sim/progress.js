@@ -34,7 +34,7 @@
  */
 
 import { angleGap, focusError } from './state.js';
-import { focusTolerance, usableRunDiv, MAJOR_EVERY_DIV } from './optics.js';
+import { focusToleranceOn, usableRunDiv, MAJOR_EVERY_DIV } from './optics.js';
 
 /** 대물렌즈 배율. 총배율(100·400배)이 아니라 `microscope.objective` 에 들어가는 값이다. */
 const OBJ_100 = 10;
@@ -66,9 +66,12 @@ const everOnStage = (st, id) =>
   || st.session.captures.some((c) => c.on === id)
   || st.session.measurements.some((r) => r.target === id);
 
-/** 그 물건에 맞는 초점 허용 범위. 크롬 선을 증착한 대물 마이크로미터가 잡기 쉽다. */
-const tolFor = (objective, on) =>
-  focusTolerance(objective, on === 'stageMic' ? 'micrometer' : 'specimen');
+/**
+ * 그 물건에 맞는 초점 허용 범위. 크롬 선을 증착한 대물 마이크로미터가 잡기 쉽다.
+ * **갈래는 `optics.js` 한 곳에만 있다** — 화면(`zoom.js`)·점수(`quality.js`)와 같은 값을 써야
+ * 「맞았습니다」와 게이지와 노트의 ✓ 가 같은 것을 말한다.
+ */
+const tolFor = (objective, on) => focusToleranceOn(objective, on);
 
 /**
  * 그 배율에서 그 물건이 **또렷했는가.**

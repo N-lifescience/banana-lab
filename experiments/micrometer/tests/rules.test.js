@@ -206,17 +206,65 @@ test('하드 게이트는 금 간 기구를 다시 올릴 때 하나뿐이다', 
   assert.equal(broke.outcome, 'happened', '조작을 막으면 안 된다');
   assert.equal(broke.tag, 'cracked');
   assert.equal(broke.state.items.stageMic.cracked, true);
-  assert.equal(broke.state.microscope.stage, null, '깨진 것은 재물대에서 내려온다');
+
+  /**
+   * ★ **깨진 것은 재물대에 그대로 있다** (사장님 지시 2026-09-03).
+   *
+   * 앞서는 여기서 규칙이 스스로 `stage: null` 로 내렸다. 그러면 학생이 보고 있던 것이
+   * **말도 없이 사라진다** — 무엇이 어떻게 됐는지는 문장 한 줄로만 남는다.
+   * 실물에서 깨진 유리는 재물대에 남는다. 내리는 것은 학생이 단추로 한다.
+   */
+  assert.equal(broke.state.microscope.stage, 'stageMic',
+    '깨졌다고 화면이 스스로 내려놓습니다 — 학생이 보고 있던 것이 소리 없이 사라집니다');
+  assert.ok(/재물대에서 내리기/.test(broke.message), '어떻게 내리는지 말하지 않습니다');
+
+  // 학생이 내린다. 내린 것은 **현미경 옆**에 놓인다 — 선반의 제자리가 아니다.
+  const down = run(broke.state, 'REMOVE_FROM_STAGE', {});
+  assert.equal(down.state.microscope.stage, null);
+  assert.equal(down.state.items.stageMic.unmounted, true,
+    '내려놓은 자리 표시가 없습니다 — 실험대가 금 간 유리를 선반에 도로 꽂습니다');
+  assert.ok(/쓰레기통/.test(down.message), '어디에 버리는지 말하지 않습니다');
 
   // 막히는 것은 그다음이다.
-  const again = run(broke.state, 'PLACE_ON_STAGE', { item: 'stageMic' });
+  const again = run(down.state, 'PLACE_ON_STAGE', { item: 'stageMic' });
   assert.equal(again.outcome, 'blocked');
   assert.equal(again.reason, BLOCKING_REASONS.BROKEN);
+  assert.ok(/쓰레기통/.test(again.message), '막으면서 빠져나갈 길을 말하지 않습니다');
+
+  // 쓰레기통에 버린다. 버린 것은 실험대에서 사라진다.
+  const gone = run(again.state, 'DISCARD_ITEM', { item: 'stageMic' });
+  assert.equal(gone.state.items.stageMic.discarded, true);
 
   // 그리고 반드시 빠져나갈 길이 있다. 없으면 결과가 아니라 막다른 길이다.
-  const fresh = run(again.state, 'NEW_ITEM', { item: 'stageMic' });
+  const fresh = run(gone.state, 'NEW_ITEM', { item: 'stageMic' });
   assert.equal(fresh.state.items.stageMic.cracked, false);
+  assert.equal(fresh.state.items.stageMic.discarded, false);
   assert.notEqual(run(fresh.state, 'PLACE_ON_STAGE', { item: 'stageMic' }).outcome, 'blocked');
+});
+
+/**
+ * ★ **멀쩡한 것을 버려도 막지 않는다** (AGENTS.md §2.1).
+ * 버려지고, 무슨 일이 일어났는지 말한다. 막으면 학생은 쓰레기통이 무엇을 받는 물건인지
+ * 영영 모르고, 실물에도 그런 보호막은 없다.
+ */
+test('멀쩡한 것을 쓰레기통에 넣으면 막지 않고 결과로 답한다', () => {
+  for (const id of ['stageMic', 'specimen']) {
+    const r = run(S0(), 'DISCARD_ITEM', { item: id });
+    assert.notEqual(r.outcome, 'blocked', '버리는 것을 막았습니다');
+    assert.equal(r.state.items[id].discarded, true, '버렸다는데 그대로 남아 있습니다');
+    assert.ok(/멀쩡한/.test(r.message), '멀쩡한 것을 버렸다는 사실을 말하지 않습니다');
+    assert.ok(/새로 꺼내/.test(r.message), '어떻게 다시 얻는지 말하지 않습니다');
+  }
+});
+
+/** 상자에 넣으면 실험대에서 사라지고, 꺼내면 돌아온다. 넣기만 있고 꺼내기가 없으면 안 된다. */
+test('상자에 넣고 꺼내는 길이 둘 다 있다', () => {
+  for (const id of ['stageMic', 'specimen']) {
+    const put = run(S0(), 'PUT_AWAY_ITEM', { item: id });
+    assert.equal(put.state.items[id].stowed, true);
+    const out = run(put.state, 'TAKE_OUT_ITEM', { item: id });
+    assert.equal(out.state.items[id].stowed, false);
+  }
 });
 
 test('막는 결과는 이 하나뿐이다', () => {

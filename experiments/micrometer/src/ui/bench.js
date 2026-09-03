@@ -12,6 +12,7 @@
 
 import { ASSETS } from '../assets/index.js';
 import { CONTRACT, CONTENT_BOX, drawnBoxMm } from '../assets/contract.js';
+import { ITEM_IDS } from '../sim/state.js';
 import { UI } from './strings.js';
 
 /**
@@ -87,10 +88,15 @@ function clamp(v, a, b) {
  * 위쪽 좌표(y)는 실물 크기에서 계산하므로, `realSizeMm` 을 고치면 자리도 알아서 따라온다.
  */
 function defaultItems() {
-  const shelf = (x, rest) => ({ x, bottom: SHELF_MM, ...rest });
-  const surface = (x, rest) => ({ x, bottom: SURFACE_MM, ...rest });
-  // 선 위가 아닌 자리 — 편집 모드에서 미세 조정한 것이 이 모양으로 나온다.
-  const at = (x, bottom, rest) => ({ x, bottom, ...rest });
+  /**
+   * 선 위가 아닌 자리 — 편집 모드에서 미세 조정한 것이 이 모양으로 나온다.
+   *
+   * ★ **둘째 인자는 `y` 다** (편집 표의 두 번째 칸과 같은 값). 앞서는 `bottom`(바닥이 닿는
+   *   높이)이었는데, 편집 모드가 화면에 적어 주는 것도 「코드 복사」가 뱉는 것도 `y` 라
+   *   그 숫자를 그대로 붙여 넣으면 **애셋 높이만큼 어긋난 자리**에 놓였다.
+   *   화면이 말한 숫자와 코드가 받는 숫자가 같아야 옮겨 적기가 성립한다.
+   */
+  const at = (x, y, rest) => ({ x, bottom: y + heightMm(rest.asset), ...rest });
   const I = UI.bench.items;
   return [
     // 상단 선반 — 왼쪽에서 오른쪽으로 **쓰는 순서**다. 접안 마이크로미터를 먼저 끼우고,
@@ -104,23 +110,48 @@ function defaultItems() {
     // 훨씬 넓어서(「접안 마이크로미터 통」 이 173 mm), 그림 간격만 보고 벌리면 이름표가
     // 서로 밀려 아래 줄로 내려가고 선반이 지저분해진다. 이름표 폭을 재어 중심 간격을 잡고
     // 거기서 그림 위치를 거꾸로 냈다.
-    shelf(312, { id: 'ocularCase', asset: 'ocularbox', kind: 'ocularBox', labelKey: 'ocularCase' }),
+    //
+    // ★ 아래 일곱 좌표는 **사장님이 편집 모드(`?edit=1`)에서 직접 잡아 보내신 값**이다
+    //   (2026-09-03). 「내가 미세하게 조정할거야. 내 마음대로 할거야.」 — 보기 좋게
+    //   다시 정렬하거나 선에 붙이지 말 것. 옮길 일이 생기면 편집 모드에서 다시 받는다.
+    at(312, 203, { id: 'ocularCase', asset: 'ocularbox', kind: 'ocularBox', labelKey: 'ocularCase' }),
     // 접안 마이크로미터 **원판**. 통 바로 옆에 꺼내 둔 채로 시작한다.
     // 통만 놓여 있으면 학생은 통을 현미경에 끌어다 놓는다 — 통을 끼우는 그림이 되고,
     // 「렌즈 안에 들어가는 것은 원판」이라는 이 실험의 중심이 첫 조작부터 흐려진다.
-    shelf(493, { id: 'ocular', asset: 'ocular', kind: 'ocular', labelKey: 'ocular' }),
+    at(455, 199, { id: 'ocular', asset: 'ocular', kind: 'ocular', labelKey: 'ocular' }),
     // 대물 마이크로미터 보관함. 금이 갔을 때 새것을 꺼내는 곳이기도 한데, 앞서는 그 자리가
     // 표본 상자뿐이었다 — 대물 마이크로미터를 표본 상자에서 꺼내는 그림은 거짓말이고,
     // 학생은 그 거짓말을 실험 순서로 배운다.
-    shelf(652, { id: 'stageMicBox', asset: 'stagemicbox', kind: 'stageMicBox', labelKey: 'stageMicBox' }),
-    shelf(846, { id: 'stageMic', asset: 'stagemic', kind: 'stageMic', item: 'stageMic', labelKey: 'stageMic' }),
+    at(679, 175, { id: 'stageMicBox', asset: 'stagemicbox', kind: 'stageMicBox', labelKey: 'stageMicBox' }),
+    at(837, 198, { id: 'stageMic', asset: 'stagemic', kind: 'stageMic', item: 'stageMic', labelKey: 'stageMic' }),
     // 표본 상자. 다 쓴 표본을 도로 넣는 자리이자 깨졌을 때 새것을 꺼내는 자리다.
     // 받침 유리 통 그림을 그대로 쓴다 — 실제로 같은 물건(슬라이드를 세워 담는 상자)이다.
-    shelf(966, { id: 'specimenBox', asset: 'slidebox', kind: 'specimenBox', labelKey: 'specimenBox' }),
-    shelf(1066, { id: 'specimen', asset: 'specimen', kind: 'specimen', item: 'specimen', labelKey: 'specimen' }),
-    surface(520, { id: 'microscope', asset: 'microscope', kind: 'microscope', labelKey: 'microscope' }),
+    at(1089, 169, { id: 'specimenBox', asset: 'slidebox', kind: 'specimenBox', labelKey: 'specimenBox' }),
+    at(1232, 199, { id: 'specimen', asset: 'specimen', kind: 'specimen', item: 'specimen', labelKey: 'specimen' }),
+    at(880, 337, { id: 'microscope', asset: 'microscope', kind: 'microscope', labelKey: 'microscope' }),
+    /**
+     * 쓰레기통 — **깨진 표본·대물 마이크로미터를 버리는 곳**.
+     *
+     * 작업면 왼쪽 끝에 둔다. 현미경(그림 x 956~1135)과 한참 떨어져 있어야 재물대에
+     * 올리려다 잘못 놓는 일이 없고, 재물대에서 내려놓는 자리(`UNMOUNT_SPOT`, x 620·740)
+     * 와도 안 겹친다. 겹치면 뒤엣것이 앞엣것의 클릭을 가로챈다.
+     */
+    at(200, 401, { id: 'bin', asset: 'bin', kind: 'bin', labelKey: 'bin' }),
   ].map((it) => ({ ...it, label: I[it.labelKey], y: it.bottom - heightMm(it.asset) }));
 }
+
+/**
+ * 재물대에서 내린 물건이 놓이는 자리 (mm). **선반의 제자리가 아니다.**
+ *
+ * 사장님 지시(2026-09-03): 「깨진 것을 선반에 도로 꽂는 그림은 틀렸다. 내리면 현미경
+ * 왼쪽 실험대 위에 놓여야 한다.」 거기서 학생이 쓰레기통으로 끌어다 버린다.
+ * 현미경 x 는 880 이므로 그 **왼쪽**, 작업면 높이에 둘을 나란히 둔다 —
+ * 둘이 같은 자리면 하나가 다른 하나의 클릭을 가로챈다.
+ */
+const UNMOUNT_SPOT = {
+  stageMic: { x: 620, bottom: SURFACE_MM },
+  specimen: { x: 740, bottom: SURFACE_MM },
+};
 
 /**
  * 끌어다 놓았을 때 무슨 일이 일어나는가. **종류 쌍**으로만 적는다.
@@ -143,18 +174,31 @@ export function dropTable(store, openZoom = () => {}) {
       // 정리는 늦게라도 하면 위반 기록에서 지워지는 일이라 길이 막히면 안 된다.
       ocularBox: () => store.dispatch('PUT_AWAY_OCULAR', {}),
     },
-    // 재물대에 올린다. **순서를 강제하지 않는다** — 표본을 먼저 올려도 막지 않고,
-    // 견줄 눈금자가 없다는 것이 시야에 그대로 보인다.
+    /**
+     * 재물대에 올린다. **순서를 강제하지 않는다** — 표본을 먼저 올려도 막지 않고,
+     * 견줄 눈금자가 없다는 것이 시야에 그대로 보인다.
+     *
+     * ★ **접안 마이크로미터와 같은 모양이다** (사장님 지시 2026-09-03) —
+     *   ① 자기 상자(도로 넣기) ② 현미경(재물대에 올리기). 거기에 ③ 쓰레기통이 붙는다.
+     *   원판에는 쓰레기통이 없다 — 렌즈 안에 있는 것이라 깨지지 않는다.
+     *
+     *   상자에 놓는 것이 앞서는 `NEW_ITEM`(새것 꺼내기)이었다. 그러면 **다 쓴 것을
+     *   정리하려고 상자에 넣었는데 새것이 튀어나온다** — 넣는 손짓이 꺼내는 일이 된다.
+     *   이제 넣는 것은 넣는 것이고(`PUT_AWAY_ITEM`), 꺼내는 것은 상자를 눌러 연 화면의
+     *   「꺼내기」다.
+     */
     stageMic: {
       microscope: (item) => store.dispatch('PLACE_ON_STAGE', { item: item.item }),
       // 제자리는 **자기 보관함**이다. 표본 상자로 가던 것을 여기로 옮겼다 —
       // 대물 마이크로미터를 표본 상자에 넣는 그림은 거짓말이고, 그 거짓말이 실험 순서로 남는다.
-      stageMicBox: (item) => store.dispatch('NEW_ITEM', { item: item.item }),
+      stageMicBox: (item) => store.dispatch('PUT_AWAY_ITEM', { item: item.item }),
+      bin: (item) => store.dispatch('DISCARD_ITEM', { item: item.item }),
     },
     specimen: {
       microscope: (item) => store.dispatch('PLACE_ON_STAGE', { item: item.item }),
-      // 상자에 도로 넣는다. 정리이기도 하고, 금 간 것을 새것으로 바꾸는 길이기도 하다.
-      specimenBox: (item) => store.dispatch('NEW_ITEM', { item: item.item }),
+      // 상자에 도로 넣는다. 금 간 것을 치우는 길은 쓰레기통이다.
+      specimenBox: (item) => store.dispatch('PUT_AWAY_ITEM', { item: item.item }),
+      bin: (item) => store.dispatch('DISCARD_ITEM', { item: item.item }),
     },
   };
 }
@@ -171,24 +215,35 @@ export function tapTable(store, onOpenZoom) {
     // 현미경을 누르면 확대 뷰가 열린다. 여기서 눈금을 보고, 세고, 기록한다.
     microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
     /**
-     * 통을 누르면 **통 안을 들여다본다** — 대물 마이크로미터 보관함과 같다.
+     * 통·상자 셋은 **한 화면으로 통일했다** (사장님 지시 2026-09-03).
      *
-     * 앞서는 누르는 즉시 「넣기」가 일어났다. 그러면 원판이 통 속으로 사라지는데
-     * **꺼내는 길이 없어서**, 다시 누르면 또 넣기가 될 뿐이었다. 누르는 것만으로
-     * 되돌아갈 수 없는 자리가 생기면 안 된다 (AGENTS.md §2.1).
+     * 누르면 **열린 통 안**이 보이고, 단추는 「꺼내기」 하나다. 앞서는 접안 통만 다른
+     * 화면(원판 그림 + 단추 넷)이었고, 대물 보관함·표본 상자는 「기구 살펴보기」였다 —
+     * 셋이 같은 일을 하는데 화면이 셋 다 달랐다.
      *
-     * 넣기·꺼내기·끼우기는 열린 화면 안에 **지금 갈 수 있는 것만** 나온다.
-     * 끌어다 놓는 길(`dropTable` 의 `ocularBox`)은 그대로 넣기다 — 손짓이 이미 뜻을 말한다.
+     * 누르는 것만으로 되돌아갈 수 없는 자리가 생기면 안 된다 (AGENTS.md §2.1).
+     * 넣는 것은 손짓(`dropTable`)이 하고, 꺼내는 것은 이 화면이 한다.
      */
-    ocularBox: (item, el) => onOpenZoom('ocular', null, el, 'ocular'),
-    // 표본 상자도 통과 같다 — 눌러서 **들여다보고**, 거기서 넣는다.
-    // 정리(`PUT_AWAY_SPECIMEN`)를 부르는 곳이 여기뿐이라 길이 사라지면 안 되는데,
-    // 이제 그 단추가 열린 화면 안에 있다 (`renderItemMode`).
-    specimenBox: (item, el) => onOpenZoom('item', 'specimen', el),
-    // 대물 마이크로미터 보관함에는 「정리」 액션이 없다 (rules.js 에 그 액션이 없다).
-    // 없는 액션을 부르는 대신 **들여다본다** — 상자 안의 유리판을 확대해서 보는 일은
-    // 언제 해도 아무것도 바꾸지 않으므로, 눌러도 손해가 없는 유일한 답이다.
-    stageMicBox: (item, el) => onOpenZoom('item', 'stageMic', el),
+    ocularBox: (item, el) => onOpenZoom('box', 'ocularBox', el),
+    specimenBox: (item, el) => onOpenZoom('box', 'specimenBox', el),
+    stageMicBox: (item, el) => onOpenZoom('box', 'stageMicBox', el),
+    /**
+     * 꺼낸 물건 셋도 **누르면 자기 화면이 열린다** — 셋이 같은 손짓, 같은 화면이다
+     * (사장님 지시 2026-09-03).
+     *
+     * ★ 앞서는 셋 다 눌러도 아무 일이 없었다. 원판 화면은 **통을 눌러야** 열렸고
+     *   (통 화면에서 렌즈에 끼우는 그림이 됐다), 유리판·표본 화면은 **상자를 눌러야**
+     *   열렸다. 물건을 눌러 물건을 보는 길이 어디에도 없었다.
+     *   방향(뒤집어 끼우기)은 여전히 여기서 안 정한다 — 그 화면에서 학생이 고른다.
+     */
+    ocular: (item, el) => onOpenZoom('item', 'ocular', el),
+    stageMic: (item, el) => onOpenZoom('item', 'stageMic', el),
+    specimen: (item, el) => onOpenZoom('item', 'specimen', el),
+    /**
+     * 쓰레기통은 눌러도 아무것도 열지 않는다 — **버리는 일은 끌어다 놓는 손짓뿐**이다.
+     * 누르면 버려지게 하면, 스쳐 누른 것 하나로 표본이 사라진다.
+     * 말풍선이 무엇을 받는 곳인지 말하고, 키보드로는 물건 쪽 「여기에 놓기」로 간다.
+     */
   };
 }
 
@@ -208,8 +263,39 @@ export function benchLayout() {
   });
 }
 
+/**
+ * 실험대 배치의 **날 좌표** (mm). 편집 모드 표에 뜨는 두 칸(x, y)과 같은 값이다.
+ *
+ * 사장님이 편집 모드에서 잡아 보내신 숫자가 코드에 그대로 들어갔는지 검사가 물을 수 있어야
+ * 한다 — `benchLayout()` 은 그림 여백(dx·dy)을 더한 뒤라 그 숫자와 다르다.
+ */
+export function benchItems() {
+  return defaultItems().map((it) => ({ id: it.id, kind: it.kind, x: it.x, y: it.y }));
+}
+
+/**
+ * 재물대에서 내려놓은 물건들의 mm 사각형. `benchLayout()` 과 같은 재는 법을 쓴다.
+ *
+ * 이 자리는 `defaultItems()` 에 없어서 겹침 검사가 지나친다 — 그런데 여기가 겹치면
+ * 금 간 유리를 집으려는 순간 옆엣것이 잡힌다. 검사가 볼 수 있게 따로 내보낸다.
+ */
+export function unmountLayout() {
+  const byItem = Object.fromEntries(defaultItems().filter((it) => it.item).map((it) => [it.item, it]));
+  return Object.entries(UNMOUNT_SPOT).map(([itemId, spot]) => {
+    const asset = byItem[itemId].asset;
+    const d = drawnBoxMm(asset);
+    return {
+      id: `${itemId}@unmount`,
+      x: spot.x + d.dx,
+      y: spot.bottom - heightMm(asset) + d.dy,
+      w: d.w,
+      h: d.h,
+    };
+  });
+}
+
 /** 실험대에 놓인 물건들. 배치를 몰라도 종류만 알면 되는 검사에 쓴다. */
-export const BENCH_KINDS = ['ocular', 'ocularBox', 'stageMic', 'stageMicBox', 'specimen', 'specimenBox', 'microscope'];
+export const BENCH_KINDS = ['ocular', 'ocularBox', 'stageMic', 'stageMicBox', 'specimen', 'specimenBox', 'microscope', 'bin'];
 
 /**
  * 배치를 다시 코드로 뱉는다 — 편집 모드에서 옮긴 자리를 그대로 `defaultItems()` 에 붙여 넣는다.
@@ -220,15 +306,15 @@ export const BENCH_KINDS = ['ocular', 'ocularBox', 'stageMic', 'stageMicBox', 's
 function layoutCode(items) {
   const lines = items.map((it) => {
     /*
-     * 자유 배치가 되면서 바닥이 **두 값이 아니다.** 선 위에 딱 선 것만 `shelf`/`surface` 로
-     * 짧게 적고, 미세 조정한 것은 `at(x, bottom)` 으로 그 숫자를 그대로 적는다 —
-     * 가까운 선으로 반올림해 적으면 선생님이 맞춰 둔 몇 밀리미터가 **적히는 순간 사라진다.**
+     * ★ **한 가지 모양으로만 적는다 — `at(x, y)`.**
+     *
+     * 앞서는 선 위에 딱 선 것만 `shelf`/`surface` 로 짧게 적고 나머지는 `at(x, bottom)` 으로
+     * 적었다. 두 가지 탈이 났다. 하나는 **화면에 적힌 숫자(y)와 코드가 받는 숫자(bottom)가
+     * 달라서** 표를 보고 손으로 옮겨 적으면 애셋 높이만큼 어긋난 것. 다른 하나는 선에서
+     * 0.5 mm 떨어진 자리를 `shelf(x)` 로 적어 **선생님이 맞춰 둔 몇 밀리미터가 적히는
+     * 순간 사라진 것.** 이제 표의 두 칸(x, y)을 그대로 적는다.
      */
-    const onShelf = Math.abs(it.bottom - SHELF_MM) < 1;
-    const onSurface = Math.abs(it.bottom - SURFACE_MM) < 1;
-    const call = onShelf ? `shelf(${Math.round(it.x)}`
-      : onSurface ? `surface(${Math.round(it.x)}`
-      : `at(${Math.round(it.x)}, ${Math.round(it.bottom)}`;
+    const call = `at(${Math.round(it.x)}, ${Math.round(it.y)}`;
     const props = [
       `id: '${it.id}'`,
       `asset: '${it.asset}'`,
@@ -470,11 +556,17 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
        * 없어서(`rules.js` 에 그 액션이 없다) 뚜껑을 닫을 계기가 상태에 없다.
        * 덮은 그림은 계약에 남겨 둔다 — 나중에 그 동작이 생기면 그때 이어 붙인다.
        */
+      // 상자가 비었는가는 **상자 안에 있는가**(`stowed`) 하나가 말한다. 앞서는
+      // 「재물대에 올라가 있는가」로 봤는데, 그러면 선반에 꺼내 놓은 동안에도 상자가
+      // 가득 차 보여 **같은 유리판이 두 곳에** 있는 그림이 됐다.
       case 'stageMicBox':
-        return { empty: st.microscope.stage === 'stageMic', open: true };
+        return { empty: !st.items.stageMic.stowed, open: true };
       case 'stageMic':
       case 'specimen':
         return itemRenderState(item.item);
+      // 쓰레기통은 버린 것이 있으면 안이 찬다. 버린 것이 어디로 갔는지가 눈에 남는다.
+      case 'bin':
+        return { fill: ITEM_IDS.some((id) => st.items[id].discarded) ? 1 : 0 };
       case 'microscope':
         return {
           objective: st.microscope.objective, coarse: st.microscope.coarse, fine: st.microscope.fine,
@@ -488,13 +580,43 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
   /**
    * 재물대에 올라간 것은 실험대에서 사라진다 — 그 자리에 있으니까.
    * 케이스와 상자는 사라지지 않는다. 계속 꺼내 쓰는 자리다.
+   *
+   * 상자에 넣은 것(`stowed`)과 버린 것(`discarded`)도 사라진다. 「통에 넣었습니다」라고
+   * 말해 놓고 선반에 그대로 그리면 화면이 거짓말을 한다 (사장님 지시 2026-09-03).
    */
   function isHidden(item) {
     const st = store.getState();
     // 접안 마이크로미터는 재물대에 오르지 않는다 — **렌즈 안**이거나 통 안이면 실험대에서 사라진다.
     // 이 비대칭이 실험의 중심이라 숨기는 조건도 다른 곳을 본다.
     if (item.kind === 'ocular') return st.eyepiece.micrometer || st.eyepiece.stowed;
-    return Boolean(item.item) && st.microscope.stage === item.item;
+    if (!item.item) return false;
+    const it = st.items[item.item];
+    return st.microscope.stage === item.item || Boolean(it.stowed) || Boolean(it.discarded);
+  }
+
+  /**
+   * 물건이 **쉬는 자리**. 선반의 제자리이거나, 재물대에서 내려놓은 현미경 옆자리다.
+   *
+   * 끌어 놓은 뒤 물건이 돌아갈 곳이자 다시 그릴 때 앉는 곳이라, 두 곳에서 따로 계산하면
+   * 「끌었다 놓으면 딴 데로 간다」가 된다. 여기 한 함수만 본다.
+   */
+  function restPos(item) {
+    const spot = item.item ? UNMOUNT_SPOT[item.item] : null;
+    if (spot && store.getState().items[item.item]?.unmounted) {
+      return { x: spot.x, y: spot.bottom - heightMm(item.asset) };
+    }
+    return { x: item.homeX, y: item.homeY };
+  }
+
+  /** 끌고 있지 않은 물건을 쉬는 자리에 맞춘다. 편집 모드에서는 사람이 자리를 정한다. */
+  function syncPlaces() {
+    if (edit) return;
+    for (const item of items) {
+      if (drag && drag.item.id === item.id) continue;
+      const p = restPos(item);
+      item.x = p.x;
+      item.y = p.y;
+    }
   }
 
   const elFor = (id) => layer.querySelector(`[data-id="${id}"]`);
@@ -980,15 +1102,16 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     const run = target ? DROPS[item.kind]?.[target.kind] : null;
     if (run) run(item, target, { smearMm: drag.smearMm, lastDx: drag.lastDx, lastDy: drag.lastDy });
 
-    // 쓴 물건은 언제나 제자리로 돌아간다.
+    // 쓴 물건은 언제나 **쉬는 자리**로 돌아간다.
     //
     // 놓인 자리는 결과에 아무 영향을 주지 않는데, 물건이 놓인 채로 남으면 자리가 뜻을 갖는 것처럼
-    // 보인다 — 현미경 위에 얹힌 받침 유리는 재물대에 올라간 것처럼 보인다(실제로는 아니다).
-    // 재물대에 올라가 화면에서 사라진 받침 유리도 마찬가지로 되돌려 둔다.
+    // 보인다 — 현미경 위에 얹힌 유리판은 재물대에 올라간 것처럼 보인다(실제로는 아니다).
+    // 재물대에 올라가 화면에서 사라진 것도 마찬가지로 되돌려 둔다.
     // 그러지 않으면 내렸을 때 현미경 위에 겹쳐 나타나 다시 집을 수가 없다.
-    item.x = item.homeX;
-    item.y = item.homeY;
     drag = null;
+    const back = restPos(item);
+    item.x = back.x;
+    item.y = back.y;
     renderTokens();
   }
 
@@ -997,6 +1120,8 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     // 매번 새 <button> 을 만들면 포커스가 <body> 로 빠져 Tab 흐름이 끊긴다.
     // 같은 id 를 가진 새 요소로 포커스를 옮겨 준다.
     const focusedId = layer.contains(document.activeElement) ? document.activeElement.dataset.id : null;
+    // 재물대에서 내려놓은 물건은 선반이 아니라 현미경 옆에 선다. 그리기 직전에 맞춘다.
+    syncPlaces();
     layer.innerHTML = '';
     for (const item of items) {
       if (isHidden(item)) continue;

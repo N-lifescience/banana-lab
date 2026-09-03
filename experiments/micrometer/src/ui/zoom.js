@@ -49,10 +49,10 @@ import { observabilityOf } from '../sim/quality.js';
 import {
   EYEPIECE, OBJECTIVES, RETICLE_DIVS, ZOOM, MAJOR_EVERY_DIV, STAGE_DIV_UM, STAGE_RULED_UM,
   eyepieceDivPx, stageDivPx, canResolveStageTicks, canResolveStageMajor, magnification,
-  focusTolerance,
+  KNOB_SPAN,
 } from '../sim/optics.js';
-import { ITEM_IDS, PICK_KINDS, PAN_LIMIT, fieldParams, focusError } from '../sim/state.js';
-import { visibleRange } from '../sim/scale.js';
+import { ITEM_IDS, PICK_KINDS, PAN_LIMIT, fieldParams, isFocused } from '../sim/state.js';
+import { visibleRange, pickAt } from '../sim/scale.js';
 import { UI } from './strings.js';
 import { ASSETS } from '../assets/index.js';
 import { PALETTE, INK, STROKE } from '../style/tokens.js';
@@ -101,9 +101,6 @@ const TAP_SLOP_PX = 5;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-/** 재물대에 오르는 기구의 애셋 이름. 상태의 id 와 애셋 키가 다르다. */
-const ASSET_OF = { stageMic: 'stagemic', specimen: 'specimen' };
-
 /**
  * 초점 안내 한 줄. **나사가 끝까지 갔으면 그것부터 말한다.**
  *
@@ -119,11 +116,30 @@ const ASSET_OF = { stageMic: 'stagemic', specimen: 'specimen' };
 export function focusLineFor(m, focused) {
   if (focused) return UI.zoom.focusInRange;
   const at = (v, span) => Math.abs(Math.abs(v) - span) < 1e-6;
-  if (at(m.fine ?? 0, 0.2)) {
+  if (at(m.fine ?? 0, KNOB_SPAN.fine)) {
     return (m.objective ?? 4) > 10 ? UI.zoom.focusFineAtEndHighMag : UI.zoom.focusFineAtEnd;
   }
-  if (at(m.coarse ?? 0, 1)) return UI.zoom.focusCoarseAtEnd;
+  if (at(m.coarse ?? 0, KNOB_SPAN.coarse)) return UI.zoom.focusCoarseAtEnd;
   return UI.zoom.focusOutOfRange;
+}
+
+/**
+ * 나사 밑에 늘 붙는 한 줄. **테두리의 호가 무엇인지 말한다** (사장님: 「왜 나오는지,
+ * 조건이 뭔지 모르겠다」).
+ *
+ * 호는 **가운데(0)에서 얼마나 돌렸는지**이고, 색은 초점이 맞았는가다. 색만으로 나르면
+ * 색을 못 가리는 학생에게는 아무 말도 안 한 것이 된다 (WCAG 1.4.1) — 그래서 같은 것을
+ * 글로도 적는다. `aria-valuetext` 와 눈에 보이는 글이 같은 함수에서 나온다.
+ * DOM 없이 판정되도록 `createZoom` 밖에 둔다.
+ */
+export function dialStateFor(value, span, focused) {
+  const t = Math.max(-1, Math.min(1, (value ?? 0) / span));
+  const pct = Math.round(Math.abs(t) * 100);
+  const side = t > 0 ? UI.zoom.dialRight : UI.zoom.dialLeft;
+  const turn = pct === 0 ? UI.zoom.dialCenter
+    : pct >= 100 ? UI.zoom.dialEnd(side)
+      : UI.zoom.dialTurned(side, pct);
+  return UI.zoom.dialState(turn, focused);
 }
 
 export function createZoom(root, store) {
@@ -190,13 +206,20 @@ export function createZoom(root, store) {
   root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
 
   /**
-   * @param {'scope'|'ocular'|'item'} openMode
-   * @param {string|null} openItemId  'item' 모드에서 볼 기구 ('stageMic'|'specimen')
+   * @param {'scope'|'ocular'|'item'|'box'} openMode
+   * @param {string|null} openItemId  'item' 모드에서 볼 기구, 'box' 모드에서 볼 상자의 kind
    * @param {HTMLElement|null} openerEl 닫을 때 포커스를 돌려줄 곳
    */
   function open(openMode, openItemId = null, openerEl = null) {
-    mode = openMode;
-    itemId = openItemId;
+    /**
+     * ★ **'ocular' 는 'item' 의 한 갈래다.**
+     *
+     * 꺼낸 물건 셋(원판·대물 마이크로미터·표본)의 화면을 하나로 합쳤다 (사장님 지시
+     * 2026-09-03: 「세 물건의 확대 화면·문구·단추 구조가 서로 같아야 합니다」).
+     * 부르는 쪽(`bench.js` 의 `dropTable`)은 예전 이름을 그대로 쓰므로 여기서 옮긴다.
+     */
+    mode = openMode === 'ocular' ? 'item' : openMode;
+    itemId = openMode === 'ocular' ? 'ocular' : openItemId;
     captureNotice = null;
     /**
      * ★ **찍기 모드는 재물대에 올린 것을 따라간다.**
@@ -235,7 +258,7 @@ export function createZoom(root, store) {
 
   function renderBody() {
     if (mode === 'scope') renderScopeMode();
-    else if (mode === 'ocular') renderOcularMode();
+    else if (mode === 'box') renderBoxMode();
     else if (mode === 'item') renderItemMode();
   }
 
@@ -262,95 +285,169 @@ export function createZoom(root, store) {
    * 지금 있는 자리에서 **갈 수 있는 곳만** 단추로 낸다. 못 가는 곳을 회색으로 죽여 두지는
    * 않는다 (AGENTS.md §2.1) — 애초에 그 자리에서 할 수 있는 일이 아니면 안 그린다.
    */
-  function renderOcularMode() {
-    const eye = store.getState().eyepiece;
-    const mat = materialFor('ocular');
-    const where = eye.micrometer
-      ? (eye.flipped ? UI.zoom.insertedFlipped : UI.zoom.inserted)
-      : (eye.stowed ? UI.zoom.inCase : UI.zoom.outOfCase);
+  /**
+   * 꺼낸 물건 셋. **세 화면이 이 표 하나를 읽으므로 구조가 어긋날 수 없다.**
+   *
+   * 앞서는 원판만 다른 함수(`renderOcularMode`)였고 제목·문장·단추가 딴판이었다 —
+   * 원판은 「접안 마이크로미터 끼우기」에 단추 셋, 유리판·표본은 「… 살펴보기」에 단추 하나.
+   * 같은 일(어디 있는지 보고, 옮긴다)을 하는데 화면을 물건마다 새로 읽어야 했다.
+   */
+  const ITEM_VIEW = {
+    ocular: { asset: 'ocular', boxKey: 'ocularCase' },
+    stageMic: { asset: 'stagemic', boxKey: 'stageMicBox' },
+    specimen: { asset: 'specimen', boxKey: 'specimenBox' },
+  };
 
-    // 통 안에 있으면 먼저 꺼내야 끼울 수 있다. 실물이 그렇다.
-    const actions = eye.micrometer
-      ? `<button type="button" id="ocular-remove">${UI.zoom.remove}</button>`
-      : eye.stowed
-        ? `<button type="button" class="zoom-action" id="ocular-take-out">${UI.zoom.takeOut}</button>`
-        : `<button type="button" class="zoom-action" data-insert="0">${UI.zoom.insert}</button>
-           <button type="button" class="zoom-action" data-insert="1">${UI.zoom.insertFlipped}</button>
-           <button type="button" id="ocular-put-away">${UI.zoom.putAway}</button>`;
+  /** 통·상자 셋. `item` 은 그 안에 드는 물건이다 — 설명 두 줄이 거기서 나온다. */
+  const BOX_VIEW = {
+    ocularBox: { asset: 'ocularbox', item: 'ocular', labelKey: 'ocularCase' },
+    stageMicBox: { asset: 'stagemicbox', item: 'stageMic', labelKey: 'stageMicBox' },
+    specimenBox: { asset: 'slidebox', item: 'specimen', labelKey: 'specimenBox' },
+  };
 
-    // 제목도 **어디에 있는지**를 따라간다. 늘 「통」이라고 하면 꺼내 놓았을 때도,
-    // 렌즈에 끼웠을 때도 통이라고 말하게 된다 — 바로 아래 단추가 「통에 넣기」인데.
-    const title = eye.micrometer ? UI.zoom.ocularModeIn
-      : eye.stowed ? UI.zoom.caseMode
-        : UI.zoom.ocularMode;
+  /** 화면에 적는 물건 이름. 원판은 `bench.items`, 재물대에 오르는 둘은 `stageItems` 에 있다. */
+  const nameOf = (id) => (id === 'ocular' ? UI.bench.items.ocular : UI.stageItems[id]);
 
-    body.innerHTML = `
-      <h2>${title}</h2>
-      <div class="zoom-slide-stage" id="ocular-figure"></div>
-      <p class="zoom-slide-label" style="margin-top:10px">${where}</p>
-      ${mat ? `<p class="zoom-empty">${mat.role}</p>` : ''}
-      <div class="zoom-scope-controls" style="margin-top:12px">${actions}</div>`;
-
-    body.querySelector('#ocular-figure').innerHTML =
-      ASSETS.ocular.render({ flipped: eye.flipped, inCase: eye.stowed });
-
-    body.querySelectorAll('[data-insert]').forEach((b) => {
-      b.addEventListener('click', () => {
-        store.dispatch('INSERT_OCULAR', { flipped: b.dataset.insert === '1' });
-      });
-    });
-    // 빼내는 길은 늘 열려 있다 — 뒤집어 끼운 것을 고치는 길이기도 하다 (M-02).
-    body.querySelector('#ocular-remove')
-      ?.addEventListener('click', () => store.dispatch('REMOVE_OCULAR', {}));
-    body.querySelector('#ocular-take-out')
-      ?.addEventListener('click', () => store.dispatch('TAKE_OUT_OCULAR', {}));
-    body.querySelector('#ocular-put-away')
-      ?.addEventListener('click', () => store.dispatch('PUT_AWAY_OCULAR', {}));
+  /**
+   * 그 물건이 **지금 어디 있는가.** `null` 이면 자기 상자 안이다.
+   * 상자 화면과 물건 화면이 같은 답을 말해야 해서 한 함수에서 낸다.
+   */
+  function whereOf(st, id) {
+    if (id === 'ocular') {
+      if (st.eyepiece.micrometer) return UI.zoom.whereInEyepiece;
+      return st.eyepiece.stowed ? null : UI.zoom.whereOnBench;
+    }
+    const it = st.items[id];
+    if (st.microscope.stage === id) return UI.zoom.whereOnStage;
+    if (it.stowed) return null;
+    if (it.discarded) return UI.zoom.whereDiscarded;
+    if (it.unmounted) return UI.zoom.whereUnmounted;
+    return UI.zoom.whereOnBench;
   }
 
   /* ---------------------------------------------------------------- */
-  /* ③ 기구 모드 — 크게 보고 라벨을 읽는다. 조작은 없다                  */
+  /* ③ 통·상자 모드 — 열린 통 안을 본다. 단추는 「꺼내기」 하나          */
   /* ---------------------------------------------------------------- */
 
-  function renderItemMode() {
+  /**
+   * ★ 사장님 지시 (2026-09-03): 「통을 누르면 **진짜 통 내부처럼** 보이게. 통 안에
+   *   원판이 가지런히 정리돼 있는 그림. **단추는 「꺼내기」 하나만.**」
+   *
+   * 세 줄 구조다 — ① 무엇이 들어 있는지 ② 그것이 하는 일(준비물 표의 「하는 일」을
+   * 그대로 쓴다. 두 곳에 따로 쓰면 반드시 갈린다) ③ 열린 통 그림.
+   * 그림은 통 애셋을 `open: true` 로 그린다 — 뚜껑이 젖혀지고 안에 든 것이 보인다.
+   */
+  function renderBoxMode() {
     const st = store.getState();
-    const assetKey = ASSET_OF[itemId];
-    if (!assetKey) { body.innerHTML = `<h2>${UI.zoom.scopeMode}</h2>`; return; }
-    const it = st.items[itemId];
-    const mat = materialFor(assetKey);
-
-    // 지금 재물대에 올라가 있으면 **여기서 내릴 수 있어야** 한다.
-    // 상자를 눌러 들여다봤는데 「저기 재물대에 있습니다」만 하고 아무것도 못 하면,
-    // 학생은 확대 뷰를 닫고 현미경을 다시 눌러 돌아가야 한다.
-    const onStage = st.microscope.stage === itemId;
-    const putAway = onStage
-      ? (itemId === 'specimen'
-        ? `<button type="button" class="zoom-action" id="item-put-away">${UI.zoom.putAwaySpecimen}</button>`
-        : `<button type="button" class="zoom-action" id="item-unmount">${UI.bench.unmount(UI.stageShort[itemId])}</button>`)
-      : '';
+    const view = BOX_VIEW[itemId];
+    if (!view) { body.innerHTML = `<h2>${UI.zoom.scopeMode}</h2>`; return; }
+    const held = view.item;
+    const name = nameOf(held);
+    const where = whereOf(st, held);
+    const inBox = where === null;
+    const mat = materialFor(ITEM_VIEW[held].asset);
+    /**
+     * 여벌이 있는가. 유리판·표본은 상자에 여벌이 있어 깨져도 실험이 안 멈춘다
+     * (`rules.js` 의 `NEW_ITEM` 머리말). 접안 마이크로미터 원판은 하나뿐이다 —
+     * 렌즈 안에 있어 깨지지 않으므로 여벌을 둘 까닭이 없다.
+     */
+    const spare = held !== 'ocular';
+    const lead = inBox ? UI.zoom.boxHolds(name)
+      : spare ? UI.zoom.boxSpare(name, where)
+        : UI.zoom.boxEmpty(name, where);
 
     body.innerHTML = `
-      <h2>${UI.zoom.itemMode(UI.stageItems[itemId])}</h2>
-      <div class="zoom-slide-stage" id="item-figure"></div>
-      <p class="zoom-slide-label" style="margin-top:10px">${
-        onStage ? UI.zoom.itemOnStage : UI.zoom.itemInBox}</p>
-      ${mat ? `<p class="zoom-empty" style="margin-top:12px">${mat.role}</p>` : ''}
+      <h2>${UI.bench.items[view.labelKey]}</h2>
+      <p class="zoom-slide-label">${lead}</p>
+      ${mat ? `<p class="zoom-empty">${mat.role}</p>` : ''}
+      <div class="zoom-slide-stage" id="box-figure"></div>
       <div class="zoom-scope-controls" style="margin-top:12px">
-        ${putAway}
-        ${it.cracked ? `<button type="button" id="item-new">${UI.zoom.newItem}</button>` : ''}
-      </div>
-      ${it.cracked
-        ? `<p class="zoom-empty" data-why="cracked">${UI.zoom.crackedNote(UI.stageShort[itemId])}</p>`
-        : ''}`;
+        ${inBox || spare
+          ? `<button type="button" class="zoom-action" id="box-take">${UI.zoom.boxTakeOut}</button>`
+          : ''}
+      </div>`;
 
-    body.querySelector('#item-figure').innerHTML =
-      ASSETS[assetKey].render({ cracked: it.cracked, seed: it.seed });
-    body.querySelector('#item-new')
-      ?.addEventListener('click', () => store.dispatch('NEW_ITEM', { item: itemId }));
-    body.querySelector('#item-put-away')
-      ?.addEventListener('click', () => store.dispatch('REMOVE_FROM_STAGE', {}));
-    body.querySelector('#item-unmount')
-      ?.addEventListener('click', () => store.dispatch('REMOVE_FROM_STAGE', {}));
+    body.querySelector('#box-figure').innerHTML =
+      ASSETS[view.asset].render({ open: true, empty: !inBox });
+
+    body.querySelector('#box-take')?.addEventListener('click', () => {
+      if (held === 'ocular') { store.dispatch('TAKE_OUT_OCULAR', {}); return; }
+      // 들어 있으면 그것을 꺼내고, 비었으면 여벌에서 새것을 꺼낸다. 단추는 하나다.
+      store.dispatch(inBox ? 'TAKE_OUT_ITEM' : 'NEW_ITEM', { item: held });
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* ④ 물건 모드 — 꺼낸 물건 셋이 같은 화면을 쓴다                       */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * 제목 · ① 어디 있는가 · ② 하는 일 · ③ 그림 · 갈 수 있는 곳(단추).
+   *
+   * **못 가는 곳을 회색으로 죽여 두지 않는다** (AGENTS.md §2.1) — 그 자리에서 할 수 없는
+   * 일이면 아예 안 그린다. 원판이 통 안에 있으면 「꺼내기」만, 렌즈 안이면 「빼내기」만 나온다.
+   */
+  function renderItemMode() {
+    const st = store.getState();
+    const view = ITEM_VIEW[itemId];
+    if (!view) { body.innerHTML = `<h2>${UI.zoom.scopeMode}</h2>`; return; }
+    const name = nameOf(itemId);
+    const mat = materialFor(view.asset);
+    const boxName = UI.bench.items[view.boxKey];
+    const where = whereOf(st, itemId);
+    const cracked = itemId !== 'ocular' && st.items[itemId].cracked;
+
+    /** 갈 수 있는 곳. `[id, 글자, 액션, payload]` 넷으로만 적어 셋이 같은 모양을 갖게 한다. */
+    const acts = [];
+    if (itemId === 'ocular') {
+      const eye = st.eyepiece;
+      if (eye.micrometer) acts.push(['ocular-remove', UI.zoom.remove, 'REMOVE_OCULAR', {}]);
+      else if (eye.stowed) acts.push(['ocular-take-out', UI.zoom.takeOut, 'TAKE_OUT_OCULAR', {}]);
+      else {
+        acts.push(['ocular-insert', UI.zoom.insert, 'INSERT_OCULAR', { flipped: false }]);
+        acts.push(['ocular-insert-flip', UI.zoom.insertFlipped, 'INSERT_OCULAR', { flipped: true }]);
+        acts.push(['ocular-put-away', UI.zoom.itemPutAwayBox(boxName), 'PUT_AWAY_OCULAR', {}]);
+      }
+    } else {
+      const it = st.items[itemId];
+      const onStage = st.microscope.stage === itemId;
+      if (onStage) {
+        acts.push(['item-unmount', UI.bench.unmount(UI.stageShort[itemId]), 'REMOVE_FROM_STAGE', {}]);
+      } else if (it.stowed) {
+        acts.push(['item-take-out', UI.zoom.boxTakeOut, 'TAKE_OUT_ITEM', { item: itemId }]);
+      } else if (!it.discarded) {
+        // 금 간 것을 올리려 하면 규칙이 결과로 답한다. 단추를 지우지 않는다 —
+        // 「왜 못 올리는지」를 듣는 것이 이 실험에서 배우는 내용이다 (AGENTS.md §2.1).
+        acts.push(['item-place', UI.zoom.itemPlaceOnStage, 'PLACE_ON_STAGE', { item: itemId }]);
+      }
+      if (!it.stowed && !it.discarded) {
+        acts.push(['item-put-away', UI.zoom.itemPutAwayBox(boxName), 'PUT_AWAY_ITEM', { item: itemId }]);
+        acts.push(['item-discard', UI.zoom.itemDiscard, 'DISCARD_ITEM', { item: itemId }]);
+      }
+    }
+
+    body.innerHTML = `
+      <h2>${name}</h2>
+      <p class="zoom-slide-label">${where ? `${where}.` : UI.zoom.whereInBox(boxName)}</p>
+      ${mat ? `<p class="zoom-empty">${mat.role}</p>` : ''}
+      <div class="zoom-slide-stage" id="item-figure"></div>
+      ${cracked
+        // 이미 내려놓았으면 「내리기」를 시키지 않는다 — 없는 단추를 가리키는 안내가 된다.
+        ? `<p class="zoom-empty" data-why="cracked">${
+            UI.zoom.crackedNote(UI.stageShort[itemId], st.microscope.stage === itemId)}</p>`
+        : ''}
+      <div class="zoom-scope-controls" style="margin-top:12px">
+        ${acts.map(([id, label]) =>
+          `<button type="button" class="zoom-action" id="${id}">${label}</button>`).join('')}
+      </div>`;
+
+    body.querySelector('#item-figure').innerHTML = itemId === 'ocular'
+      ? ASSETS.ocular.render({ flipped: st.eyepiece.flipped, inCase: st.eyepiece.stowed })
+      : ASSETS[view.asset].render({ cracked: st.items[itemId].cracked, seed: st.items[itemId].seed });
+
+    for (const [id, , type, payload] of acts) {
+      body.querySelector(`#${id}`)?.addEventListener('click', () => store.dispatch(type, payload));
+    }
   }
 
   /** 준비물 표에 적힌 「하는 일」. 기구를 크게 볼 때 읽을 것이 그 한 줄이다. */
@@ -372,16 +469,25 @@ export function createZoom(root, store) {
     syncChosenCalibration(st);
 
     /**
-     * 지금 초점이 맞았는가. **절차가 요구하는 바로 그 조건**이다
-     * (`progress.js` 의 `focusedOn` 과 같은 식이어야 한다 — 둘이 어긋나면
-     * 화면은 「맞았다」는데 노트의 ✓ 가 안 켜진다).
-     * 재물대가 비어 있으면 맞출 상대가 없으므로 판정하지 않는다.
+     * 지금 초점이 맞았는가. **절차가 요구하는 바로 그 조건**이다.
+     * 화면·점수·노트의 ✓ 가 전부 `isFocused` 하나를 부른다 (`sim/state.js`) —
+     * 앞서는 세 곳이 저마다 허용 범위를 골라 표본에서 갈렸다.
      */
-    const focused = Boolean(on)
-      && focusError(m) <= focusTolerance(m.objective, on === 'stageMic' ? 'micrometer' : 'specimen');
+    const focused = isFocused(m);
 
-    // 재물대가 비어도 **화면을 접지 않는다.** 정리(조명·최저배율)로 가는 통로가 여기뿐이라,
-    // 표본을 상자에 넣고 나면 조명을 끌 길이 사라진다. 시야는 빈 시야를 그리면 된다.
+    /**
+     * ★ **화면 차례를 실제 관찰 순서로 놓는다** (사장님 지시 2026-09-03).
+     *
+     *   ① 시야 — ② 관찰 가능성 게이지 — ③ 재물대에서 내리기(현미경 그림 바로 아래) —
+     *   ④ 접안렌즈 돌리기 — ⑤ 대물렌즈 배율 — ⑥ 조동/미동나사 — ⑦ 조리개 —
+     *   ⑧ 눈금 찍기 — ⑨ 기록 — ⑩ 사진
+     *
+     * 「재물대에서 내리기」는 맨 아래 있었다. 그런데 그 단추가 가장 급해지는 때는
+     * **유리에 금이 갔을 때**이고(이제 깨져도 재물대에 그대로 있다), 그때 학생이 보는 것은
+     * 현미경 그림이다. 그래서 그림 바로 밑에 붙인다 — 차례로는 셋째이지만 눈으로는
+     * 그림에 딸린 단추다.
+     */
+    // 재물대가 비어도 **화면을 접지 않는다.** 시야는 빈 시야를 그리면 된다.
     body.innerHTML = `
       <h2>${UI.zoom.scopeMode}</h2>
       ${on
@@ -390,7 +496,11 @@ export function createZoom(root, store) {
       ${crackedHtml(st)}
       ${st.eyepiece.micrometer ? '' : `<p class="zoom-empty">${UI.zoom.noReticle}</p>`}
       <div class="scope-stage">
-        <div class="scope-figure" id="scope-figure" aria-hidden="true"></div>
+        <div class="scope-figure-col">
+          <div class="scope-figure" id="scope-figure" aria-hidden="true"></div>
+          ${on ? `<button type="button" class="zoom-action" id="scope-unmount"
+            >${UI.bench.unmount(UI.stageShort[on])}</button>` : ''}
+        </div>
         <div class="zoom-fov" id="fov-slot" tabindex="0" style="touch-action:none"
           role="group" aria-label="${UI.zoom.stageGroup}"></div>
       </div>
@@ -403,27 +513,27 @@ export function createZoom(root, store) {
         <div class="hint" id="zoom-gauge-hint"></div>
       </div>
       <div class="zoom-scope-controls">
-        ${pickHtml(st)}
+        ${rotateHtml()}
         ${objectiveHtml(m)}
         <div class="dial-row" id="ctrl-focus">
-          ${dialHtml('coarse', UI.zoom.coarseGroup, m.coarse, 1, focused)}
-          ${dialHtml('fine', UI.controls.focus, m.fine, 0.2, focused)}
+          ${dialHtml('coarse', UI.zoom.coarseGroup, m.coarse, KNOB_SPAN.coarse, focused)}
+          ${dialHtml('fine', UI.controls.focus, m.fine, KNOB_SPAN.fine, focused)}
         </div>
+        <p class="pick-how">${UI.zoom.dialLegend}</p>
         <p class="pick-how" id="focus-readout">${focusLine(m, focused)}</p>
         <div class="ctrl-group" id="ctrl-diaphragm">
           <label for="zoom-diaphragm">${UI.controls.diaphragm}</label>
           <input type="range" id="zoom-diaphragm" min="0" max="1" step="0.02" value="${m.diaphragm}">
         </div>
-        ${rotateHtml()}
+        ${pickHtml(st)}
         ${on === 'stageMic'
           ? `<button type="button" class="zoom-action" id="record-cal">${UI.zoom.recordCalibration}</button>`
           : ''}
-        ${calibrationListHtml(st)}
         ${on === 'specimen'
           ? `<button type="button" class="zoom-action" id="record-meas">${UI.zoom.recordMeasurement}</button>`
           : ''}
+        ${calibrationListHtml(st)}
         <button type="button" class="zoom-action" id="capture">${UI.zoom.capture}</button>
-        ${on ? `<button type="button" id="scope-unmount">${UI.bench.unmount(UI.stageShort[on])}</button>` : ''}
         <!--
           「정리」 단추 묶음(조명 끄기 · 최저배율로 내리기)을 뺐다.
 
@@ -442,13 +552,20 @@ export function createZoom(root, store) {
     bindScopeControls();
   }
 
-  /** 금 간 것이 있으면 왜 그렇게 됐는지까지 말하고, 새것을 꺼내는 길을 연다 (M-23). */
+  /**
+   * 금 간 것이 있으면 왜 그렇게 됐는지와 **빠져나갈 세 걸음**을 말한다 (M-23).
+   *
+   * ★ 앞서는 여기에 「새것 꺼내기」 단추가 있었다. 이제 금 간 유리는 **재물대에 그대로
+   *   남으므로**(사장님 지시 2026-09-03) 그 단추를 누르면 재물대의 것이 소리 없이
+   *   사라진다 — 학생이 한 일과 화면이 어긋난다. 길은 셋이다:
+   *   내리고(바로 위 단추) · 쓰레기통에 버리고 · 상자에서 꺼낸다. 문장이 그 순서를 말한다.
+   */
   function crackedHtml(st) {
-    const cracked = ITEM_IDS.filter((id) => st.items[id].cracked);
+    const cracked = ITEM_IDS.filter((id) => st.items[id].cracked && !st.items[id].discarded);
     if (!cracked.length) return '';
-    return cracked.map((id) => `
-      <p class="zoom-empty" data-why="cracked">${UI.zoom.crackedNote(UI.stageShort[id])}</p>
-      <button type="button" data-new-item="${id}">${UI.zoom.newItem}</button>`).join('');
+    return cracked.map((id) =>
+      `<p class="zoom-empty" data-why="cracked">${
+        UI.zoom.crackedNote(UI.stageShort[id], st.microscope.stage === id)}</p>`).join('');
   }
 
   /**
@@ -718,14 +835,78 @@ export function createZoom(root, store) {
   /* 시야에서 찍기와 재물대 옮기기                                      */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * 손끝 보정 (화면 px).
+   *
+   * 손가락이 닿는 자국의 한가운데는 사람이 **겨눈 곳보다 아래**다 — 손톱 끝이 아니라
+   * 지문 바닥이 닿기 때문이다. 그대로 쓰면 폰에서 늘 조금 아래를 찍는다.
+   * 마우스에는 이 어긋남이 없으므로 0 이다.
+   */
+  const TOUCH_LIFT_PX = 16;
+  const liftOf = (e) => (e.pointerType && e.pointerType !== 'mouse' ? TOUCH_LIFT_PX : 0);
+
   /** 화면 좌표를 이 SVG 의 좌표로. viewBox 와 그려진 상자의 가로세로비가 같아 선형이다. */
-  function svgPointOf(svg, e) {
+  function svgPointOf(svg, e, liftPx = 0) {
     const r = svg.getBoundingClientRect();
     const v = viewOf(svg);
     return {
       x: v.x + ((e.clientX - r.left) / (r.width || 1)) * v.w,
-      y: v.y + ((e.clientY - r.top) / (r.height || 1)) * v.h,
+      y: v.y + ((e.clientY - liftPx - r.top) / (r.height || 1)) * v.h,
     };
+  }
+
+  /**
+   * 누른(또는 겨눈) 자리를 **접안 눈금자의 축 위로 내린다.** −1~1 로 돌려준다.
+   *
+   * 재는 일은 **축 위에서 두 점을 찍는 것**이다. 세포 경계는 눈금선 사이에 오므로
+   * 눈금선에 붙이지(스냅) 않는다 — 붙이면 잰 길이가 늘 칸 수의 정수배가 되어
+   * 학생이 잰 것이 아니라 앱이 고른 값이 된다 (`DESIGN-rules.md` M-25·M-26).
+   */
+  function axisNormOf(svg, e) {
+    const st = store.getState();
+    const v = viewOf(svg);
+    const pt = svgPointOf(svg, e, liftOf(e));
+    const a = ((st.eyepiece.angleDeg ?? 0) * Math.PI) / 180;
+    const t = (pt.x - v.cx) * Math.cos(a) + (pt.y - v.cy) * Math.sin(a);
+    return clamp(t / halfSpan(scaleOf(svg)), -1, 1);
+  }
+
+  /**
+   * ★ **찍히기 전에 어디에 찍힐지 보여 준다** (사장님: 「세포에 눈금을 찍는 것이 매우
+   *   어렵고 엉뚱한 곳에 찍힌다」).
+   *
+   * 두 눈금이 겹친 자리를 찍을 때는 눈금선이 이미 「여기」라고 말해 준다. 그런데 **세포
+   * 경계**에는 그런 표가 없다 — 학생은 세포의 끝과 접안 눈금자를 눈으로 맞춰야 하는데,
+   * 손끝이 어느 칸에 떨어질지는 누르기 전에는 알 수 없었다. 그래서 「엉뚱한 곳에 찍힌다」.
+   *
+   * 십자선은 **축 위에 내린 자리**에 서고, 옆에 그 자리의 접안 눈금 번호를 적는다.
+   * 찍힌 표시(실선)와 헷갈리지 않게 **점선**으로 그린다.
+   */
+  function drawAim(svg, xNorm) {
+    svg.querySelector('.aim-layer')?.remove();
+    if (xNorm === null) return;
+    const st = store.getState();
+    if (!st.eyepiece.micrometer) return;      // 눈금자가 없으면 내릴 축도 없다
+    const scale = scaleOf(svg);
+    const center = viewOf(svg);
+    const a = ((st.eyepiece.angleDeg ?? 0) * Math.PI) / 180;
+    const nx = -Math.sin(a), ny = Math.cos(a);
+    const t = xNorm * halfSpan(scale);
+    const x = center.cx + t * Math.cos(a);
+    const y = center.cy + t * Math.sin(a);
+    const arm = Math.min(16, center.h * 0.34);
+    const c = EXP_PALETTE.mark[0];
+    const div = pickAt(st, xNorm).eyeDiv;
+    svg.insertAdjacentHTML('beforeend',
+      `<g class="aim-layer" aria-hidden="true" stroke="${c}" fill="${c}" opacity="0.75">`
+      + `<line x1="${(x - nx * arm).toFixed(2)}" y1="${(y - ny * arm).toFixed(2)}"`
+      + ` x2="${(x + nx * arm).toFixed(2)}" y2="${(y + ny * arm).toFixed(2)}"`
+      + ` stroke-width="${STROKE.hair}" stroke-dasharray="3 3"/>`
+      + `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.2" fill="none"`
+      + ` stroke-width="${STROKE.hair}"/>`
+      + `<text x="${(x + 4).toFixed(2)}" y="${(y + arm - 1).toFixed(2)}"`
+      + ` font-family="ui-monospace, monospace" font-size="9" stroke="none"`
+      + `>${UI.zoom.aimAt(div)}</text></g>`);
   }
 
   /**
@@ -743,18 +924,31 @@ export function createZoom(root, store) {
       try { svg.setPointerCapture(e.pointerId); } catch { /* 잡지 못해도 계속한다 */ }
       drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false };
       busy = true;
+      // 손가락에는 hover 가 없다. 누르는 순간 십자선을 보여 줘야 **떼기 전에** 자리를 고칠 수 있다.
+      drawAim(svg, axisNormOf(svg, e));
     });
 
     svg.addEventListener('pointermove', (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag || e.pointerId !== drag.id) {
+        // 끌고 있지 않으면 겨누는 자리를 따라다니게 한다 (마우스).
+        if (!drag) drawAim(svg, axisNormOf(svg, e));
+        return;
+      }
       const dx = e.clientX - drag.lastX, dy = e.clientY - drag.lastY;
       drag.lastX = e.clientX; drag.lastY = e.clientY;
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > TAP_SLOP_PX) drag.moved = true;
-      if (!drag.moved) return;
+      if (!drag.moved) {
+        // 아직 탭인지 끌기인지 모르는 사이 — 겨눈 자리는 계속 보여 준다.
+        drawAim(svg, axisNormOf(svg, e));
+        return;
+      }
+      drawAim(svg, null);   // 재물대를 끄는 중에는 겨눌 것이 없다
       // 상은 재물대와 반대로 움직인다 — 손가락을 따라 그림이 움직이려면 부호를 뒤집는다.
       store.dispatch('MOVE_STAGE', { dx: -dx, dy: -dy }, { skipNotify: true });
       updateScene();
     });
+
+    svg.addEventListener('pointerleave', () => { if (!drag) drawAim(svg, null); });
 
     const end = (e) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -762,21 +956,11 @@ export function createZoom(root, store) {
       const tapped = !drag.moved;
       drag = null;
       busy = false;
-      if (tapped) pickAtPoint(svg, e);
+      drawAim(svg, null);
+      if (tapped) dispatchPick(axisNormOf(svg, e));
     };
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);
-  }
-
-  function pickAtPoint(svg, e) {
-    const st = store.getState();
-    const v = viewOf(svg);
-    const pt = svgPointOf(svg, e);
-    const a = ((st.eyepiece.angleDeg ?? 0) * Math.PI) / 180;
-    // 누른 자리를 **접안 눈금자의 축 위로** 내린다. 눈금자를 돌려 놓아도
-    // 눈금 위를 누르면 그 눈금이 잡힌다.
-    const t = (pt.x - v.cx) * Math.cos(a) + (pt.y - v.cy) * Math.sin(a);
-    dispatchPick(clamp(t / halfSpan(scaleOf(svg)), -1, 1));
   }
 
   /** 이 뷰가 접안 눈금을 몇 배로 그렸는가. 시야 원은 1배, 세는 띠는 8배. */
@@ -866,12 +1050,11 @@ export function createZoom(root, store) {
       b.addEventListener('click', () =>
         store.dispatch('SET_OBJECTIVE', { objective: Number(b.dataset.obj) }));
     });
-    body.querySelectorAll('[data-new-item]').forEach((b) => {
-      b.addEventListener('click', () => store.dispatch('NEW_ITEM', { item: b.dataset.newItem }));
-    });
 
-    bindDial('coarse', 'COARSE_FOCUS', 0.5);
-    bindDial('fine', 'FINE_FOCUS', 0.16);
+    // 한 바퀴에 폭의 절반(조동)·8할(미동)을 움직인다. 미동 폭이 넓어졌으므로 같은 비율로
+    // 따라 키운다 — 안 그러면 끝에서 끝까지 가는 데 마우스를 네 바퀴 가까이 돌려야 한다.
+    bindDial('coarse', 'COARSE_FOCUS', KNOB_SPAN.coarse * 0.5);
+    bindDial('fine', 'FINE_FOCUS', KNOB_SPAN.fine * 0.8);
     bindDiaphragm();
     bindRotate();
     bindFovKeys();
@@ -1056,13 +1239,14 @@ export function createZoom(root, store) {
 
   function dialHtml(name, label, value, span, focused) {
     const arc = gaugeArc(value, span, focused);
+    const state = dialStateFor(value, span, focused);
     return `
       <div class="dial-cell">
         <div class="dial" id="dial-${name}" role="slider" tabindex="0"
           data-focused="${focused}"
           aria-label="${label}" aria-valuenow="${value.toFixed(3)}"
           aria-valuemin="${(-span).toFixed(3)}" aria-valuemax="${span.toFixed(3)}"
-          aria-valuetext="${focused ? UI.zoom.focusInRange : UI.zoom.focusOutOfRange}">
+          aria-valuetext="${state}">
           <svg viewBox="0 0 64 64" aria-hidden="true">
             <circle cx="32" cy="32" r="27"
               fill="${PALETTE.metal[0]}" stroke="${PALETTE.metal[1]}" stroke-width="${STROKE.outline}"/>
@@ -1082,6 +1266,12 @@ export function createZoom(root, store) {
           </svg>
         </div>
         <span class="dial-label">${label}</span>
+        <!--
+          ★ **색만으로 뜻을 나르지 않는다** (WCAG 1.4.1, 사장님: 「빨간 호·초록 원이
+            무엇인지 알 수 없다」). 호가 말하는 것을 여기 글로도 적는다 —
+            얼마나 돌렸는지, 그리고 초점 범위 안인지.
+        -->
+        <span class="dial-state" id="dial-state-${name}">${state}</span>
       </div>`;
   }
 
@@ -1103,18 +1293,20 @@ export function createZoom(root, store) {
    *   하나 빠뜨리면 화면의 그 부분만 옛날을 말하고, 콘솔에는 아무것도 안 남는다.
    */
   function updateFocusReadout() {
-    const st = store.getState();
-    const m = st.microscope;
-    const on = m.stage;
-    const focused = Boolean(on)
-      && focusError(m) <= focusTolerance(m.objective, on === 'stageMic' ? 'micrometer' : 'specimen');
-    for (const [name, span] of [['coarse', 1], ['fine', 0.2]]) {
+    const m = store.getState().microscope;
+    const focused = isFocused(m);
+    for (const [name, span] of [['coarse', KNOB_SPAN.coarse], ['fine', KNOB_SPAN.fine]]) {
       const el = body.querySelector(`#dial-${name}`);
       if (!el) continue;
       const value = m[name] ?? 0;
+      const state = dialStateFor(value, span, focused);
       el.dataset.focused = String(focused);
       el.setAttribute('aria-valuenow', value.toFixed(3));
-      el.setAttribute('aria-valuetext', focused ? UI.zoom.focusInRange : UI.zoom.focusOutOfRange);
+      el.setAttribute('aria-valuetext', state);
+      // 눈에 보이는 글도 함께 갱신한다 — `skipNotify` 로 오는 조작이라
+      // 여기서 안 고치면 그 줄만 옛날을 말한다 (이 함수 머리말).
+      const line = body.querySelector(`#dial-state-${name}`);
+      if (line) line.textContent = state;
       // 호는 **채워진 원 바로 뒤**에 온다 — 앞에 두면 원이 덮어 안 보인다.
       // 처음 그릴 때(`dialHtml`)와 같은 자리여야 돌렸을 때 모양이 안 바뀐다.
       const svg = el.querySelector('svg');

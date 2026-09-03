@@ -22,7 +22,7 @@ import {
   ITEM_IDS, PICK_KINDS, HISTORY_LIMIT, PAN_LIMIT,
   initialItem, angleGap, centerErr, focusError, readability, fieldParams,
 } from './state.js';
-import { focusTolerance, EYEPIECE, STAGE_DIV_UM } from './optics.js';
+import { focusTolerance, focusToleranceOn, KNOB_SPAN, EYEPIECE, STAGE_DIV_UM } from './optics.js';
 import { pickAt, calibrationFrom } from './scale.js';
 
 export { PAN_LIMIT };
@@ -79,6 +79,8 @@ const eul = (w) => {
 const ITEM_NAME = { stageMic: '대물 마이크로미터', specimen: '공변세포 표본' };
 /** 제자리. 금 간 것을 새것으로 바꾸는 곳이기도 하다 (`PLACE_ON_STAGE` 의 막힘 문장). */
 const BOX_NAME = { stageMic: '대물 마이크로미터 보관함', specimen: '표본 상자' };
+/** 깨진 것이 가는 곳. 실험대에 실제로 놓여 있는 물건 이름과 같아야 한다 (`UI.bench.items.bin`). */
+const BIN_NAME = '쓰레기통';
 
 /** 목적격 조사를 붙인 이름. '표본를' 이 되지 않게 한다. */
 const item = (id) => `${ITEM_NAME[id]}${eul(ITEM_NAME[id])}`;
@@ -188,7 +190,7 @@ export const ACTIONS = {
       // 같은 곳에 계속 끌어다 놓다가 「안 되네」 하고 손을 뗀 일이 있었다.
       // 막힘은 이 실험에 둘뿐이니, 그 둘만큼은 빠져나갈 길을 문장에 담는다.
       return blocked(state,
-        `금이 간 ${item(itemId)} 다시 올릴 수 없습니다. ${BOX_NAME[itemId]}에 끌어다 놓으면 새것이 나옵니다.`,
+        `금이 간 ${item(itemId)} 다시 올릴 수 없습니다. ${BIN_NAME}에 끌어다 버리고 ${BOX_NAME[itemId]}에서 새것을 꺼내세요.`,
         BLOCKING_REASONS.BROKEN);
     }
     const before = state.microscope.stage;
@@ -196,7 +198,10 @@ export const ACTIONS = {
 
     // 재물대 클립이 잡아 주므로 **반듯하게** 놓인다. 어긋남은 접안렌즈 쪽에 있다
     // (`INSERT_OCULAR` 참조) — 그래야 학생이 돌릴 것이 접안렌즈가 된다.
-    let next = withItem(state, itemId, { angleDeg: 0 });
+    // 자리 표시 셋은 함께 지운다 — 재물대에 올라간 것은 상자 안에도, 내려놓은 자리에도 없다.
+    let next = withItem(state, itemId, {
+      angleDeg: 0, stowed: false, discarded: false, unmounted: false,
+    });
     next = withScope(next, { stage: itemId, panX: 0, panY: 0 });
 
     if (!state.eyepiece.micrometer) {
@@ -212,12 +217,24 @@ export const ACTIONS = {
     return ok(next, `${item(itemId)} 재물대에 올렸습니다.${extra}`, 'placed');
   },
 
-  /** M-07 재물대에서 내린다. 대가 없는 되돌아가기 길이다. */
+  /**
+   * M-07 재물대에서 내린다. 대가 없는 되돌아가기 길이다.
+   *
+   * ★ **내린 것은 현미경 옆 실험대에 놓인다** (`unmounted`, 사장님 지시 2026-09-03).
+   *   선반의 제자리로 곧장 되돌리면 **금 간 유리를 상자에 도로 꽂아 두는 그림**이 된다.
+   *   내려놓은 것이 눈앞에 남아 있어야 학생이 그것을 쓰레기통으로 가져간다.
+   *   자리는 `ui/bench.js` 의 `UNMOUNT_SPOT` 이 정한다 — 좌표는 화면의 일이라 여기 없다.
+   */
   REMOVE_FROM_STAGE(state) {
     const on = state.microscope.stage;
     if (!on) return ok(state);
-    return ok(withScope(state, { stage: null }),
-      `${item(on)} 재물대에서 내렸습니다.`, 'removed');
+    const next = withScope(withItem(state, on, { unmounted: true }), { stage: null });
+    if (state.items[on].cracked) {
+      return happened(next,
+        `금이 간 ${item(on)} 재물대에서 내려 현미경 옆에 놓았습니다. ${BIN_NAME}에 끌어다 버리세요.`,
+        'unmounted-cracked');
+    }
+    return ok(next, `${item(on)} 재물대에서 내려 현미경 옆에 놓았습니다.`, 'removed');
   },
 
   /**
@@ -261,18 +278,26 @@ export const ACTIONS = {
    * M-11·M-28 조동나사.
    *
    * 고배율에서 돌리면 대물렌즈가 재물대 위 유리를 누른다. 교과서가 경고하는 그 일이다.
-   * **조작 자체는 막지 않는다** — 돌아가고, 깨지고, 깨진 것이 재물대에서 내려온다.
+   * **조작 자체는 막지 않는다** — 돌아가고, 깨진다.
    * 막히는 것은 그다음, 금 간 것을 **다시 올릴 때**다 (`PLACE_ON_STAGE`).
+   *
+   * ★ **깨진 것을 스스로 내리지 않는다** (사장님 지시 2026-09-03).
+   *   앞서는 여기서 `stage: null` 로 재물대를 비웠다. 그러면 학생이 보고 있던 것이
+   *   **말도 없이 사라지고**, 무엇이 어떻게 됐는지는 문장 한 줄로만 남는다.
+   *   실물에서 깨진 유리는 재물대에 그대로 있다 — 시야에도 금이 보이는 것이 맞다.
+   *   내리는 것은 학생이 「재물대에서 내리기」 단추로 한다 (`REMOVE_FROM_STAGE`).
    */
   COARSE_FOCUS(state, { delta = 0 }) {
     const m = state.microscope;
-    const coarse = clamp((m.coarse ?? 0) + delta, -1, 1);
+    const coarse = clamp((m.coarse ?? 0) + delta, -KNOB_SPAN.coarse, KNOB_SPAN.coarse);
     if (m.objective > 10 && m.stage) {
       const id = m.stage;
-      let next = withItem(state, id, { cracked: true });
-      next = withScope(next, { coarse, stage: null });
+      // 이미 금이 간 것을 더 돌린다고 두 번 깨지지는 않는다. 같은 말을 되풀이하지 않는다.
+      if (state.items[id].cracked) return ok(withScope(state, { coarse }));
+      const next = withScope(withItem(state, id, { cracked: true }), { coarse });
       return happened(next,
-        `고배율에서 조동나사를 돌려 대물렌즈가 ${item(id)} 눌렀습니다. 유리에 금이 갔습니다.`,
+        `고배율에서 조동나사를 돌려 대물렌즈가 ${item(id)} 눌렀습니다. 유리에 금이 갔습니다. `
+        + `재물대에 그대로 있으니 「재물대에서 내리기」로 내린 뒤 ${BIN_NAME}에 버리세요.`,
         'cracked');
     }
     const err = Math.abs(coarse + (m.fine ?? 0));
@@ -282,10 +307,14 @@ export const ACTIONS = {
     }));
   },
 
-  /** M-12 미동나사. 언제나 안전하다. 저배율에서 맞으면 `lowMagFocused` 가 선다. */
+  /**
+   * M-12 미동나사. 언제나 안전하다. 저배율에서 맞으면 `lowMagFocused` 가 선다.
+   * 돌 수 있는 폭은 `KNOB_SPAN.fine` — 저배율에서 맞춘 자리에서 40배 초점까지
+   * **미동나사만으로 닿을 수 있어야** 한다는 데서 나온 값이다 (`optics.js`).
+   */
   FINE_FOCUS(state, { delta = 0 }) {
     const m = state.microscope;
-    const fine = clamp((m.fine ?? 0) + delta, -0.2, 0.2);
+    const fine = clamp((m.fine ?? 0) + delta, -KNOB_SPAN.fine, KNOB_SPAN.fine);
     const err = Math.abs((m.coarse ?? 0) + fine);
     return ok(withScope(state, {
       fine,
@@ -472,7 +501,10 @@ export const ACTIONS = {
       ...fieldParams(state),
     };
     const next = withSession(state, { captures: [...state.session.captures, capture] });
-    if (focusError(m) > focusTolerance(m.objective, 'micrometer')) {
+    // 「흐리다」의 기준도 화면·점수·노트와 **같은 함수**를 쓴다 (`focusToleranceOn`).
+    // 표본을 늘 눈금자 기준(2배 관대)으로 재면, 화면이 「아직 초점이 맞지 않았습니다」라고
+    // 말하는 사진이 아무 말 없이 저장된다.
+    if (focusError(m) > focusToleranceOn(m.objective, m.stage)) {
       return happened(next, '흐린 채로 기록됐습니다. 정리 단계에서 왜 흐렸는지 적게 됩니다.',
         'blurry-capture');
     }
@@ -510,6 +542,64 @@ export const ACTIONS = {
         'item-replaced');
     }
     return ok(next, `새 ${name}${eul(name)} 꺼냈습니다.`, 'item-replaced');
+  },
+
+  /**
+   * M-24 상자·통에 **넣는다.** 접안 마이크로미터의 `PUT_AWAY_OCULAR` 과 같은 짝이다.
+   *
+   * 넣으면 실험대에서 안 보인다 — 상자 안에 있으니까. 꺼내는 길(`TAKE_OUT_ITEM`)이
+   * 상자를 눌러 여는 화면에 있다. 넣기만 있고 꺼내기가 없으면 돌아올 수 없는 자리가 된다.
+   *
+   * **금 간 것도 막지 않고 넣어 준다.** 대신 그것이 어디로 가야 하는지를 말한다 —
+   * 막는 대신 결과로 답한다 (AGENTS.md §2.1).
+   */
+  PUT_AWAY_ITEM(state, { item: itemId }) {
+    if (!ITEM_IDS.includes(itemId)) return happened(state, '어느 기구를 넣을지 알 수 없습니다.');
+    const it = state.items[itemId];
+    if (it.stowed) return ok(state, `${ITEM_NAME[itemId]}는 이미 ${BOX_NAME[itemId]}에 있습니다.`);
+    let next = withItem(state, itemId, { stowed: true, unmounted: false, discarded: false });
+    if (state.microscope.stage === itemId) next = withScope(next, { stage: null });
+    if (it.cracked) {
+      return happened(next,
+        `금 간 ${item(itemId)} ${BOX_NAME[itemId]}에 넣었습니다. 금 간 것은 ${BIN_NAME}에 버리고 새것을 꺼내세요.`,
+        'stowed-cracked');
+    }
+    return ok(next, `${item(itemId)} ${BOX_NAME[itemId]}에 넣었습니다.`, 'item-stowed');
+  },
+
+  /** M-24b 상자에서 **꺼낸다.** 넣기의 짝. 꺼낸 것은 실험대 제자리에 놓인다. */
+  TAKE_OUT_ITEM(state, { item: itemId }) {
+    if (!ITEM_IDS.includes(itemId)) return happened(state, '어느 기구를 꺼낼지 알 수 없습니다.');
+    if (!state.items[itemId].stowed) {
+      return ok(state, `${ITEM_NAME[itemId]}는 이미 꺼내져 있습니다.`);
+    }
+    return ok(withItem(state, itemId, { stowed: false, unmounted: false }),
+      `${BOX_NAME[itemId]}에서 ${item(itemId)} 꺼냈습니다.`, 'item-out');
+  },
+
+  /**
+   * M-25 **쓰레기통에 버린다.** 깨진 유리가 가는 곳이다.
+   *
+   * ★ **멀쩡한 것을 버려도 막지 않는다** (AGENTS.md §2.1). 버려지고, 무슨 일이 일어났는지
+   *   말한다 — 「멀쩡한 것을 버렸습니다. 상자에서 새로 꺼내야 합니다」. 막으면 학생은
+   *   쓰레기통이 무엇을 받는 물건인지 영영 모르고, 실물에서도 그런 보호막은 없다.
+   *
+   * 버린 것은 실험대에서 사라지고(`discarded`), 새것은 상자에서 꺼낸다 (`NEW_ITEM`).
+   */
+  DISCARD_ITEM(state, { item: itemId }) {
+    if (!ITEM_IDS.includes(itemId)) return happened(state, '무엇을 버릴지 알 수 없습니다.');
+    const it = state.items[itemId];
+    if (it.discarded) return ok(state, `${ITEM_NAME[itemId]}는 이미 버렸습니다.`);
+    let next = withItem(state, itemId, { discarded: true, stowed: false, unmounted: false });
+    if (state.microscope.stage === itemId) next = withScope(next, { stage: null });
+    if (it.cracked) {
+      return ok(next,
+        `금 간 ${item(itemId)} ${BIN_NAME}에 버렸습니다. ${BOX_NAME[itemId]}에서 새것을 꺼내세요.`,
+        'item-discarded');
+    }
+    return happened(next,
+      `멀쩡한 ${item(itemId)} 버렸습니다. ${BOX_NAME[itemId]}에서 새로 꺼내야 합니다.`,
+      'discarded-good');
   },
 
   /* ── 정리 — 시야로 말할 수 없는 것들 ───────────────────────────── */

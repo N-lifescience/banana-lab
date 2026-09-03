@@ -15,7 +15,9 @@
  * 설계: `tasks/DESIGN-rules.md` §1·§2 · `tasks/DESIGN-optics.md`
  */
 
-import { PAN_LIMIT_PX, GAP_MAX_DEG, umPerEyepieceDiv, OBJECTIVES } from './optics.js';
+import {
+  PAN_LIMIT_PX, GAP_MAX_DEG, umPerEyepieceDiv, OBJECTIVES, focusToleranceOn,
+} from './optics.js';
 
 /** 재물대에 오를 수 있는 것. 서로 대조군이 아니라 **차례로 쓰는 도구**다. */
 export const ITEM_IDS = ['stageMic', 'specimen'];
@@ -43,7 +45,24 @@ export const MODES = { SOLO: 'solo', GROUP: 'group' };
  * 그러면 절차의 한 단계가 통째로 사라진다. 시드로 흩뜨려 매번 조금씩 다르게 놓는다.
  */
 export function initialItem(id, seed) {
-  return { id, angleDeg: 0, cracked: false, seed };
+  return {
+    id, angleDeg: 0, cracked: false, seed,
+    /**
+     * 물건이 실험대 **어디에** 있는가. 재물대 위인지는 `microscope.stage` 가 말하고,
+     * 여기 셋은 재물대 밖에서의 자리를 가른다 — 셋 다 거짓이면 선반의 제자리다.
+     *
+     *   stowed     상자·통 안 (실험대에서 안 보인다)
+     *   discarded  쓰레기통에 버렸다 (실험대에서 안 보인다. 상자에서 새것을 꺼낸다)
+     *   unmounted  재물대에서 내려 **현미경 옆에** 내려놓았다
+     *
+     * `unmounted` 가 따로 있는 까닭: 금 간 유리를 선반의 제자리로 되돌리면
+     * **깨진 것을 도로 꽂아 두는 그림**이 된다. 내려놓은 것은 내려놓은 자리에 있어야
+     * 학생이 그것을 보고 쓰레기통으로 가져간다 (사장님 지시 2026-09-03).
+     */
+    stowed: false,
+    discarded: false,
+    unmounted: false,
+  };
 }
 
 export function initialState(level = 1, seed = 20260826, mode = MODES.GROUP) {
@@ -140,6 +159,18 @@ export function initialState(level = 1, seed = 20260826, mode = MODES.GROUP) {
 /** 초점이 얼마나 어긋났는가. 바나나랩 그대로. */
 export function focusError(m) {
   return Math.abs((m.coarse ?? 0) + (m.fine ?? 0));
+}
+
+/**
+ * 지금 초점이 맞았는가. **화면·점수·노트의 ✓ 가 전부 이 한 함수를 부른다.**
+ *
+ * 앞서는 세 곳이 저마다 허용 범위를 골랐고, 표본에서 갈렸다 —
+ * 게이지는 100 인데 바로 밑줄이 「아직 초점이 맞지 않았습니다」였다 (`focusToleranceOn`).
+ * 재물대가 비어 있으면 맞출 상대가 없으므로 거짓이다.
+ */
+export function isFocused(m) {
+  if (!m?.stage) return false;
+  return focusError(m) <= focusToleranceOn(m.objective, m.stage);
 }
 
 /** 시야가 얼마나 밝은가. 조리개와 조명만으로 정해진다. */

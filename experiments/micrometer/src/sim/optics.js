@@ -445,3 +445,43 @@ export function focusTolerance(objective, target = 'specimen') {
   const base = objective === 4 ? 0.30 : objective === 10 ? 0.12 : 0.03;
   return target === 'micrometer' ? base * STAGE_MICROMETER_FOCUS_EASE : base;
 }
+
+/**
+ * ★ **재물대에 올라간 것이 허용 범위를 정한다. 부르는 곳이 저마다 고르면 안 된다.**
+ *
+ * `quality.js` 의 점수는 늘 `'micrometer'`(2배 관대)로 쟀고, `zoom.js` 의 「초점이
+ * 맞았습니다」와 `progress.js` 의 ✓ 는 재물대에 표본이 있으면 `'specimen'`(2배 엄격)으로
+ * 쟀다. 그래서 **표본에서 두 판정이 갈렸다** — 게이지는 100 인데 바로 밑줄은
+ * 「아직 초점이 맞지 않았습니다」였다. 화면이 자기 자신과 다투는 자리다.
+ *
+ * 세 곳이 **이 함수 하나**를 부른다. 갈래를 여기 한 곳에만 두어 다시 갈라질 수 없게 한다.
+ *
+ * @param {number} objective  대물배율
+ * @param {?string} on        재물대에 올라간 것 ('stageMic' | 'specimen' | null)
+ */
+export function focusToleranceOn(objective, on) {
+  return focusTolerance(objective, on === 'stageMic' ? 'micrometer' : 'specimen');
+}
+
+/**
+ * 판정 · 초점 나사가 돌 수 있는 폭 (±값). 광학 상수가 아니라 **손잡이 규격**이다.
+ *
+ * ★ 미동나사가 ±0.2 이던 때, **저배율에서 초점을 맞추고 40배로 올리면 미동나사만으로는
+ *   초점에 닿지 못하는 상태가 생겼다.** 저배율 합격 잔차의 최댓값은
+ *
+ *     4배  · `focusTolerance(4)`  = 0.30   (`lowMagFocused` 가 쓰는 값)
+ *     10배 · `focusTolerance(10,'micrometer')` = 0.24  (화면이 「맞았습니다」라고 하는 값)
+ *
+ *   이고, 40배 표본 허용은 0.03 이다. 그러니 미동나사가 한쪽으로 최소
+ *   **0.30 − 0.03 = 0.27** 만큼은 갈 수 있어야 저배율에서 합격한 자리에서 곧장 내려올 수 있다.
+ *   ±0.2 로는 못 닿았고, 화면은 대신 조동나사를 돌리게 만들어 **유리를 깨뜨렸다** —
+ *   사장님이 「상당히 불쾌하다」고 한 자리다. 0.3 으로 넓혀 0.27 을 여유 있게 덮는다.
+ *
+ *   **완전한 보장은 아니다.** 미동나사를 한쪽 끝까지 쓴 채 저배율 합격선에 걸쳐 있으면
+ *   조동나사가 그만큼 더 멀리 가 있을 수 있다 (|coarse| ≤ 허용 + 0.3). 그 자리는
+ *   `UI.zoom.focusFineAtEndHighMag` 가 「배율을 내려 조동나사로 맞추고 다시 올리라」고
+ *   말해 준다 — 폭을 아무리 넓혀도 수학적으로 남는 구석이라, 문장으로 답한다.
+ *
+ * 시야 지름·눈금값 같은 광학 상수는 여기에 없다. 저것들은 못 바꾼다.
+ */
+export const KNOB_SPAN = { coarse: 1, fine: 0.3 };
