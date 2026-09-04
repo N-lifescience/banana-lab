@@ -28,9 +28,10 @@ test('판정 표가 절차표와 한 칸씩 짝을 이룬다', () => {
 
 test('처음에는 아무 단계도 끝나 있지 않다', () => {
   const st = initialState(1);
-  // STEP 1 의 "받침 유리 꺼내기" 만 예외다 — 처음부터 선반에 나와 있으므로 늘 참이다.
+  // STEP 1 은 「껍질 벗기기」 한 칸이다. 앞서 있던 「받침 유리 꺼내기」는 할 일이 없어 없앴다 —
+  // 늘 ✓ 인 칸은 학생에게 자기가 무엇을 했는지 알려 주지 못한다.
   assert.equal(stepDone(st, '1', 0), false);
-  assert.equal(stepDone(st, '1', 1), true);
+  assert.equal(UI.protocol[0].steps.length, 1, 'STEP 1 은 한 칸이다');
   for (const g of UI.protocol) assert.equal(groupDone(st, g.id), false, `STEP ${g.id}`);
   assert.equal(resultsDone(st), false);
 });
