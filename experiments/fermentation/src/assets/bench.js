@@ -85,7 +85,7 @@ export function render(_state = {}) {
     <!-- 아래 선반 유리판 (앞 모서리 y=116 → 뒤 y=105) -->
     <polygon points="0,116 400,116 380,105 20,105" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <!-- 작업면 상판 (앞 모서리 y=172 → 뒤 y=151) -->
-    <polygon points="0,172 400,172 380,151 20,151" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <polygon points="0,172 400,172 380,151 20,151" fill="${PALETTE.benchTop[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!-- 6. 바닥 — 벽과 만나는 모서리. 실험대 옆으로 이 선이 보여야 「방」 이 된다 -->
     <rect x="0" y="252" width="400" height="48" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
@@ -136,7 +136,7 @@ export function render(_state = {}) {
       1. 상판의 **서 있는 면** — 두께다. 누운 면(#room)보다 한 단 어둡다.
       이 한 단 차이가 「상판이 앞으로 떨어진다」 를 만든다.
     -->
-    <rect x="0" y="172" width="400" height="17" fill="${PALETTE.metal[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="172" width="400" height="17" fill="${PALETTE.benchTop[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!--
       2. 캐비닛 문. **상판보다 좁다** — 상판이 좌우로 걸쳐 나오고 그 옆으로 벽이 보인다.

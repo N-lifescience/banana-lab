@@ -21,7 +21,7 @@ function holePattern(count = 0) {
   for (let i = 0; i < n; i++) {
     const cx = 122 + (i % 6) * 22;
     const cy = 150 + Math.floor(i / 6) * 24;
-    out += `<circle cx="${cx}" cy="${cy}" r="7" fill="${PALETTE.bench[1]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>`;
+    out += `<circle cx="${cx}" cy="${cy}" r="7" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>`;
   }
   return out;
 }

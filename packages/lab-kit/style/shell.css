@@ -82,7 +82,7 @@ svg[data-render]{color:var(--ink)}
   user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .token svg{width:100%;height:auto;display:block;pointer-events:auto;
   -webkit-user-drag:none;
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  filter:var(--token-shadow)}
 .token[data-small="true"]::after{pointer-events:auto}
 .token:active,.token--dragging{cursor:grabbing;z-index:5}
 /* 끄는 물건은 살짝 비친다 — 큰 것을 끌 때 아래 놓을 곳의 강조가 가려지면 어디에 놓이는지 안 보인다. */
@@ -118,17 +118,24 @@ svg[data-render]{color:var(--ink)}
    다크 모드에서도 실험실 그림은 그대로다. 그런데 `--indigo` 는 다크에서 밝은 남보라(`#94A4F2`)가
    되므로, 그대로 쓰면 **밝은 바탕에 밝은 빛**이 되어 다크 모드에서만 표시가 묻힌다.
    그래서 여기서만 고정색을 쓴다 — 이름표(`.token-name`)가 검은 글씨·흰 바탕을 박아 둔 것과 같은 까닭이다. */
-:root{--token-glow:#1F2C86}
+:root{--token-glow:#1F2C86;
+  /*
+   * 물건의 접지 그림자. **색으로 못 떼는 것을 그림자가 뗀다.**
+   * 상판을 밝게 바꾸니 어두운 기구는 또렷해졌는데 흰 것(거름종이·휴지)이 묻혔다 —
+   * 색 하나로는 밝은 것과 어두운 것을 동시에 못 뗀다. 그림자는 물건이 무슨 색이든 듣는다.
+   * 잉크색(#2F2A20)을 옅게 쓴다. 검정을 쓰면 세트에서 이 그림자만 차게 뜬다.
+   */
+  --token-shadow:drop-shadow(0 3px 3.5px rgba(47,42,32,.34))}
 
 @keyframes token-target-breathe{
-  0%,100%{filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))
+  0%,100%{filter:var(--token-shadow)
     drop-shadow(0 0 3px var(--token-glow)) drop-shadow(0 0 7px var(--token-glow))}
-  50%    {filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))
+  50%    {filter:var(--token-shadow)
     drop-shadow(0 0 5px var(--token-glow)) drop-shadow(0 0 13px var(--token-glow))}
 }
 .token--target svg{
   /* 애니메이션이 꺼진 자리(아래 reduced-motion)에서도 빛이 남도록 filter 를 여기서도 준다. */
-  filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))
+  filter:var(--token-shadow)
     drop-shadow(0 0 4px var(--token-glow)) drop-shadow(0 0 10px var(--token-glow));
   animation:token-target-breathe 1.5s ease-in-out infinite;
   transform:scale(1.04);transform-origin:50% 50%}
@@ -141,7 +148,7 @@ svg[data-render]{color:var(--ink)}
    번짐 0 인 그림자를 네 방향으로 겹치면 실루엣을 따라가는 **선**이 된다. */
 .token--target-hot svg{
   animation:none;
-  filter:drop-shadow(0 3px 5px rgba(0,0,0,.3))
+  filter:drop-shadow(0 4px 5px rgba(47,42,32,.36))
     drop-shadow(1.5px 0 0 var(--token-glow)) drop-shadow(-1.5px 0 0 var(--token-glow))
     drop-shadow(0 1.5px 0 var(--token-glow)) drop-shadow(0 -1.5px 0 var(--token-glow))
     drop-shadow(0 0 7px var(--token-glow)) drop-shadow(0 0 16px var(--token-glow));
@@ -204,6 +211,50 @@ svg[data-render]{color:var(--ink)}
 .bench-lock-card b{display:block;font-size:14.5px;margin-bottom:6px}
 .bench-lock-card p{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;line-height:1.5}
 .bench-lock-card ul{margin:0;padding-left:18px;text-align:left;font-size:13px}
+
+/* ── 실험대에 불이 들어온다 — 자물쇠가 열리는 그 한 번 ──────────────────
+   「이 쪽을 읽었습니다」 넷을 눌러 온 것의 보상이다. 앞서는 덮개가 한 프레임에 사라져서
+   무슨 일이 일어났는지 눈이 못 따라갔다 (사장님 지시, 2026-09-05).
+   도는 것은 `packages/lab-kit/ui/bench-wake.js` 가 잠김 → 열림 그 순간에만 켠다. */
+.bench-lock{transition:opacity .34s ease, backdrop-filter .34s ease}
+.bench-lock--opening{opacity:0;pointer-events:none}
+/* 빛이 왼쪽에서 오른쪽으로 한 번 훑는다.
+   ★ **얇고 옅게.** 처음에는 무대 너비의 38 % 짜리 띠를 `screen` 으로 덮었더니 오른쪽 절반이
+   통째로 하얘져서, 불이 켜지는 것이 아니라 화면이 날아간 것처럼 보였다 (찍어서 확인했다).
+   빛은 지나가는 것이지 덮는 것이 아니다. */
+@keyframes bench-wake-sweep{
+  from{transform:translateX(-30%)}
+  to  {transform:translateX(160%)}
+}
+.bench-wake{position:absolute;inset:0;z-index:25;pointer-events:none;border-radius:6px;
+  overflow:hidden}
+.bench-wake::before{content:"";position:absolute;top:-10%;bottom:-10%;left:0;width:16%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.34),transparent);
+  animation:bench-wake-sweep .9s cubic-bezier(.32,.6,.36,1) both}
+
+/* 물건이 왼쪽부터 차례로 깨어난다. 늦춤(`--wake-delay`)은 x 자리에서 나온다.
+   ★ **크기로 말한다.** 빛만으로는 안 보였다 — 실험대가 밝은 색이라 남보라 빛이 그림자로
+   읽힌다. 살짝 들렸다 놓이는 움직임은 밝기와 상관없이 눈에 걸린다. */
+@keyframes token-wake{
+  0%  {transform:scale(1);   filter:var(--token-shadow)}
+  30% {transform:scale(1.14);filter:drop-shadow(0 6px 7px rgba(47,42,32,.34))
+       drop-shadow(0 0 5px var(--token-glow)) drop-shadow(0 0 12px var(--token-glow))}
+  100%{transform:scale(1);   filter:var(--token-shadow)}
+}
+.bench--waking .token svg{animation:token-wake .8s cubic-bezier(.34,1.3,.5,1) var(--wake-delay,0ms) both;
+  transform-origin:50% 85%}
+/* 실험대 바닥도 한 번 밝아진다. 물건만 빛나면 「물건이 켜졌다」이고,
+   바닥까지 밝아져야 「이 방에 불이 들어왔다」로 읽힌다. */
+@keyframes bench-wake-floor{
+  0%  {filter:brightness(.9)}
+  35% {filter:brightness(1.08)}
+  100%{filter:brightness(1)}
+}
+.bench--waking .bench-bg{animation:bench-wake-floor 1s ease-out both}
+@media (prefers-reduced-motion:reduce){
+  .bench-wake{display:none}
+  .bench--waking .token svg,.bench--waking .bench-bg{animation:none}
+}
 
 /* ── 탐구 노트 ──────────────────────────────────────────────────── */
 #notebook h1{font-size:17px;margin:0 0 14px}

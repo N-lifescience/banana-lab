@@ -147,6 +147,13 @@ ok(await page.evaluate(() => window.__store.getState().session.level) === 1,
 // 자물쇠가 실제로 걸려 있는가 — 열기 전에 한 번 본다.
 ok(await page.locator('#bench-lock').isVisible(), '탐구 노트를 읽기 전에는 실험대가 잠겨 있다');
 await unlock(page);
+/*
+ * **덮개는 이제 툭 꺼지지 않고 물러난다** (`packages/lab-kit/ui/bench-wake.js`).
+ * 걷히는 데 약 0.34초가 걸리므로, 누른 그 프레임에 재면 아직 보인다 —
+ * 그것은 안 열린 것이 아니라 **열리는 중**이다. 둘을 가르지 못하면
+ * 이 검사가 멀쩡한 화면을 고장으로 부른다. 그래서 사라질 때까지 기다린다.
+ */
+await page.locator('#bench-lock').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 ok(await page.locator('#bench-lock').isHidden(), '1~4 쪽을 읽으면 실험대가 열린다');
 
 /* ---------- 1단계 ---------- */

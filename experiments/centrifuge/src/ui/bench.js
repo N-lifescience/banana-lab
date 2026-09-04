@@ -14,6 +14,7 @@ import { ASSETS } from '../assets/index.js';
 import { CONTRACT, CONTENT_BOX, drawnBoxMm } from '../assets/contract.js';
 import { isSpinning, sampleSlot, SLOT_ITEMS, SLOTS } from '../sim/state.js';
 import { UI } from './strings.js';
+import { wakeBench } from '../../../../packages/lab-kit/ui/bench-wake.js';
 
 /**
  * 실험대의 좌표계는 **밀리미터**다. 픽셀이 아니다.
@@ -1218,9 +1219,23 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
   const lockEl = root.querySelector('#bench-lock');
 
+  /**
+   * 자물쇠는 **잠김 → 열림으로 바뀌는 그 한 번**에만 불이 들어온다.
+   * 다시 그릴 때마다 돌면 실험 내내 깜빡이는 실험대가 된다. 그래서 앞 상태를 기억한다.
+   * 첫 그림에서 이미 열려 있으면(배치 편집 모드 등) 켜지 않는다 — 얻어낸 것이 아니다.
+   */
+  let wasLocked = null;
+
   function renderLock() {
     const { locked, left } = lockState();
-    lockEl.hidden = !locked;
+    const justOpened = wasLocked === true && !locked;
+    wasLocked = locked;
+    if (justOpened) {
+      // 덮개는 `wakeBench` 가 물린 뒤에 감춘다 — 여기서 곧장 `hidden` 을 켜면 걷힐 틈이 없다.
+      wakeBench(root, lockEl);
+    } else {
+      lockEl.hidden = !locked;
+    }
     root.classList.toggle('bench--locked', locked);
     if (!locked) return;
     const titleOf = (id) => UI.notebook.stages.find((st) => st.id === id)?.title ?? id;
