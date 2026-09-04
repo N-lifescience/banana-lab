@@ -60,10 +60,20 @@ svg[data-render]{color:var(--ink)}
 /* 시계·시행 수처럼 살아 움직이는 숫자. 실제 시간이 아니라 빨리 돌린 시간이라는 것을 색으로 말한다. */
 .bench-clock{font-family:inherit!important;color:var(--good)!important;font-weight:600}
 .bench-clock[hidden]{display:none}
-/* 실험대 위에 크게 보이는 결과 그릇 (설계 실험의 비커·발효관). */
-.bench-watch{background:var(--surface);border:1px solid var(--rule);border-radius:6px;
-  padding:8px;display:flex;justify-content:center}
-.bench-watch svg{width:auto;max-height:200px;display:block}
+/* 실험대 위에 크게 보이는 결과 그릇 (설계 실험의 비커·발효관).
+   실험대의 작은 토큰에서는 원반이 떠오르는 것이 안 보인다 — 이 실험에서 **보는 것이 결과
+   전부**라 크게 그릴 자리가 따로 있어야 한다.
+
+   ★ **판이 그림을 감싸게 한다.** 앞서는 폭을 꽉 채우는 판(729×218) 한가운데에 130 px 짜리
+   비커가 떠 있었다. 다크 모드에서는 커다란 검은 네모가 실험대 위에 얹힌 꼴이라,
+   무엇을 보라는 것인지가 아니라 **무엇이 잘못됐는지**로 읽혔다
+   (사장님 지시, 2026-09-05: 「실험대 위에 무슨 이상한 그림 떠 있는 것도 수정하고.」). */
+.bench-watch{background:var(--surface);border:1px solid var(--rule);border-radius:8px;
+  padding:6px 12px;margin:0 auto 8px;width:max-content;max-width:100%;
+  display:flex;justify-content:center;box-shadow:0 1px 3px rgba(47,42,32,.14)}
+/* **높이를 못 박고 폭은 viewBox 비례로 따라오게 한다.** `width:auto` 만 두면
+   판이 내용을 감싸는 순간(`max-content`) 폭을 정할 근거가 없어 26 px 로 쪼그라든다. */
+.bench-watch svg{height:min(190px,26vh);width:auto;display:block}
 
 /* ── 무대 ─────────────────────────────────────────────────────────────
    아이폰에서 길게 누르면 돋보기가 뜨고 글자가 골라진다. 무대 안에서만 막는다.

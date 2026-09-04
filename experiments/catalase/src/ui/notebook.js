@@ -589,7 +589,56 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       </div>`;
   }
 
-  const STAGE_BODY = { 1: stage1, 2: stage2, 3: stage3, 4: stage4, 5: stage5, 6: stage6, 7: stage7 };
+  /*
+   * ── 설계 판을 노트 쪽 안팎으로 옮긴다 ────────────────────────────
+   *
+   * 판 자체는 `main.js` 가 `#design-root` 에 한 번 만들고, 그 안의 손잡이도 거기 붙어 있다.
+   * **노드를 옮겨도 손잡이는 따라간다** — 그래서 새로 만들지 않고 옮기기만 한다.
+   * 다시 만들면 손잡이가 둘이 되어 한 번 누른 것이 두 번 처리된다.
+   */
+  const designHome = () => document.getElementById('design-home');
+  const designParts = () => [document.getElementById('design-root'),
+    document.getElementById('design-sentence')].filter(Boolean);
+
+  /** 쪽을 다시 그리기 **전에** 제집으로 돌려놓는다. */
+  function stowDesign() {
+    const home = designHome();
+    if (!home) return;
+    for (const el of designParts()) if (el.parentElement !== home) home.appendChild(el);
+  }
+
+  /** 설계 쪽이 열려 있으면 그 자리에 꺼내 놓는다. */
+  function placeDesign() {
+    const slot = panelEl.querySelector('#design-slot');
+    if (!slot) return;
+    for (const el of designParts()) slot.appendChild(el);
+  }
+
+  /**
+   * 「3. 실험 설계」 — 판은 여기서 **만들지 않는다.** `main.js` 가 `#design-root` 에 이미
+   * 만들어 두었고, 이 쪽이 열릴 때 그것을 **옮겨 온다** (`placeDesign`).
+   * 여기서 다시 만들면 손잡이가 둘이 되어 한 번 누른 것이 두 번 처리된다.
+   */
+  const stageDesign = () => '<div id="design-slot"></div>';
+
+  /*
+   * ★ **함수 이름의 숫자와 쪽 번호는 다르다.** 설계 쪽이 3번으로 끼어들면서 뒤가 한 칸씩
+   *   밀렸다. `stage3`(예상)이 4쪽, `stage4`(탐구 과정)가 5쪽이다.
+   *   이 표가 그 대응의 **유일한 자리**다 — 다른 곳에서 쪽 번호를 다시 세지 말 것.
+   */
+  const STAGE_BODY = {
+    1: stage1,        // 문제 인식
+    2: stage2,        // 준비물
+    3: stageDesign,   // 실험 설계  ← 새로 끼어든 쪽
+    4: stage3,        // 예상
+    5: stage4,        // 탐구 과정
+    6: stage5,        // 결과
+    7: stage6,        // 정리
+    8: stage7,        // 자기 평가
+  };
+
+  /** 예상 쪽의 번호. 여기 한 곳에서만 센다. */
+  const PREDICT_STAGE = '4';
 
   /* ---------------- 읽음 표시 · 보고서 ---------------- */
 
@@ -614,7 +663,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     }
     // **막을 때는 지금 할 일을 말한다.** 조작변인을 안 골랐으면 예상할 칸이 화면에
     // 아예 없으므로, 「예상을 고르세요」는 없는 것을 고르라는 말이 된다.
-    const blocked = activeStage === '3' && !predictDone(st);
+    const blocked = activeStage === PREDICT_STAGE && !predictDone(st);
     return `
       <div class="read-mark">
         <p id="read-why">${blocked ? predictWhyBlocked(st) : N.readLeadIn}</p>
@@ -644,7 +693,14 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       // 끝낸 쪽에는 표시를 남긴다. 어디가 남았는지 탭만 보고 알 수 있어야 한다.
       tab.dataset.read = String(stageDone(st, tab.dataset.stage));
     });
+    /*
+     * **다시 그리기 전에 설계 판을 제집으로 돌려놓는다.**
+     * 아래 `innerHTML` 교체는 쪽 안의 것을 통째로 버린다 — 설계 판이 그 안에 있으면
+     * 판과 함께 `createDesign` 이 걸어 둔 손잡이까지 사라져 두 번 다시 안 눌린다.
+     */
+    stowDesign();
     panelEl.innerHTML = STAGE_BODY[activeStage](st) + readFooter(st);
+    placeDesign();
     renderReportSlot(st);
   }
 
@@ -754,7 +810,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     const btn = root.querySelector('#mark-read');
     if (!btn) return;
     const st = store.getState();
-    const blocked = activeStage === '3' && !predictDone(st);
+    const blocked = activeStage === PREDICT_STAGE && !predictDone(st);
     if (blocked) {
       btn.setAttribute('aria-disabled', 'true');
       btn.setAttribute('aria-describedby', 'read-why');

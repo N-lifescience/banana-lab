@@ -74,7 +74,17 @@ const center = (b) => [b.x + b.width / 2, b.y + b.height / 2];
  */
 async function unlock(p) {
   await p.evaluate(() => {
-    for (const stage of ['1', '2', '3', '4']) window.__store.dispatch('MARK_READ', { stage });
+    /*
+     * **몇 쪽을 읽어야 하는지는 실험마다 다르다.** catalase·fermentation 은 「실험 설계」가
+     * 한 쪽을 차지해 다섯이고 나머지는 넷이다 (2026-09-05). 숫자를 박아 두면 그 둘에서
+     * **실험대가 안 열린 채로** 뒤 검사가 줄줄이 엉뚱한 실패를 낸다.
+     * 자물쇠 카드가 이미 「무엇이 남았는지」를 적고 있으니 거기서 읽는다.
+     */
+    const ids = [...document.querySelectorAll('#bench-lock-left li')]
+      .map((li) => li.textContent.split('.')[0].trim()).filter(Boolean);
+    for (const stage of ids.length ? ids : ['1', '2', '3', '4']) {
+      window.__store.dispatch('MARK_READ', { stage });
+    }
   });
   await p.waitForTimeout(80);
 }

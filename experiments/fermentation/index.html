@@ -74,8 +74,16 @@
     <div id="side">
       <!-- 탐구 노트. 실험대 옆에 둔다 — 무엇을 왜 하는지와 실제 조작이 한 화면에 있어야 한다. -->
       <div id="notebook"></div>
-      <div id="design-root"></div>
-      <p class="shell-sentence" id="design-sentence"></p>
+      <!--
+        설계 판의 **제집.** 화면에는 안 나온다 — 탐구 노트의 「3. 실험 설계」 쪽이 열릴 때
+        노트가 이 안에서 꺼내 가고, 쪽을 떠날 때 여기로 돌려놓는다.
+        집이 없으면 노트가 다시 그려지는 순간 `innerHTML` 교체가 설계 판을 통째로 지운다 —
+        `createDesign` 이 걸어 둔 손잡이까지 같이 사라져 두 번 다시 안 눌린다.
+      -->
+      <div id="design-home" hidden>
+        <div id="design-root"></div>
+        <p class="shell-sentence" id="design-sentence"></p>
+      </div>
       <!-- 결과 그래프. 설계 바로 아래에 둔다 — 「무엇을 바꾸기로 했나」와
            「그래서 어떻게 나왔나」가 한 화면에서 이어져야 한다. -->
       <section class="result-card">
