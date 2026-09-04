@@ -87,6 +87,9 @@ svg[data-render]{color:var(--ink)}
 .token:active,.token--dragging{cursor:grabbing;z-index:5}
 /* 끄는 물건은 살짝 비친다 — 큰 것을 끌 때 아래 놓을 곳의 강조가 가려지면 어디에 놓이는지 안 보인다. */
 .token--dragging{opacity:.72}
+/* 문지르는 동안에는 더 비친다. **보라는 것이 바로 그 밑에 있기 때문이다** —
+   시료가 발리는 것을 미리 그려 놓고 그 위를 바나나가 덮으면 그려 봐야 소용이 없다. */
+.token--smearing{opacity:.4}
 .token:hover::after,.token:focus-visible::after{background:rgba(255,255,255,.18)}
 .token-name{position:absolute;user-select:none;-webkit-user-select:none;
   transform:translate(-50%,calc(2px + var(--name-row,0) * 15px));
@@ -162,11 +165,22 @@ svg[data-render]{color:var(--ink)}
   .token--target svg,.token--target-hot svg{transition:none;transform:none}
 }
 .token--inert{opacity:.45}
-/* 얼마나 됐는지 보여 주는 작은 띠 (문지르기 등). 없으면 하는 중인 줄을 모른다. */
-.smear-meter{position:absolute;left:50%;top:-12px;transform:translateX(-50%);
-  width:56px;height:6px;border-radius:3px;background:var(--sunk);
-  border:1px solid var(--rule);overflow:hidden;pointer-events:none;line-height:0}
-.smear-meter i{display:block;height:100%;background:var(--indigo);width:0}
+/* ── 얼마나 발렸는지 (문지르기) ──────────────────────────────────────
+   앞서는 56×6 px 짜리 띠가 **끄는 물건에 붙어** 있었다. 끄는 물건은 `opacity:.72` 라
+   띠까지 흐려지고, 그 자리는 손가락과 물건이 덮는다 — 문지르는 내내 잘 안 보였다.
+   (사장님 지시, 2026-09-05: 「게이지 바가 너무 좁아서 제대로 안 보여.」)
+
+   이제 **문지르는 받침 유리 위**에 뜨고, 두 배 넓고 두껍다. 실험대 색이 아니라
+   자기 색을 쓴다 — 무대 위에 얹힌 계기이지 실험실 가구가 아니다. */
+.smear-meter{position:absolute;transform:translate(-50%,-230%);
+  width:112px;height:13px;border-radius:7px;background:var(--surface);
+  border:2px solid var(--ink);overflow:hidden;pointer-events:none;line-height:0;z-index:6;
+  box-shadow:0 2px 5px rgba(47,42,32,.3)}
+.smear-meter i{display:block;height:100%;background:var(--token-glow);width:0;
+  border-radius:5px 0 0 5px;transition:width .06s linear}
+/* 다 찼다는 것은 **표시**로 말한다. 「알맞다」고는 하지 않는다 —
+   두께와 보이는 것의 관계는 학생이 시야에서 찾아낼 몫이다 (AGENTS.md §2.1). */
+.smear-meter[data-full="true"] i{background:var(--good);border-radius:5px}
 
 /* ── 말풍선 ─────────────────────────────────────────────────────────
    몸통은 포인터를 통과시킨다 — 말풍선이 덮은 자리의 물건이 눌러도 안 집히면 콘솔 오류 한 줄 없이

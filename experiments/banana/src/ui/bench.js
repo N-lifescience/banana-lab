@@ -500,8 +500,25 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     window.__layoutCode = () => layoutCode(items);
   }
 
+  /**
+   * 문지르는 **동안** 그 받침 유리에 지금까지 발린 만큼을 미리 그린다.
+   *
+   * 앞서는 손을 뗄 때(`SMEAR`)에야 시료가 나타났다. 그동안 보이는 것은 바나나 위에 뜬
+   * 56×6 px 짜리 막대 하나뿐이라, **무엇이 얼마나 발리고 있는지가 안 보였다.**
+   * (사장님 지시, 2026-09-05: 「발린다는 게 제대로 보였으면 좋겠어.」)
+   *
+   * 상태를 건드리지 않는다 — 손을 떼지 않고 실험대 밖으로 끌고 나가면 아무 일도
+   * 일어나지 않아야 한다. 그리는 것만 미리 보여 준다.
+   */
+  let smearPreview = null;   // { slideId, thickness }
+
   function slideRenderState(slideId) {
     const s = store.getState().slides[slideId];
+    if (smearPreview?.slideId === slideId) {
+      return { ...s, sample: { thickness: smearPreview.thickness },
+        excess: excess(s), coverslip: s.coverslip.placed, bubbles: s.coverslip.bubbles, seed: s.seed,
+        stain: s.stain, reaction: s.reactionT };
+    }
     return {
       sample: s.sample,
       stain: s.stain,
@@ -868,21 +885,37 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     });
   }
 
-  /** 문지르는 동안 얼마나 발렸는지 보여 준다. 안 보이면 문지르는 중인 줄을 모른다. */
+  /**
+   * 문지르는 동안 얼마나 발렸는지 보여 준다. 안 보이면 문지르는 중인 줄을 모른다.
+   *
+   * ★ **끄는 바나나가 아니라 문지르고 있는 받침 유리 위에 붙인다.**
+   *   앞서는 `drag.el`(바나나)의 자식이었다. 그러면 두 가지가 한꺼번에 나빠진다 —
+   *   ① 끄는 물건은 `opacity:.72` 라 **막대도 같이 흐려진다**
+   *   ② 손가락과 바나나가 그 자리를 덮는다
+   *   자리를 옮기니 둘 다 사라진다. 눈이 가 있어야 할 곳은 시료가 발리는 유리다.
+   */
   function updateSmearMeter() {
-    let meter = drag.el.querySelector('.smear-meter');
-    if (drag.smearMm <= 0) {
+    let meter = layer.querySelector('.smear-meter');
+    const target = drag.smearTarget;
+    if (drag.smearMm <= 0 || !target) {
       meter?.remove();
       return;
     }
     if (!meter) {
       meter = document.createElement('div');
       meter.className = 'smear-meter';
+      meter.setAttribute('aria-hidden', 'true');
       meter.innerHTML = '<i></i>';
-      drag.el.appendChild(meter);
+      layer.appendChild(meter);
     }
+    // 받침 유리 바로 위. 자리는 물건과 같은 자(무대 비율)로 낸다.
+    meter.style.left = `${xPct(target.x)}%`;
+    meter.style.top = `${yPct(target.y)}%`;
     const t = clamp(drag.smearMm / SMEAR_FULL_MM, 0, 1);
     meter.querySelector('i').style.width = `${(t * 100).toFixed(0)}%`;
+    // 다 찼는지를 색이 아니라 **표시로** 말한다. 「얼마나」는 보여 주되 「알맞다」고는 하지 않는다 —
+    // 두께와 보이는 것의 관계는 학생이 시야에서 찾아낼 몫이다 (AGENTS.md §2.1).
+    meter.dataset.full = String(t >= 1);
   }
 
   /**
@@ -978,6 +1011,17 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       drag.smearMm += Math.hypot(drag.lastDx, drag.lastDy) * k;
       drag.smearTarget = target;
       updateSmearMeter();
+      /*
+       * 그 받침 유리 **하나만** 다시 그린다. `renderTokens()` 는 층을 통째로 새로 만들어
+       * 끄는 물건까지 갈아 치우는데, 그러면 포인터 캡처가 끊겨 **문지르다 손이 놓인다.**
+       */
+      smearPreview = { slideId: target.slide,
+        thickness: clamp(drag.smearMm / SMEAR_FULL_MM, SMEAR_MIN, SMEAR_MAX) };
+      const tEl = elFor(target.id);
+      if (tEl) tEl.innerHTML = ASSETS[target.asset].render(assetState(target));
+      // 문지르는 동안에는 바나나를 더 비춰 준다. 안 그러면 **정작 보라는 것을 바나나가 덮는다** —
+      // 시료가 발리는 것을 보여 주려고 미리 그려 놓고 그 위에 손을 얹어 두는 셈이 된다.
+      drag.el.classList.add('token--smearing');
     }
   }
 
@@ -1022,8 +1066,10 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     onPointerMove(e);
     const { item, el, moved } = drag;
     el.releasePointerCapture(e.pointerId);
-    el.classList.remove('token--dragging');
-    el.querySelector('.smear-meter')?.remove();
+    el.classList.remove('token--dragging', 'token--smearing');
+    layer.querySelector('.smear-meter')?.remove();
+    // 미리보기를 걷는다. 진짜 값은 `SMEAR` 가 상태에 넣고, 그 뒤 renderTokens 가 다시 그린다.
+    smearPreview = null;
     clearMarks();
 
     if (!moved) {

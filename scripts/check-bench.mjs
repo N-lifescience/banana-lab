@@ -220,9 +220,24 @@ ok(hot === 1, '지금 놓을 대상이 따로 강조된다');
 for (let i = 0; i < 8; i++) {
   await page.mouse.move(sx + (i % 2 ? 26 : -26), sy + (i % 3 ? 4 : -4), { steps: 4 });
 }
-const meterW = await page.locator('.token--dragging .smear-meter i')
+/*
+ * 계량기는 **끄는 물건이 아니라 문지르는 받침 유리 위**에 뜬다 (2026-09-05).
+ * 끄는 물건에 붙어 있던 시절에는 `opacity:.72` 를 같이 먹어 흐려지고 손가락이 덮었다.
+ * 그래서 여기서도 물건 안이 아니라 **물건 층(`.bench-tokens`)에서** 찾는다.
+ */
+const meterW = await page.locator('.bench-tokens > .smear-meter i')
   .evaluate((el) => el.style.width).catch(() => null);
 ok(meterW && parseFloat(meterW) > 0, '문지르는 동안 얼마나 발렸는지 보인다', `계량기 ${meterW}`);
+/*
+ * **발리는 것이 그 자리에서 보이는가.** 앞서는 손을 뗄 때에야 시료가 나타났다 —
+ * 문지르는 내내 슬라이드는 빈 채였고, 보이는 것은 막대 하나뿐이었다.
+ * (사장님 지시: 「발린다는 게 제대로 보였으면 좋겠어.」)
+ */
+const previewing = await page.evaluate(() => {
+  const el = document.querySelector('[data-id="slideB"]');
+  return /opacity="0\.[2-9]\d*"/.test(el?.innerHTML ?? '');
+});
+ok(previewing, '문지르는 동안 받침 유리에 시료가 나타난다');
 await page.mouse.up();
 await page.waitForTimeout(120);
 
