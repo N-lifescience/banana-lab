@@ -158,29 +158,32 @@ export function dropTable(store, openZoom = () => {}) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때.
+ *
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 눌러서 상태가 바뀌는 물건은 하나도 없다 — 모든 물건이 누르면 자기 화면을 연다.
+ * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기(`dropTable`)뿐이고, 손끝 조작(센서 깊이·
+ * 뚜껑·측정)은 챔버 화면 안의 손잡이와 단추다.
  *
  * ── 안전 수칙 조작을 걷어내면서 생긴 자리 ──────────────────────────
  * 앞서는 BTB 병·폐액통·휴지를 누르면 「마개를 닫았다」·「폐액을 버렸다」·「손을 씻었다」가
  * 기록되고, 자기 평가에서 지켰는지 세었다. 그것을 전부 걷어냈다 — 그러면 평가되는 것이
  * 안전 습관이 아니라 **화면 속 단추를 눌렀다는 사실**이기 때문이다.
+ * 그 뒤 한동안 폐액통·쓰레기통은 누르면 알림(`NOTE_PRACTICE`)만 띄웠다. 이제 그 말은
+ * 물건 화면의 덧붙일 말이다 — 누르는 것으로 dispatch 가 일어나는 물건은 없다.
  *
- * 걷어내고 나서 **눌러도 아무 일도 안 나는 물건**이 남는지 표로 재어 봤다.
- * BTB 병과 휴지는 끌기 역할이 남아 살아 있다 (병 → 챔버 붓기, 휴지 → 센서 닦기).
- * 그런데 **폐액통은 탭이 안전 조작뿐이라 통째로 죽고**, **쓰레기통은 그 전부터 이미
- * 죽어 있었다** — 끌기·받기·탭 어디에도 없었다.
- *
- * 그래서 둘에는 **실제 실험에서 무엇을 하는 물건인지** 말하게 두었다. 판정이 아니라
- * 안내다 — 상태를 하나도 바꾸지 않고, 「이 앱은 확인하지 않습니다」까지 함께 말한다.
+ * `onOpenZoom(mode, id, el)` — `chamber` 면 id 는 'L'|'R', `item` 이면 실험대 물건 id.
  */
 export function tapTable(store, onOpenZoom) {
+  void store;   // 표의 모양을 다른 일곱과 맞춘다 — 누르는 것만으로는 아무것도 dispatch 하지 않는다.
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    // 챔버를 누르면 크게 본다. **결과를 보는 곳이자 뚜껑·측정을 다루는 곳**이다.
-    chamber: (item, el) => onOpenZoom(item.chamber, el),
-    // 센서를 누르면 그 센서가 꽂힌 챔버의 확대 뷰가 열린다 — 깊이를 거기서 정한다.
-    sensor: (item, el) => onOpenZoom(item.chamber, el),
-    waste: () => store.dispatch('NOTE_PRACTICE', { kind: 'waste' }),
-    bin: () => store.dispatch('NOTE_PRACTICE', { kind: 'bin' }),
+    // 챔버를 누르면 크게 본다. **결과를 보는 곳이자 뚜껑·측정·센서 깊이를 다루는 곳**이다.
+    chamber: (item, el) => onOpenZoom('chamber', item.chamber, el),
+    // 센서는 자기 화면 — 어디에 꽂혀 있나, 끝이 더러운가. 꽂힌 센서는 챔버 화면에서 뺀다.
+    sensor: view,
+    beanjar: view, scoop: view, bottle: view,
+    sink: view, tissue: view, waste: view, bin: view,
   };
 }
 
@@ -290,7 +293,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
 
   root.querySelector('#undo').addEventListener('click', () => store.dispatch('UNDO', {}));
 
-  const DROPS = dropTable(store, (id) => onOpenZoom(id, elFor(`chamber${id}`)));
+  const DROPS = dropTable(store, (id) => onOpenZoom('chamber', id, elFor(`chamber${id}`)));
 
   const TAPS = tapTable(store, onOpenZoom);
 
@@ -931,8 +934,9 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
       el.dataset.id = item.id;
       if (item.chamber) el.dataset.chamber = item.chamber;
       el.dataset.tool = item.asset;
-      // 챔버와 센서를 누르면 확대 뷰가 열린다 — 검사 스크립트가 이 표시를 찾는다.
-      if (item.kind === 'chamber' || item.kind === 'sensor') el.dataset.zoom = item.chamber;
+      // 챔버를 누르면 그 챔버의 확대 뷰가 열린다 — 검사 스크립트가 이 표시를 찾는다.
+      // (센서는 자기 물건 화면이 열린다. 꽂으면 챔버 화면이 열린다 — `dropTable`.)
+      if (item.kind === 'chamber') el.dataset.zoom = item.chamber;
       // 크기와 위치를 전부 무대 비율로 낸다. 배경 애셋과 같은 자로 재어지므로
       // 창 크기가 바뀌어도 realSizeMm 비례와 배경 위 자리가 함께 유지된다.
       el.style.left = `${xPct(item.x)}%`;

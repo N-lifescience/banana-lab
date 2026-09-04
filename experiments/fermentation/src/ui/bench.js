@@ -285,20 +285,70 @@ export function dropTable(store) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때 — **그 물건의 화면이 열린다.** 상태는 바뀌지 않는다.
  *
- * **안전 수칙(손 씻기·마개 닫기·폐액 처리)은 여기서 다루지 않는다.** 앱이 그것을
- * 재지도, 시키지도 않는다 — 탐구 노트 7단계에 **무엇을 지켜야 하는지 적어 두기만** 한다.
- * 억지로 누르게 만드는 조작이 실험을 배우는 데 보태는 것이 없다는 판단이다.
- *
- * **발효관을 누르면 솜마개가 빠진다.** 막힘 문구가 「발효관을 눌러 솜마개를 빼세요」라고
- * 말하므로(`rules.js` 의 `PLUGGED_MESSAGE`) 그 말이 실제로 되는 조작이어야 한다.
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 앞서는 발효관을 누르면 솜마개가 빠지고(UNPLUG_TUBE), 만든 병을 누르면 비워졌다(EMPTY_MIX).
+ * 둘은 이제 물건 화면(`zoom.js`)의 단추다 — 막힘 문구가 「솜마개를 빼세요」라고 하면
+ * 발효관 화면에 그 단추가 있다. 나머지는 눌러도 아무 일이 없었다 — 그 침묵은 고장과
+ * 구별되지 않는다. 모든 물건이 자기 화면을 연다. 「무엇을 받는 곳인지」를 그 화면이 말한다.
+ * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기(`dropTable`)뿐이다.
  */
-export function tapTable(store) {
+export function tapTable(store, onOpenZoom = () => {}) {
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    fermtube: () => store.dispatch('UNPLUG_TUBE', {}),
-    bottleMix: () => store.dispatch('EMPTY_MIX', {}),
+    bottleGlucose: view, bottleWater: view, bottleMix: view, bottleYeast: view, bottleKoh: view,
+    cotton: view, dropper: view, tissue: view, incubator: view, fermtube: view, waste: view, bin: view,
   };
+}
+
+/** 실험대 물건 하나. 확대 뷰가 종류·농도·온도를 읽는 데 쓴다. */
+export function itemById(id) {
+  return defaultItems().find((it) => it.id === id) ?? null;
+}
+
+/**
+ * 물건 하나를 그릴 때 애셋에 넘길 상태.
+ *
+ * **이 함수가 상태를 그림으로 옮기는 유일한 자리다.** 여기 없는 것은 화면에 안 나타나고,
+ * 화면에 안 나타나는 상태는 학생에게 없는 것과 같다. 실험대와 확대 뷰가 같은 함수를 쓴다 —
+ * 두 곳에서 따로 만들면 상태를 하나 늘릴 때 한쪽이 조용히 옛 그림을 그린다.
+ */
+export function assetState(store, item) {
+  const st = store.getState();
+  const t = st.bench.tube;
+  switch (item.kind) {
+    case 'bottleGlucose':
+      return { kind: 'GLUCOSE', pct: item.pct, level: 0.7 };
+    case 'bottleWater':
+      return { kind: 'WATER', level: 0.8 };
+    case 'bottleMix': {
+      // **만든 병은 지금 든 것을 말해야 한다.** 라벨이 「빔」인지 「5 %」인지가
+      // 골라 쓸 수 있느냐를 가른다. 비어 있으면 pct 를 주지 않는다 —
+      // 0 을 주면 「포도당 0 % 가 든 병」으로 읽힌다.
+      const pct = mixPct(st.bench.mix);
+      const total = st.bench.mix.glucoseMl + st.bench.mix.waterMl;
+      return pct === null
+        ? { kind: 'MIX', level: 0 }
+        : { kind: 'MIX', pct, level: Math.min(total / 30, 1) };
+    }
+    case 'bottleYeast':
+      return { kind: 'YEAST', level: 0.7 };
+    case 'bottleKoh':
+      return { kind: 'KOH', level: 0.6 };
+    case 'fermtube':
+      // 실험대의 발효관과 관찰 창의 발효관이 **같은 함수**를 쓴다.
+      // 두 곳에서 따로 만들면 상태를 하나 늘릴 때 한쪽이 조용히 옛 그림을 그린다.
+      return tubeAssetState(t);
+    case 'incubator':
+      return { tempC: item.tempC };
+    case 'dropper':
+      return { holds: t.drained ? 'BREW' : null, level: t.drained ? 0.6 : 0 };
+    case 'waste':
+      return { level: 0.2 };
+    default:
+      return {};
+  }
 }
 
 /**
@@ -359,7 +409,7 @@ function layoutCode(items) {
  * 이 실험에는 **확대 뷰가 없다.** 손끝으로 값을 정하는 조작(몇 방울인가, 몇 도로 덮는가)이
  * 없기 때문이다 — 조건은 물건을 골라 잡는 것으로 정해진다 (NEW-EXPERIMENT.md §3.5).
  */
-export function createBench(root, store, { edit = false } = {}) {
+export function createBench(root, store, { edit = false, onOpenZoom = () => {} } = {}) {
   root.classList.add('bench');
   // 배경과 물건을 같은 무대 안에 둔다. 무대가 4:3 을 지키므로 둘이 함께 스케일된다.
   // 안내 말풍선은 무대 바로 아래에 둔다 — 물건 층(.bench-tokens)은 조작할 때마다
@@ -369,7 +419,7 @@ export function createBench(root, store, { edit = false } = {}) {
       <button type="button" id="undo">${UI.undo.label}</button>
       <span id="undo-left"></span>
       <button type="button" id="take-out" hidden></button>
-      <button type="button" id="record">${UI.bench.record}</button>
+      <button type="button" id="record">${UI.zoom.capture}</button>
       <span id="clock"></span>
       <span id="trials"></span>
       <span id="tube-contents"></span>
@@ -410,7 +460,7 @@ export function createBench(root, store, { edit = false } = {}) {
   root.querySelector('#record').addEventListener('click', () => store.dispatch('RECORD_TRIAL', {}));
 
   const DROPS = dropTable(store);
-  const TAPS = tapTable(store);
+  const TAPS = tapTable(store, onOpenZoom);
 
   const items = defaultItems();
   for (const item of items) { item.homeX = item.x; item.homeY = item.y; }
@@ -547,49 +597,6 @@ export function createBench(root, store, { edit = false } = {}) {
     // 스크린샷만으로 배치를 옮겨 적을 수 있어야 한다. 콘솔에도 한 벌 남긴다 —
     // 붙여 넣기가 막힌 환경(권한 거부)에서도 길이 하나는 남는다.
     window.__layoutCode = () => layoutCode(items);
-  }
-
-  /**
-   * 물건 하나를 그릴 때 애셋에 넘길 상태.
-   *
-   * **이 함수가 상태를 그림으로 옮기는 유일한 자리다.** 여기 없는 것은 화면에 안 나타나고,
-   * 화면에 안 나타나는 상태는 학생에게 없는 것과 같다.
-   */
-  function assetState(item) {
-    const st = store.getState();
-    const t = st.bench.tube;
-    switch (item.kind) {
-      case 'bottleGlucose':
-        return { kind: 'GLUCOSE', pct: item.pct, level: 0.7 };
-      case 'bottleWater':
-        return { kind: 'WATER', level: 0.8 };
-      case 'bottleMix': {
-        // **만든 병은 지금 든 것을 말해야 한다.** 라벨이 「빔」인지 「5 %」인지가
-        // 골라 쓸 수 있느냐를 가른다. 비어 있으면 pct 를 주지 않는다 —
-        // 0 을 주면 「포도당 0 % 가 든 병」으로 읽힌다.
-        const pct = mixPct(st.bench.mix);
-        const total = st.bench.mix.glucoseMl + st.bench.mix.waterMl;
-        return pct === null
-          ? { kind: 'MIX', level: 0 }
-          : { kind: 'MIX', pct, level: Math.min(total / 30, 1) };
-      }
-      case 'bottleYeast':
-        return { kind: 'YEAST', level: 0.7 };
-      case 'bottleKoh':
-        return { kind: 'KOH', level: 0.6 };
-      case 'fermtube':
-        // 실험대의 발효관과 관찰 창의 발효관이 **같은 함수**를 쓴다.
-        // 두 곳에서 따로 만들면 상태를 하나 늘릴 때 한쪽이 조용히 옛 그림을 그린다.
-        return tubeAssetState(t);
-      case 'incubator':
-        return { tempC: item.tempC };
-      case 'dropper':
-        return { holds: t.drained ? 'BREW' : null, level: t.drained ? 0.6 : 0 };
-      case 'waste':
-        return { level: 0.2 };
-      default:
-        return {};
-    }
   }
 
   /**
@@ -1022,7 +1029,7 @@ export function createBench(root, store, { edit = false } = {}) {
       }
       el.setAttribute('aria-label', longNameOf(item));
       el.setAttribute('aria-describedby', 'bench-tip');
-      el.innerHTML = ASSETS[item.asset].render(assetState(item));
+      el.innerHTML = ASSETS[item.asset].render(assetState(store, item));
       // 이름표는 **그림 아래**에 붙는다. 프레임 아래가 아니다 — 애셋마다 여백이 달라서
       // 프레임 기준으로 달면 어떤 것은 물건에 붙고 어떤 것은 한참 떨어진다.
       const c = CONTENT_BOX[item.asset];

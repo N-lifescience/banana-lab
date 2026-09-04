@@ -397,7 +397,8 @@ test('손이 글칸에 있는 동안 노트를 다시 그리지 않는다 (얇�
  *   **못 재는 것은 여기서 소스로** 지킨다. 실제 확인은 아이폰 실기가 있어야 한다.
  */
 test('실험대에는 길게 누르기 메뉴를 끄고, 탐구 노트에는 걸지 않는다', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '');   // 주석에 적어 둔 설명이 규칙으로 세어지면 안 된다
 
   const block = html.match(/\.bench-stage\s*\{[^}]*\}/);

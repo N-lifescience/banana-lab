@@ -220,3 +220,34 @@ test('폐액통에 되는 것은 개수대에도 된다 — 둘 중 하나만 �
   assert.deepEqual(onlyOne, [],
     `버리는 자리 하나만 열려 있습니다 — 다른 쪽으로 가져간 학생에게는 아무 일도 안 납니다: ${onlyOne.join(' / ')}`);
 });
+
+/*
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ *
+ * 예전에는 잎을 누르면 말없이 신선한 잎↔시든 잎이 바뀌고, 바이알을 누르면 말없이 뚜껑이
+ * 열리고 닫혔다. 어떤 물건은 눌러도 아무 일이 없었다. 이제 **모든 물건이 누르면 자기 화면을
+ * 열고**, 상태는 그 화면의 단추(잎 고르기 · 뚜껑 덮기/열기 · 꺼내기)로만 바뀐다.
+ */
+test('모든 물건이 눌러도 조작이 일어나지 않는다 — 자기 화면이 열린다', () => {
+  const store = fakeStore();
+  const opened = [];
+  const taps = tapTable(store, (mode, id) => opened.push([mode, id]));
+  for (const kind of BENCH_KINDS) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = store.calls.length;
+    taps[kind]({ id: kind, kind }, null);
+    assert.equal(store.calls.length, before, `${kind} 를 누르는 것만으로 상태가 바뀝니다`);
+  }
+  assert.equal(opened.length, BENCH_KINDS.length, '누를 때마다 화면이 하나 열려야 합니다');
+  const modes = Object.fromEntries(opened.map(([mode, id]) => [id ?? mode, mode]));
+  assert.equal(modes.tube, 'tube');
+  assert.equal(modes.paper, 'paper');
+  assert.equal(modes.vial, 'vial');
+  for (const kind of ['leaf', 'bottle', 'paperbox', 'capillary', 'pencil', 'ruler', 'waste', 'sink', 'bin']) {
+    assert.equal(modes[kind], 'item', `${kind} 는 물건 화면(item)이 열려야 합니다`);
+  }
+  // 끌기는 살아 있어야 한다 — 여기까지 지우면 잎을 넣을 길이 없어진다.
+  const drops = dropTable(store, () => {});
+  assert.ok(drops.leaf.tube, '잎을 원심관에 넣는 길이 없어졌습니다');
+  assert.ok(drops.paper.vial, '종이를 바이알에 세우는 길이 없어졌습니다');
+});

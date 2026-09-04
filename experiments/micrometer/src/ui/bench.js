@@ -211,6 +211,10 @@ export function dropTable(store, openZoom = () => {}) {
  * 없으면 위반 기록이 한 번 남고 영영 지워지지 않는다.
  */
 export function tapTable(store, onOpenZoom) {
+  /*
+   * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+   * 여기서는 `store.dispatch` 를 부르지 않는다 — 눌러서 상태가 바뀌는 물건은 하나도 없다.
+   */
   return {
     // 현미경을 누르면 확대 뷰가 열린다. 여기서 눈금을 보고, 세고, 기록한다.
     microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
@@ -240,10 +244,12 @@ export function tapTable(store, onOpenZoom) {
     stageMic: (item, el) => onOpenZoom('item', 'stageMic', el),
     specimen: (item, el) => onOpenZoom('item', 'specimen', el),
     /**
-     * 쓰레기통은 눌러도 아무것도 열지 않는다 — **버리는 일은 끌어다 놓는 손짓뿐**이다.
-     * 누르면 버려지게 하면, 스쳐 누른 것 하나로 표본이 사라진다.
-     * 말풍선이 무엇을 받는 곳인지 말하고, 키보드로는 물건 쪽 「여기에 놓기」로 간다.
+     * 쓰레기통도 **누르면 자기 화면이 열린다** — 무엇을 받는 곳인지를 그 화면이 말한다
+     * (docs/09-uniformity.md §2: 눌러도 아무 일 없는 물건은 고장으로 읽힌다).
+     * 버리는 일은 여전히 **끌어다 놓는 손짓뿐**이다. 누르면 버려지게 하면 스쳐 누른 것
+     * 하나로 표본이 사라진다. 그 화면에 단추가 없는 까닭이다.
      */
+    bin: (item, el) => onOpenZoom('item', 'bin', el),
   };
 }
 

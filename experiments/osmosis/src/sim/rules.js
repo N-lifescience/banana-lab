@@ -313,7 +313,7 @@ export const ACTIONS = {
   APPLY_SOLUTION(state, { slide }) {
     const s = state.slides[slide];
     // 재물대에 아무것도 없을 때 현미경에 대면 여기로 온다. 터뜨리지 않고 말로 답한다.
-    if (!s) return happened(state, '어느 받침 유리에 댈지 알 수 없습니다. 재물대에 슬라이드가 없습니다.', 'no-slide');
+    if (!s) return happened(state, '어느 받침 유리에 댈지 알 수 없습니다. 재물대에 받침 유리가 없습니다.', 'no-slide');
     const d = state.tools.dropper;
     if (d.holds === null) {
       return happened(state, '스포이트가 비어 있어 아무것도 떨어지지 않았습니다.', 'dropper-empty');
@@ -349,7 +349,7 @@ export const ACTIONS = {
    */
   WICK(state, { slide }) {
     const s = state.slides[slide];
-    if (!s) return happened(state, '어느 받침 유리에 댈지 알 수 없습니다. 재물대에 슬라이드가 없습니다.', 'no-slide');
+    if (!s) return happened(state, '어느 받침 유리에 댈지 알 수 없습니다. 재물대에 받침 유리가 없습니다.', 'no-slide');
     if (!s.coverslip.placed) {
       return happened(state, '덮개 유리가 없습니다. 빨아들일 것이 없어 액만 번집니다.', 'no-coverslip');
     }
@@ -430,14 +430,14 @@ export const ACTIONS = {
   MOUNT(state, { slide }) {
     const s = state.slides[slide];
     if (s.cracked) {
-      return blocked(state, '이 슬라이드는 금이 갔습니다. 받침 유리 통에서 새것을 꺼내 처음부터 다시 만드세요.',
+      return blocked(state, '이 받침 유리는 금이 갔습니다. 받침 유리 통에서 새것을 꺼내 처음부터 다시 만드세요.',
         BLOCKING_REASONS.BROKEN);
     }
     const next = withScope(state, { stage: slide, coarse: MOUNT_COARSE, lowMagFocused: false });
     if (!s.coverslip.placed) {
       return happened(next, '덮개 유리 없이 올렸습니다. 고배율로 올리면 대물렌즈가 시료에 닿습니다.', 'no-coverslip');
     }
-    return ok(next, `${SLIDE_NAME[slide]} 슬라이드를 재물대에 올렸습니다.`, 'mounted');
+    return ok(next, `${SLIDE_NAME[slide]}를 재물대에 올렸습니다.`, 'mounted');
   },
 
   /**
@@ -553,7 +553,7 @@ export const ACTIONS = {
     const on = state.microscope.stage;
     if (!on) return ok(state);
     return ok(withScope(state, { stage: null }),
-      `${SLIDE_NAME[on]} 슬라이드를 재물대에서 내렸습니다.`, 'unmounted');
+      `${SLIDE_NAME[on]}를 재물대에서 내렸습니다.`, 'unmounted');
   },
 
   /**
@@ -583,7 +583,7 @@ export const ACTIONS = {
     const m = state.microscope;
     if (m.objective === 40 && m.stage) {
       const next = withScope(withSlide(state, m.stage, { cracked: true }), { stage: null });
-      return happened(next, '고배율에서 조동나사를 돌려 슬라이드에 금이 갔습니다. 새로 만들어야 합니다.', 'cracked');
+      return happened(next, '고배율에서 조동나사를 돌려 받침 유리에 금이 갔습니다. 재물대에서 내려왔습니다 — 쓰레기통이나 받침 유리 통에 대어 새것으로 바꾸세요.', 'cracked');
     }
     const wanted = m.coarse + delta;
     const coarse = Math.max(-1, Math.min(1, wanted));
@@ -650,7 +650,7 @@ export const ACTIONS = {
    */
   CAPTURE(state) {
     const m = state.microscope;
-    if (!m.stage) return happened(state, '재물대에 슬라이드가 없습니다.');
+    if (!m.stage) return happened(state, '재물대에 받침 유리가 없습니다.');
     const s = state.slides[m.stage];
     const nextAt = state.session.captures.reduce((n, c) => Math.max(n, (c.at ?? -1) + 1), 0);
     const capture = {

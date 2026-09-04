@@ -57,9 +57,12 @@ test('질문 ⓐ 가 없는 STEP 은 이 규칙과 무관하다', () => {
   assert.equal(stepNotesWritten(filled, other), true, `STEP ${other.id} 이 ⓐ 없이도 안 넘어갑니다`);
 });
 
-test('4쪽 안내가 「앞 STEP 의 기록을 적어야 열린다」를 말한다', () => {
+test('잠긴 STEP 이 「앞 STEP 의 기록을 적어야 열린다」를 말한다', () => {
   // 「다른 STEP 도 눌러서 열 수 있습니다」라고만 하고 실제로는 잠겨 있었다.
-  assert.match(UI.notebook.stepLeadIn, /기록을 적어야 열립니다/, '잠금이 있다는 것을 안내가 말하지 않습니다');
+  // 머리말(`stepLeadIn`)은 여덟 실험이 같은 문장이라(docs/09 §4), 잠금의 까닭은
+  // **잠긴 카드 안**(`stepLockedHint`·`stepLockedWhy`)이 말한다.
+  assert.match(UI.notebook.stepLockedWhy('1'), /기록을 적어야 여기가 열립니다/, '잠금이 있다는 것을 카드가 말하지 않습니다');
+  assert.equal(UI.notebook.stepLockedHint, '앞 STEP 을 먼저 적으세요');
 });
 
 /* ---------------- 잰 시간 1분 차이는 어긋난 것이 아니다 ---------------- */
@@ -139,7 +142,8 @@ test('「온도가 왼쪽이 1도 정도 높았다」는 기록으로 충분하�
 /* ---------------- 실험대 판이 가로로 스크롤되지 않는다 ---------------- */
 
 test('#bench 는 가로 스크롤을 막는다 — 오른쪽 끝 물건의 프레임이 무대를 넘는다', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
   const rule = /#bench\{[^}]*\}/.exec(html)?.[0] ?? '';
   assert.match(rule, /overflow-x:hidden/, '윈도우·크롬북에서 실험대 밑에 가로 스크롤바가 생깁니다');
 });

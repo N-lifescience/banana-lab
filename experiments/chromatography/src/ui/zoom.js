@@ -1,5 +1,5 @@
 /**
- * 확대 뷰 — 색소 추출 / 거름종이 손질 / 전개.
+ * 확대 뷰 — 색소 추출(원심관) / 거름종이 손질 / 전개(바이알) / 물건 화면.
  *
  * **실험대에서는 큰 동작만, 확대 뷰에서는 손끝 동작만** 한다 (PLAYBOOK §4).
  * 여기 있는 것은 전부 **결과를 가르는 값**이다 — 몇 번 찍는가, 한 번에 얼마나 오래 대는가,
@@ -8,8 +8,9 @@
  * 이 값들을 실험대에서 가져다 대기만 하면 알아서 정해지게 두면, 이 실험의 변인이
  * 학생 손을 떠나고 세어 볼 일 자체가 없어진다.
  *
- * Esc 로 나간다. 여는 요소가 <button> 이므로 키보드로도 들어올 수 있다 (bench.js 참조).
- * 열렸을 때 포커스를 뷰 안으로 옮기고, 닫으면 열었던 곳으로 되돌린다.
+ * 덮개·패널·닫기·Esc·포커스·스크롤은 공용 틀(`createZoomShell`)이 한다 (docs/09-uniformity.md §3).
+ * 여기는 **무엇을 그릴지**만 갖는다. 물건 화면(잎·병·통·모세관·연필·자·쓰레기통·폐액통·개수대)은
+ * 공용 `renderItemView` 로 그린다 — 누르면 본다, 끌면 옮긴다, 단추로 한다.
  */
 
 import { renderStrip } from '../render/strip.js';
@@ -18,6 +19,9 @@ import {
   stripParams, currentFrontMm, frontOverrun, isSettled, extractStrength, MARKERS,
 } from '../sim/state.js';
 import { ORIGIN_MM, ORIGIN_RANGE_MM, MAX_DEPTH_MM, PAPER_H_MM } from '../sim/develop.js';
+import { createZoomShell } from '../../../../packages/lab-kit/ui/zoom-shell.js';
+import { renderItemView, acceptsFrom } from '../../../../packages/lab-kit/ui/item-view.js';
+import { dropTable } from './bench.js';
 import { UI } from './strings.js';
 import { ASSETS } from '../assets/index.js';
 
@@ -42,24 +46,18 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => (
 ));
 
 export function createZoom(root, store) {
-  root.className = 'zoom-overlay';
-  root.hidden = true;
-  // 닫기 단추는 패널의 **첫 자식**이고 sticky 다. 절대 위치로 두면 창보다 긴 내용이
-  // 들어간 작은 화면(스마트폰 가로)에서 아래로 스크롤할 때 화면 밖으로 밀려 나가,
-  // Esc 도 배경 탭도 닿지 않는 자리에서 나갈 방법이 없어진다.
-  root.innerHTML = `
-    <div class="zoom-panel" role="dialog" aria-modal="true" tabindex="-1">
-      <button type="button" id="zoom-close" class="zoom-close"></button>
-      <div class="zoom-body"></div>
-    </div>`;
-  const panel = root.querySelector('.zoom-panel');
-  const body = root.querySelector('.zoom-body');
-  const closeBtn = root.querySelector('.zoom-close');
-  closeBtn.textContent = Z.close;
+  const shell = createZoomShell(root, {
+    closeLabel: Z.close,
+    // 닫을 때 한 번 전체를 동기화해 실험대(배경) 뷰가 최신 상태를 반영하게 한다.
+    onClose: () => store.notify(),
+  });
+  const { body } = shell;
+  /** 놓기 표 — 「여기에 끌어다 놓을 수 있는 것」을 거꾸로 읽는다. 실행하지 않는다. */
+  const DROPS = dropTable(store);
 
   let mode = null;
-  let opener = null;
-  let openerId = null;
+  /** 물건 화면에 열린 물건 (실험대의 id). */
+  let itemId = null;
   /** 실험대에서 들고 온 도구. 이것만 확대 뷰에 나온다 — 안 가져온 도구가 떠 있으면 헷갈린다. */
   let zoomTool = null;
   /** 결과를 기록한 직후 화면에 남길 확인 문구. 열 때마다 지운다. */
@@ -79,33 +77,17 @@ export function createZoom(root, store) {
    */
   let busy = false;
 
-  function onKeydown(e) {
-    if (e.key === 'Escape') close();
-  }
-
-  function close() {
-    if (root.hidden) return;
-    root.hidden = true;
-    document.removeEventListener('keydown', onKeydown);
-    // 이 notify 가 실험대를 다시 그리면 opener 로 잡아 둔 버튼 자체가 새 요소로 바뀐다.
-    // 그래서 notify 를 먼저 하고, data-id 로 (다시 만들어졌을 수도 있는) 같은 자리를 찾는다.
-    store.notify();
-    const target = openerId ? document.querySelector(`[data-id="${openerId}"]`) : opener;
-    if (target && target.isConnected) target.focus();
-    opener = null;
-    openerId = null;
-  }
-  closeBtn.addEventListener('click', close);
-  root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
+  function close() { shell.close(); }
 
   /**
-   * @param {'tube'|'paper'|'vial'} openMode
-   * @param {null} _unused 바나나랩의 슬라이드 id 자리. 이 실험은 종이가 한 장이라 쓰지 않는다
+   * @param {'tube'|'paper'|'vial'|'item'} openMode
+   * @param {string|null} openId  item 이면 실험대 물건 id. 나머지 셋은 물건이 하나라 쓰지 않는다
    * @param {HTMLElement} openerEl
    * @param {'capillary'|'pencil'|'bottle'|null} tool 실험대에서 **들고 온** 도구
    */
-  function open(openMode, _unused, openerEl, tool = null) {
+  function open(openMode, openId, openerEl, tool = null) {
     mode = openMode;
+    itemId = openMode === 'item' ? openId : null;
     zoomTool = tool;
     captureNotice = null;
     const st = store.getState();
@@ -117,18 +99,14 @@ export function createZoom(root, store) {
     originMm = st.paper.originMm ?? (assisted ? ORIGIN_MM : NEUTRAL_ORIGIN_MM);
     pourMm = assisted ? SAFE_POUR_MM : NEUTRAL_POUR_MM;
     marker = st.paper.marker ?? MARKERS.PENCIL;
-    opener = openerEl ?? document.activeElement;
-    openerId = opener?.dataset?.id ?? null;
-    root.hidden = false;
-    document.addEventListener('keydown', onKeydown);
-    renderBody();
-    panel.focus();
+    shell.open(renderBody, openerEl);
   }
 
   function renderBody() {
     if (mode === 'tube') renderTubeMode();
     else if (mode === 'paper') renderPaperMode();
     else if (mode === 'vial') renderVialMode();
+    else if (mode === 'item') renderItemMode();
   }
 
   /**
@@ -163,10 +141,104 @@ export function createZoom(root, store) {
    * (AGENTS.md §2.1 · tests/ui.contract.test.js).
    */
   const act = (id, label) =>
-    `<button type="button" class="zoom-action" id="${zid(id)}">${esc(label)}</button>`;
+    `<button type="button" class="zoom-action zoom-act" id="${zid(id)}">${esc(label)}</button>`;
 
-  const note = (text, kind = '') =>
-    `<p class="zoom-note${kind ? ` zoom-note--${kind}` : ''}">${esc(text)}</p>`;
+  /**
+   * 상태 한 줄. 공용 `.zoom-hint` — 잘 됐으면 `data-good="true"`, 조심할 것이면 `"false"`,
+   * 그냥 사실이면 표시 없음 (docs/09 §3).
+   */
+  const hint = (text, good = null) =>
+    `<p class="zoom-hint"${good === null ? '' : ` data-good="${good}"`}>${esc(text)}</p>`;
+
+  /** 제목 밑 한 줄 — 이 화면에서 무엇을 하는가. */
+  const subtitle = (text) => `<p class="zoom-slide-label">${esc(text)}</p>`;
+
+  /** 실험대 물건 id → 놓기 표의 종류. 병 둘은 한 종류다. */
+  const kindOf = (id) => (id.startsWith('bottle') ? 'bottle' : id);
+  /** 종류 → 화면에 쓸 이름. 끄는 쪽 이름이라 짧은 것(`UI.assetNames`)을 쓴다. */
+  const nameOfKind = (kind) => UI.assetNames[kind] ?? kind;
+  /** 「여기에 끌어다 놓을 수 있는 것」 — 놓기 표를 거꾸로 읽는다. 없으면 빈 줄. */
+  function acceptsLine(kind) {
+    const names = acceptsFrom(DROPS, kind, nameOfKind);
+    return names.length
+      ? `<p class="zoom-hint zoom-accepts">${esc(Z.acceptsLabel)} ${names.map(esc).join(' · ')}</p>` : '';
+  }
+  /** 준비물 표의 「하는 일」. 두 곳에 따로 쓰면 반드시 갈린다. */
+  const roleOf = (asset, name = null) =>
+    UI.notebook.materials.find((m) => m.asset === asset && (!name || m.name === name))?.role ?? null;
+
+  /* ---------------------------------------------------------------- */
+  /* 물건 화면 — 누르면 본다 (docs/09 §2·§3)                             */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * 물건 하나의 화면. 제목 · 어디에 있나 · 하는 일 · 그림 · 덧붙일 말 · 받는 것 · 단추 —
+   * 차례는 공용 `renderItemView` 가 정한다. 여기서는 **이 실험의 사실**만 채운다.
+   */
+  function renderItemMode() {
+    const st = store.getState();
+    const id = itemId;
+    const kind = kindOf(id);
+    const I = Z.item;
+    const v = {
+      title: UI.bench.items[id] ?? UI.assetNames[kind],
+      where: null, role: null, note: null, figure: '', actions: [], extra: '',
+    };
+    const action = (aid, label, type, payload = {}, quiet = false) =>
+      v.actions.push({ id: aid, label, quiet, run: () => store.dispatch(type, payload) });
+
+    if (kind === 'leaf') {
+      // 신선한 잎과 시든 잎 중 무엇을 넣을지는 **학생이 정한다** — 이 실험의 변인 하나다.
+      // 예전에는 실험대에서 잎을 누르면 말없이 바뀌었다. 이제 여기서 고른다 (`PICK_LEAF`).
+      const leafKind = st.tools.leafKind;
+      v.where = leafKind === 'fresh' ? I.leafFresh : I.leafWilted;
+      v.role = roleOf('leaf');
+      v.figure = ASSETS.leaf.render({ fresh: leafKind === 'fresh' ? 1 : 0 });
+      v.extra = `
+        <div class="zoom-pick ctrl-group" role="group" aria-label="${esc(I.leafPickLabel)}">
+          <span>${esc(I.leafPickLabel)}</span>
+          ${['fresh', 'wilted'].map((k) => `
+            <button type="button" data-leaf="${k}" aria-pressed="${leafKind === k}">${esc(UI.leafKinds[k])}</button>`).join('')}
+        </div>`;
+    } else if (kind === 'bottle') {
+      const liquid = id.replace('bottle', '');
+      v.where = I.bottleHolds(UI.liquids[liquid]);
+      v.role = roleOf('bottle', UI.liquidsShort[liquid]);
+      v.figure = ASSETS.bottle.render({ kind: liquid, level: 0.7 });
+    } else if (kind === 'paperbox') {
+      v.where = I.paperboxHolds;
+      v.role = roleOf('paperbox');
+      v.figure = ASSETS.paperbox.render({});
+      action('act-take', Z.takeOut, 'NEW_PAPER');
+    } else if (kind === 'capillary') {
+      const c = st.tools.capillary;
+      const loaded = c.strength > 0;
+      v.where = loaded ? I.capillaryLoaded : I.capillaryEmpty;
+      v.role = roleOf('capillary');
+      v.figure = ASSETS.capillary.render({ loaded: c.strength });
+      if (loaded && c.grit > 0.2) v.note = I.capillaryGritty;
+      if (loaded) action('act-rinse', I.rinse, 'RINSE_CAPILLARY', {}, true);
+    } else if (kind === 'pencil') {
+      v.where = I.pencilWhere;
+      v.role = roleOf('pencil');
+      v.figure = ASSETS.pencil.render({});
+    } else if (kind === 'ruler') {
+      v.where = I.rulerWhere;
+      v.role = roleOf('ruler');
+      v.figure = ASSETS.ruler.render({});
+    } else {
+      // 받는 곳 — 폐액통·개수대·쓰레기통. 「무엇을 받는지」가 몸통이다.
+      v.role = roleOf(kind);
+      v.figure = ASSETS[kind].render(kind === 'waste' ? { level: 0.2 } : kind === 'sink' ? { water: 0 } : { fill: 0 });
+    }
+    v.accepts = acceptsFrom(DROPS, kind, nameOfKind);
+    v.acceptsLabel = Z.acceptsLabel;
+    renderItemView(body, v);
+
+    body.querySelectorAll('[data-leaf]').forEach((b) => {
+      b.addEventListener('click', () => store.dispatch('PICK_LEAF', { kind: b.dataset.leaf }));
+    });
+  }
 
   /* ---------------------------------------------------------------- */
   /* 색소 추출 — 원심관                                                 */
@@ -196,8 +268,8 @@ export function createZoom(root, store) {
      */
     const settled = isSettled(t);
     const settling = !settled && t.settleT > 0;
-    const layerNote = settled ? [Z.tubeSettled, 'good']
-      : (settling ? [Z.tubeSettle, ''] : [Z.tubeUnsettled, 'warn']);
+    const layerNote = settled ? [Z.tubeSettled, true]
+      : (settling ? [Z.tubeSettle, null] : [Z.tubeUnsettled, false]);
 
     /*
      * **뽑힌 정도를 보여 준다.**
@@ -217,25 +289,25 @@ export function createZoom(root, store) {
       </div>` : '';
 
     body.innerHTML = `
-      <h2>${esc(Z.tubeMode)}</h2>
+      <h2>${esc(UI.bench.items.tube)}</h2>
+      ${subtitle(Z.tubeMode)}
       <div class="zoom-vessel-stage">${ASSETS.tube.render({
         leaf: t.leaf, extract: t.extract, settleT: t.settleT, capped: true,
       })}</div>
-      ${missing ? note(missing) : `
-        ${note(layerNote[0], layerNote[1])}
-        ${note(Z.tubeShakeHint)}
+      ${missing ? `${hint(missing)}${acceptsLine('tube')}` : `
+        ${hint(layerNote[0], layerNote[1])}
+        ${gauge}
+        ${hint(Z.tubeShakeHint)}
+        ${acceptsLine('tube')}
         ${act('shake', Z.tubeShake)}
         ${zoomTool === 'capillary' ? act('load', UI.protocol[3].steps[0].label) : ''}
-        ${gauge}
       `}`;
 
     body.querySelector(`#${zid('shake')}`)?.addEventListener('click', () => {
       store.dispatch('SHAKE', { amount: 0.2 });
-      renderBody();
     });
     body.querySelector(`#${zid('load')}`)?.addEventListener('click', () => {
       store.dispatch('LOAD_CAPILLARY', {});
-      renderBody();
     });
   }
 
@@ -251,27 +323,31 @@ export function createZoom(root, store) {
 
     if (p.torn) {
       body.innerHTML = `
-        <h2>${esc(Z.paperMode)}</h2>
+        <h2>${esc(UI.bench.items.paper)}</h2>
+        ${subtitle(Z.paperMode)}
         <div class="zoom-strip">${renderStrip(params, { idPrefix: 'zoom-' })}</div>
-        ${note(Z.tornNote, 'warn')}`;
+        ${hint(Z.tornNote, false)}
+        ${acceptsLine('paper')}`;
       return;
     }
 
     body.innerHTML = `
-      <h2>${esc(Z.paperMode)}</h2>
+      <h2>${esc(UI.bench.items.paper)}</h2>
+      ${subtitle(Z.paperMode)}
       <div class="zoom-strip">${renderStrip(params, { idPrefix: 'zoom-' })}</div>
-      ${captureNotice ? note(captureNotice, 'good') : ''}
-      ${zoomTool === 'pencil' ? pencilControls(p) : ''}
-      ${zoomTool === 'capillary' ? capillaryControls(st) : ''}
-      ${zoomTool === null ? measureControls(p) : ''}
+      ${captureNotice ? hint(captureNotice, true) : ''}
       ${p.runT > 0 ? `
       <div class="zoom-gauge">
         <div class="bar"><div class="fill" style="width:${q.score}%"></div></div>
         <div class="cap"><span>${esc(UI.observability.label)}</span><b>${q.score}</b></div>
         <div class="hint">${esc(q.worst
-          ? UI.observability.hint(UI.observability.worst[q.worst])
+          ? UI.observability.hint(UI.observability.worst[q.worst], UI.observability.fix[q.worst])
           : UI.observability.allGood)}</div>
-      </div>` : note(Z.notDeveloped)}`;
+      </div>` : hint(Z.notDeveloped)}
+      ${acceptsLine('paper')}
+      ${zoomTool === 'pencil' ? pencilControls(p) : ''}
+      ${zoomTool === 'capillary' ? capillaryControls(st) : ''}
+      ${zoomTool === null ? measureControls(p) : ''}`;
 
     bindPencil();
     bindCapillary();
@@ -284,17 +360,16 @@ export function createZoom(root, store) {
         min: ORIGIN_RANGE_MM[0], max: ORIGIN_RANGE_MM[1], step: 1,
         readout: UI.units.mm(Math.round(originMm)),
       })}
-      ${note(Z.originHint)}
-      <div class="zoom-choice" role="group" aria-label="${esc(Z.markerLabel)}">
-        <span class="zoom-choice-label">${esc(Z.markerLabel)}</span>
+      ${hint(Z.originHint)}
+      <div class="zoom-pick ctrl-group" role="group" aria-label="${esc(Z.markerLabel)}">
+        <span>${esc(Z.markerLabel)}</span>
         ${[MARKERS.PENCIL, MARKERS.PEN].map((m) => `
-          <button type="button" data-marker="${m}" aria-pressed="${marker === m}"
-            class="zoom-opt${marker === m ? ' zoom-opt--chosen' : ''}">${esc(UI.markers[m])}</button>`).join('')}
+          <button type="button" data-marker="${m}" aria-pressed="${marker === m}">${esc(UI.markers[m])}</button>`).join('')}
       </div>
-      ${marker === MARKERS.PEN ? note(Z.markerPenWarn, 'warn') : ''}
+      ${marker === MARKERS.PEN ? hint(Z.markerPenWarn, false) : ''}
       ${act('draw-origin', UI.protocol[2].steps[0].label)}
       ${act('mark-front', Z.markFrontLabel)}
-      ${note(Z.markFrontHint)}
+      ${hint(Z.markFrontHint)}
       ${act('dry-paper', Z.dryPaperLabel)}
       ${act('mark-bands', Z.markBandsLabel)}`;
   }
@@ -310,39 +385,35 @@ export function createZoom(root, store) {
       originEl.addEventListener('change', () => { busy = false; });
     }
     body.querySelectorAll('[data-marker]').forEach((b) => {
-      b.addEventListener('click', () => { marker = b.dataset.marker; renderBody(); });
+      b.addEventListener('click', () => { marker = b.dataset.marker; shell.repaint(); });
     });
     body.querySelector(`#${zid('draw-origin')}`)?.addEventListener('click', () => {
       store.dispatch('DRAW_ORIGIN', { heightMm: originMm, marker });
-      renderBody();
     });
     body.querySelector(`#${zid('mark-front')}`)?.addEventListener('click', () => {
       store.dispatch('MARK_FRONT', {});
-      renderBody();
     });
     body.querySelector(`#${zid('dry-paper')}`)?.addEventListener('click', () => {
       store.dispatch('DRY_PAPER', {});
-      renderBody();
     });
     body.querySelector(`#${zid('mark-bands')}`)?.addEventListener('click', () => {
       store.dispatch('MARK_BANDS', {});
-      renderBody();
     });
   }
 
   function capillaryControls(st) {
     const p = st.paper;
-    if (st.tools.capillary.strength <= 0) return note(Z.capillaryEmpty, 'warn');
+    if (st.tools.capillary.strength <= 0) return hint(Z.capillaryEmpty, false);
     return `
       ${slider('dwell', Z.dwellLabel, Math.round(dwell * 100), {
         min: 0, max: 100, step: 5,
         readout: dwell > 0.3 ? Z.dwellLong : Z.dwellShort,
       })}
-      ${dwell > 0.3 ? note(Z.dwellWarn, 'warn') : ''}
-      ${note(Z.spotHint)}
-      ${note(Z.spotCount(p.spots))}
+      ${dwell > 0.3 ? hint(Z.dwellWarn, false) : ''}
+      ${hint(Z.spotHint)}
+      ${hint(Z.spotCount(p.spots))}
       ${act('spot', Z.spotLabel)}
-      ${act('dry-spot', Z.dryLabel, p.spotWet <= 0)}`;
+      ${act('dry-spot', Z.dryLabel)}`;
   }
 
   function bindCapillary() {
@@ -353,22 +424,20 @@ export function createZoom(root, store) {
         dwell = Number(e.target.value) / 100;
         body.querySelector(`#${zid('dwell')}-out`).textContent = dwell > 0.3 ? Z.dwellLong : Z.dwellShort;
       });
-      dwellEl.addEventListener('change', () => { busy = false; renderBody(); });
+      dwellEl.addEventListener('change', () => { busy = false; shell.repaint(); });
     }
     body.querySelector(`#${zid('spot')}`)?.addEventListener('click', () => {
       store.dispatch('SPOT', { dwell });
-      renderBody();
     });
     body.querySelector(`#${zid('dry-spot')}`)?.addEventListener('click', () => {
       store.dispatch('DRY_SPOT', {});
-      renderBody();
     });
   }
 
   function measureControls(p) {
     const wet = p.wetness > 0.6;
     return `
-      ${wet ? note(Z.rulerWet, 'warn') : note(Z.rulerHint)}
+      ${wet ? hint(Z.rulerWet, false) : hint(Z.rulerHint)}
       ${act(p.rulerPlaced ? 'lift-ruler' : 'place-ruler', p.rulerPlaced ? Z.rulerLift : Z.rulerLabel)}
       ${act('capture', Z.capture)}`;
   }
@@ -376,17 +445,15 @@ export function createZoom(root, store) {
   function bindMeasure() {
     body.querySelector(`#${zid('place-ruler')}`)?.addEventListener('click', () => {
       store.dispatch('MEASURE', {});
-      renderBody();
     });
     body.querySelector(`#${zid('lift-ruler')}`)?.addEventListener('click', () => {
       store.dispatch('LIFT_RULER', {});
-      renderBody();
     });
     body.querySelector(`#${zid('capture')}`)?.addEventListener('click', () => {
       const r = store.dispatch('CAPTURE', {});
       const n = r.state.session.captures.length;
       captureNotice = Z.captureSaved(n);
-      renderBody();
+      shell.repaint();
     });
   }
 
@@ -403,24 +470,26 @@ export function createZoom(root, store) {
     const over = frontOverrun(p);
 
     body.innerHTML = `
-      <h2>${esc(Z.vialMode)}</h2>
+      <h2>${esc(UI.bench.items.vial)}</h2>
+      ${subtitle(Z.vialMode)}
       <div class="zoom-vessel-stage">${ASSETS.vial.render({
         depth: v.depthMm, capped: v.capped, hasPaper: v.hasPaper,
       })}</div>
-      ${zoomTool === 'bottle' ? `
-        ${slider('pour', Z.pourAmount, pourMm, {
-          min: 1, max: 10, step: 1, readout: UI.units.mm(pourMm),
-        })}
-        ${act('pour-go', Z.pourLabel)}` : ''}
       <dl class="zoom-readout">
         <div><dt>${esc(Z.depthLabel)}</dt><dd>${esc(UI.units.mm(Math.round(v.depthMm)))}</dd></div>
         <div><dt>${esc(UI.notebook.originLabel)}</dt><dd>${esc(UI.units.mm(Math.round(origin)))}</dd></div>
         <div><dt>${esc(Z.frontLabel)}</dt><dd>${esc(over ? '—' : UI.units.mm(Math.round(front)))}</dd></div>
       </dl>
-      ${note(v.depthMm >= origin ? Z.depthWarnDeep : Z.depthOk, v.depthMm >= origin ? 'warn' : 'good')}
-      ${over ? note(Z.frontOverrun, 'warn') : note(Z.frontHint)}
-      ${act('cap', v.capped ? `${Z.capLabel} — ${Z.capClosed}` : `${Z.capLabel} — ${Z.capOpen}`)}
-      ${note(Z.capHint)}
+      ${hint(v.depthMm >= origin ? Z.depthWarnDeep : Z.depthOk, v.depthMm < origin)}
+      ${over ? hint(Z.frontOverrun, false) : hint(Z.frontHint)}
+      ${hint(`${Z.capLabel} — ${v.capped ? Z.capClosed : Z.capOpen}. ${Z.capHint}`)}
+      ${acceptsLine('vial')}
+      ${zoomTool === 'bottle' ? `
+        ${slider('pour', Z.pourAmount, pourMm, {
+          min: 1, max: 10, step: 1, readout: UI.units.mm(pourMm),
+        })}
+        ${act('pour-go', Z.pourLabel)}` : ''}
+      ${act('cap', v.capped ? Z.item.uncapBtn : Z.item.capBtn)}
       ${act(p.inVial ? 'remove' : 'insert', p.inVial ? Z.removeLabel : Z.insertLabel)}`;
 
     const pourEl = body.querySelector(`#${zid('pour')}`);
@@ -434,28 +503,23 @@ export function createZoom(root, store) {
     }
     body.querySelector(`#${zid('pour-go')}`)?.addEventListener('click', () => {
       store.dispatch('POUR_SOLVENT', { mm: pourMm });
-      renderBody();
     });
+    // 뚜껑은 열고 닫는 한 쌍이다. 예전에는 실험대에서 바이알을 누르면 말없이 바뀌었다 —
+    // 이제 여기 단추다. 열려 있을 때만 종이가 들어가고, 덮여 있어야 용매가 안 날아가고 빛도 안 든다.
     body.querySelector(`#${zid('cap')}`)?.addEventListener('click', () => {
       store.dispatch(v.capped ? 'UNCAP_VIAL' : 'CAP_VIAL', {});
-      renderBody();
     });
     body.querySelector(`#${zid('insert')}`)?.addEventListener('click', () => {
       store.dispatch('INSERT_PAPER', {});
-      renderBody();
     });
     body.querySelector(`#${zid('remove')}`)?.addEventListener('click', () => {
       store.dispatch('REMOVE_PAPER', {});
-      renderBody();
     });
   }
 
   // 전개가 진행되는 동안 화면이 따라 움직여야 한다 — 전선이 오르는 것을 보고 꺼내기 때문이다.
   // 손잡이를 쥐고 있는 동안에는 건너뛴다. 다시 그리면 그 손잡이가 사라진다.
-  store.subscribe(() => {
-    if (root.hidden || busy) return;
-    renderBody();
-  });
+  store.subscribe(() => { if (!busy) shell.repaint(); });
 
   return { open, close };
 }

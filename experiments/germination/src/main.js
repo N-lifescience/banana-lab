@@ -147,7 +147,8 @@ function boot(level, mode = MODES.GROUP) {
   if (import.meta.env.DEV) window.__store = store;
 
   const zoom = createZoom($('#zoom'), store);
-  const openZoom = (id, from) => zoom.open(id, from);
+  // `mode` 는 'chamber'(id 는 L·R) 또는 'item'(실험대 물건 id). 실험대·노트가 같은 통로를 쓴다.
+  const openZoom = (mode, id, from) => zoom.open(mode, id, from);
   const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {

@@ -129,10 +129,21 @@ test('고를 수 있는 값마다 화면에 쓸 단위 표기가 있다', () => 
  * 소스에서 눈으로는 안 보인다. 화면을 열어야 보이고, 그때는 이미 학생이 본 뒤다.
  */
 test('화면 문자열에 마크다운 표시가 남아 있지 않다', () => {
+  /*
+   * **`**굵게**` 를 허용하는 자리는 `emph()` 로 그리는 것뿐이다.**
+   * 탐구 과정 머리말(`stepLeadIn`)·가치 안내는 여덟 실험이 글자까지 같아야 하고
+   * (`tests/uniformity.test.js`), 정본은 강조를 `**` 로 적는다. 그 문자열은 `notebook.js` 가
+   * `emph()` 로 <b> 로 바꿔 그린다 — 그 함수를 거치지 않는 문자열에 `**` 가 있으면 별표가 그대로 나간다.
+   */
+  const viaEmph = new Set(['UI.notebook.stepLeadIn', 'UI.notebook.valuesLead', 'UI.notebook.valuesList', 'UI.notebook.predictLeadIn']);
+  const notebook = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8');
+  for (const key of ['stepLeadIn', 'valuesLead']) {
+    assert.ok(notebook.includes(`emph(N.${key})`), `notebook.js 가 N.${key} 를 emph() 로 그리지 않습니다`);
+  }
   const found = [];
   (function walk(node, path) {
     if (typeof node === 'string') {
-      if (/\*\*|(^|\s)__/.test(node)) found.push(`${path}: ${node.slice(0, 40)}…`);
+      if (/\*\*|(^|\s)__/.test(node) && ![...viaEmph].some((k) => path.startsWith(k))) found.push(`${path}: ${node.slice(0, 40)}…`);
     } else if (node && typeof node === 'object') {
       for (const [k, v] of Object.entries(node)) walk(v, `${path}.${k}`);
     }
@@ -205,7 +216,9 @@ test('탐구 노트가 막는 자리는 하나뿐이고, 왜 막혔는지 말한
  */
 test('아이폰 길게 누르기 막이가 실험대에 걸려 있다', async () => {
   const { readFileSync } = await import('node:fs');
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
   const rule = html.slice(html.indexOf('.bench-stage{'), html.indexOf('.bench-bg{'));
   assert.ok(rule.includes('-webkit-touch-callout:none'),
     '.bench-stage 에 -webkit-touch-callout:none 이 없습니다 — 아이폰에서 돋보기가 뜹니다');
@@ -221,8 +234,9 @@ test('아이폰 길게 누르기 막이가 실험대에 걸려 있다', async ()
 
 test('탐구 노트에는 길게 누르기 막이를 안 건다', () => {
   // 글칸에 걸면 **붙여넣기와 글자 고르기가 죽는다.** 학생이 쓴 것을 못 옮긴다.
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  for (const sel of ['.note{', '.note-body{', '#notebook{', '.note-input{']) {
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const sel of ['#note-panel', '#notebook,#side{', 'textarea[data-note]']) {
     const at = html.indexOf(sel);
     if (at < 0) continue;
     const rule = html.slice(at, html.indexOf('}', at));

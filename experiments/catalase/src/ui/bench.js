@@ -305,23 +305,67 @@ export function dropTable(store) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때 — **그 물건의 화면이 열린다.** 상태는 바뀌지 않는다.
  *
- * 앞서는 여기에 안전 수칙 조작 넷이 더 있었다 — 시약병 마개 닫기·폐액 버리기·손 씻기.
- * **앱이 안전을 판정하지 않기로 하면서 함께 걷어냈다** (`rules.js` 참조).
- * 시약병과 폐액통은 **끌기로 하던 일이 그대로 있어서** 눌러도 아무 일 없는 물건이 되지 않는다:
- * 시약병은 비커로 끌어 붓고, 폐액통은 비커를 끌어 비운다.
- * 휴지는 손 씻기 하나뿐이었으므로 **실험대에서 뺐다** — 눌러도 아무 말도 없는 물건을
- * 남기지 않는다. 실제 실험에서 무엇을 해야 하는지는 탐구 노트의 안내가 말한다.
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 앞서는 여기서 원반을 뚫고(PUNCH_DISC), 집고(PICK_DISC), 시행을 기록하고(RECORD_TRIAL),
+ * 수조에서 꺼냈다(TAKE_FROM_BATH). 그 넷은 이제 물건 화면(`zoom.js`)의 단추다.
+ * 나머지 아홉 종류는 눌러도 아무 일이 없었다 — 그 침묵은 고장과 구별되지 않는다.
+ * 모든 물건이 자기 화면을 연다. 「무엇을 받는 곳인지」를 그 화면이 말한다.
+ * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기(`dropTable`)뿐이다.
  */
-export function tapTable(store) {
+export function tapTable(store, onOpenZoom = () => {}) {
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    filterpaper: () => store.dispatch('PUNCH_DISC', {}),
-    forceps: () => store.dispatch('PICK_DISC', {}),
-    // 초시계를 멈추고 적는 것이 이 실험에서 결과를 남기는 동작이다.
-    stopwatch: () => store.dispatch('RECORD_TRIAL', {}),
-    beaker: () => store.dispatch('TAKE_FROM_BATH', {}),
+    bottleH2O2: view, bottleBuffer: view, bottleAcid: view, bottleBase: view,
+    filterpaper: view, forceps: view, extract: view, beaker: view, waterbath: view,
+    stopwatch: view, beakerbox: view, waste: view, bin: view,
   };
+}
+
+/** 실험대 물건 하나. 확대 뷰가 종류·농도·온도를 읽는 데 쓴다. */
+export function itemById(id) {
+  return defaultItems().find((it) => it.id === id) ?? null;
+}
+
+/**
+ * 물건 하나를 그릴 때 애셋에 넘길 상태.
+ *
+ * **이 함수가 상태를 그림으로 옮기는 유일한 자리다.** 여기 없는 것은 화면에 안 나타나고,
+ * 화면에 안 나타나는 상태는 학생에게 없는 것과 같다. 실험대와 확대 뷰가 같은 함수를 쓴다 —
+ * 두 곳에서 따로 만들면 상태를 하나 늘릴 때 한쪽이 조용히 옛 그림을 그린다.
+ */
+export function assetState(store, item) {
+  const st = store.getState();
+  const b = st.bench.beaker;
+  switch (item.kind) {
+    case 'bottleH2O2':
+      return { kind: 'H2O2', pct: item.pct, level: 0.7 };
+    case 'bottleBuffer':
+      return { kind: 'BUFFER', ph: item.ph, level: 0.7 };
+    case 'bottleAcid':
+      return { kind: 'ACID', level: 0.7 };
+    case 'bottleBase':
+      return { kind: 'BASE', level: 0.7 };
+    case 'extract':
+      return { level: 0.55, contents: item.boiled ? 'POTATO_BOILED' : 'POTATO' };
+    case 'beaker':
+      // 「아직 안 부었다」와 「부었다」가 그림에서 갈려야 한다 — 액체가 있고 없고로 보인다.
+      return { level: b.h2o2Pct === null ? 0 : 0.6, contents: 'H2O2', cracked: b.cracked };
+    case 'waterbath':
+      return { tempC: item.tempC };
+    case 'filterpaper':
+      // 뚫은 자국이 쌓인다. **한 일이 그림에 남아야** 방금 누른 것이 먹혔는지 알 수 있다.
+      return { punched: st.session.log.filter((l) => l.action === 'PUNCH_DISC').length };
+    case 'forceps':
+      return { closed: st.bench.disc.held, holding: st.bench.disc.punched ? 'disc' : null };
+    case 'stopwatch':
+      return { seconds: b.elapsedS, running: isRunning(b) };
+    case 'waste':
+      return { level: 0.2 };
+    default:
+      return {};
+  }
 }
 
 /**
@@ -419,7 +463,7 @@ function layoutCode(items) {
  * 이 실험에는 **확대 뷰가 없다.** 손끝으로 값을 정하는 조작(몇 방울인가, 몇 도로 덮는가)이
  * 없기 때문이다 — 조건은 물건을 골라 잡는 것으로 정해진다 (NEW-EXPERIMENT.md §3.5).
  */
-export function createBench(root, store, { edit = false } = {}) {
+export function createBench(root, store, { edit = false, onOpenZoom = () => {} } = {}) {
   root.classList.add('bench');
   // 배경과 물건을 같은 무대 안에 둔다. 무대가 4:3 을 지키므로 둘이 함께 스케일된다.
   // 안내 말풍선은 무대 바로 아래에 둔다 — 물건 층(.bench-tokens)은 조작할 때마다
@@ -429,7 +473,7 @@ export function createBench(root, store, { edit = false } = {}) {
       <button type="button" id="undo">${UI.undo.label}</button>
       <span id="undo-left"></span>
       <button type="button" id="take-out" hidden></button>
-      <button type="button" id="record">${UI.bench.record}</button>
+      <button type="button" id="record">${UI.zoom.capture}</button>
       <span id="clock"></span>
       <span id="trials"></span>
     </div>
@@ -469,7 +513,7 @@ export function createBench(root, store, { edit = false } = {}) {
   root.querySelector('#record').addEventListener('click', () => store.dispatch('RECORD_TRIAL', {}));
 
   const DROPS = dropTable(store);
-  const TAPS = tapTable(store);
+  const TAPS = tapTable(store, onOpenZoom);
 
   const items = defaultItems();
   for (const item of items) { item.homeX = item.x; item.homeY = item.y; }
@@ -607,45 +651,6 @@ export function createBench(root, store, { edit = false } = {}) {
     // 스크린샷만으로 배치를 옮겨 적을 수 있어야 한다. 콘솔에도 한 벌 남긴다 —
     // 붙여 넣기가 막힌 환경(권한 거부)에서도 길이 하나는 남는다.
     window.__layoutCode = () => layoutCode(items);
-  }
-
-  /**
-   * 물건 하나를 그릴 때 애셋에 넘길 상태.
-   *
-   * **이 함수가 상태를 그림으로 옮기는 유일한 자리다.** 여기 없는 것은 화면에 안 나타나고,
-   * 화면에 안 나타나는 상태는 학생에게 없는 것과 같다.
-   */
-  function assetState(item) {
-    const st = store.getState();
-    const b = st.bench.beaker;
-    switch (item.kind) {
-      case 'bottleH2O2':
-        return { kind: 'H2O2', pct: item.pct, level: 0.7 };
-      case 'bottleBuffer':
-        return { kind: 'BUFFER', ph: item.ph, level: 0.7 };
-      case 'bottleAcid':
-        return { kind: 'ACID', level: 0.7 };
-      case 'bottleBase':
-        return { kind: 'BASE', level: 0.7 };
-      case 'extract':
-        return { level: 0.55, contents: item.boiled ? 'POTATO_BOILED' : 'POTATO' };
-      case 'beaker':
-        // 「아직 안 부었다」와 「부었다」가 그림에서 갈려야 한다 — 액체가 있고 없고로 보인다.
-        return { level: b.h2o2Pct === null ? 0 : 0.6, contents: 'H2O2', cracked: b.cracked };
-      case 'waterbath':
-        return { tempC: item.tempC };
-      case 'filterpaper':
-        // 뚫은 자국이 쌓인다. **한 일이 그림에 남아야** 방금 누른 것이 먹혔는지 알 수 있다.
-        return { punched: st.session.log.filter((l) => l.action === 'PUNCH_DISC').length };
-      case 'forceps':
-        return { closed: st.bench.disc.held, holding: st.bench.disc.punched ? 'disc' : null };
-      case 'stopwatch':
-        return { seconds: b.elapsedS, running: isRunning(b) };
-      case 'waste':
-        return { level: 0.2 };
-      default:
-        return {};
-    }
   }
 
   /**
@@ -1162,7 +1167,7 @@ export function createBench(root, store, { edit = false } = {}) {
       }
       el.setAttribute('aria-label', item.label);
       el.setAttribute('aria-describedby', 'bench-tip');
-      el.innerHTML = ASSETS[item.asset].render(assetState(item));
+      el.innerHTML = ASSETS[item.asset].render(assetState(store, item));
       // 이름표는 **그림 아래**에 붙는다. 프레임 아래가 아니다 — 애셋마다 여백이 달라서
       // 프레임 기준으로 달면 어떤 것은 물건에 붙고 어떤 것은 한참 떨어진다.
       const c = CONTENT_BOX[item.asset];

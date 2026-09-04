@@ -6,9 +6,13 @@
  *
  * 세 가지 모드로 열린다 (`src/ui/bench.js` 의 `dropTable`·`tapTable`).
  *
- *   'ocular'  접안 마이크로미터를 접안렌즈에 끼운다. **방향을 학생이 고른다**
+ *   'ocular'  접안 마이크로미터를 접안렌즈에 끼운다. **방향을 학생이 고른다** ('item' 의 한 갈래)
  *   'scope'   현미경 관찰 — 찍고, 세고, 기록한다. 여기가 몸통이다
- *   'item'    기구를 크게 그려 라벨을 읽는다. 조작은 없다
+ *   'box'     통·상자 — 열린 통 안을 보고 「꺼내기」
+ *   'item'    꺼낸 물건 셋과 쓰레기통 — 어디 있나 · 하는 일 · 그림 · 갈 수 있는 곳
+ *
+ * 틀(덮개·닫기·Esc·포커스)은 공용 `createZoomShell`, 물건·통 화면의 차례는 공용
+ * `renderItemView` 가 정한다 (docs/09-uniformity.md §3). 여기는 **무엇을 그릴지**만 갖는다.
  *
  * ── 이 화면이 절대 하지 않는 일 ────────────────────────────────────
  *
@@ -55,6 +59,9 @@ import { ITEM_IDS, PICK_KINDS, PAN_LIMIT, fieldParams, isFocused } from '../sim/
 import { visibleRange, pickAt } from '../sim/scale.js';
 import { UI } from './strings.js';
 import { ASSETS } from '../assets/index.js';
+import { createZoomShell } from '../../../../packages/lab-kit/ui/zoom-shell.js';
+import { renderItemView, acceptsFrom } from '../../../../packages/lab-kit/ui/item-view.js';
+import { dropTable } from './bench.js';
 import { PALETTE, INK, STROKE } from '../style/tokens.js';
 import { EXP_PALETTE } from '../style/palette.experiment.js';
 
@@ -143,25 +150,24 @@ export function dialStateFor(value, span, focused) {
 }
 
 export function createZoom(root, store) {
-  root.className = 'zoom-overlay';
-  root.hidden = true;
-  // 닫기 단추는 패널의 **첫 자식**이고 sticky 다. 절대 위치로 두면 창보다 긴 내용이 들어간
-  // 작은 화면에서 아래로 스크롤할 때 화면 밖으로 밀려 나가, 나갈 방법이 없어진다.
-  root.innerHTML = `
-    <div class="zoom-panel" role="dialog" aria-modal="true" tabindex="-1">
-      <button type="button" id="zoom-close" class="zoom-close"></button>
-      <div class="zoom-body"></div>
-    </div>`;
-  const panel = root.querySelector('.zoom-panel');
-  const body = root.querySelector('.zoom-body');
-  const closeBtn = root.querySelector('.zoom-close');
-  closeBtn.textContent = UI.zoom.close;
+  /*
+   * 덮개·패널·닫기·포커스·스크롤은 공용 틀이 한다 (docs/09-uniformity.md §3).
+   * 「열 때마다 맨 위에서 시작한다」(내려간 자리가 남으면 시야 원이 화면 위로 잘린다 —
+   * 이 실험에서 찾은 고침)도 이제 틀 안에 있다. 여기는 **무엇을 그릴지**만 갖는다.
+   */
+  const shell = createZoomShell(root, {
+    closeLabel: UI.zoom.close,
+    // 재물대 이동·초점·조리개·접안렌즈 회전은 드래그 중 skipNotify 로 조용히 갱신됐다.
+    // 닫을 때 한 번 전체를 동기화해 실험대(배경)가 최신 상태를 반영하게 한다.
+    onClose: () => store.notify(),
+  });
+  const { body } = shell;
+  /** 놓기 표 — 「여기에 끌어다 놓을 수 있는 것」을 거꾸로 읽는다. 실행하지 않는다. */
+  const DROPS = dropTable(store);
 
   let mode = null;
   /** 'item' 모드에서 무엇을 보고 있는가. */
   let itemId = null;
-  let opener = null;
-  let openerId = null;
   /** 결과를 기록한 직후 화면에 남길 확인 문구. 열 때마다 지운다. */
   let captureNotice = null;
   /**
@@ -183,27 +189,6 @@ export function createZoom(root, store) {
    * 통째로 사라져 조작이 끊긴다.
    */
   let busy = false;
-
-  function onKeydown(e) {
-    if (e.key === 'Escape') close();
-  }
-
-  function close() {
-    if (root.hidden) return;
-    root.hidden = true;
-    document.removeEventListener('keydown', onKeydown);
-    // 재물대 이동·초점·조리개·접안렌즈 회전은 드래그 중 skipNotify 로 조용히 갱신됐다.
-    // 닫을 때 한 번 전체를 동기화해 실험대(배경)가 최신 상태를 반영하게 한다.
-    // 이 notify 가 실험대를 다시 그리면 opener 로 잡아 둔 버튼이 새 요소로 바뀌므로,
-    // notify 를 먼저 하고 나서 data-id 로 같은 자리를 찾아 포커스한다.
-    store.notify();
-    const target = openerId ? document.querySelector(`[data-id="${openerId}"]`) : opener;
-    if (target && target.isConnected) target.focus();
-    opener = null;
-    openerId = null;
-  }
-  closeBtn.addEventListener('click', close);
-  root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
 
   /**
    * @param {'scope'|'ocular'|'item'|'box'} openMode
@@ -236,24 +221,7 @@ export function createZoom(root, store) {
      */
     pickKind = store.getState().microscope.stage === 'specimen'
       ? PICK_KINDS.CELL : PICK_KINDS.SCALE;
-    // 문자열이 넘어오는 통로가 있다 (bench.js 의 dropTable). 포커스를 줄 수 있는 것만 잡는다.
-    opener = (openerEl && typeof openerEl.focus === 'function') ? openerEl : document.activeElement;
-    openerId = opener?.dataset?.id ?? null;
-    root.hidden = false;
-    document.addEventListener('keydown', onKeydown);
-    renderBody();
-    /**
-     * **열 때마다 맨 위에서 시작한다.**
-     *
-     * 아래쪽 단추(「눈금값 기록」 같은 것)를 누르려고 패널을 내리면 그 자리가 남는다.
-     * Esc 로 닫았다 현미경을 다시 눌러도 **내려간 자리 그대로** 열려서, 시야 원이
-     * 화면 위로 잘려 **아예 안 보인다** (재어 보니 y = -149). 재물대에 올린 것을 바꾸고
-     * 돌아오는 절차(STEP 4·6)에서 매번 지나는 길이라 그때마다 시야가 사라진 것처럼 보인다.
-     * 창이 작아서가 아니라 스크롤이 남아서다.
-     */
-    root.scrollTop = 0;
-    panel.scrollTop = 0;
-    panel.focus();
+    shell.open(renderBody, openerEl);
   }
 
   function renderBody() {
@@ -356,38 +324,37 @@ export function createZoom(root, store) {
       : spare ? UI.zoom.boxSpare(name, where)
         : UI.zoom.boxEmpty(name, where);
 
-    body.innerHTML = `
-      <h2>${UI.bench.items[view.labelKey]}</h2>
-      <p class="zoom-slide-label">${lead}</p>
-      ${mat ? `<p class="zoom-empty">${mat.role}</p>` : ''}
-      <div class="zoom-slide-stage" id="box-figure"></div>
-      <div class="zoom-scope-controls" style="margin-top:12px">
-        ${inBox || spare
-          ? `<button type="button" class="zoom-action" id="box-take">${UI.zoom.boxTakeOut}</button>`
-          : ''}
-      </div>`;
-
-    body.querySelector('#box-figure').innerHTML =
-      ASSETS[view.asset].render({ open: true, empty: !inBox });
-
-    body.querySelector('#box-take')?.addEventListener('click', () => {
-      if (held === 'ocular') { store.dispatch('TAKE_OUT_OCULAR', {}); return; }
-      // 들어 있으면 그것을 꺼내고, 비었으면 여벌에서 새것을 꺼낸다. 단추는 하나다.
-      store.dispatch(inBox ? 'TAKE_OUT_ITEM' : 'NEW_ITEM', { item: held });
+    renderItemView(body, {
+      title: UI.bench.items[view.labelKey],
+      where: lead,
+      role: roleText(mat),
+      figure: ASSETS[view.asset].render({ open: true, empty: !inBox }),
+      accepts: acceptsFrom(DROPS, itemId, nameOf),
+      acceptsLabel: UI.zoom.acceptsLabel,
+      // 단추는 「꺼내기」 하나다. 들어 있으면 그것을 꺼내고, 비었으면 여벌에서 새것을 꺼낸다.
+      actions: (inBox || spare) ? [{
+        id: 'box-take', label: UI.zoom.takeOut,
+        run: () => {
+          if (held === 'ocular') { store.dispatch('TAKE_OUT_OCULAR', {}); return; }
+          store.dispatch(inBox ? 'TAKE_OUT_ITEM' : 'NEW_ITEM', { item: held });
+        },
+      }] : [],
     });
   }
 
   /* ---------------------------------------------------------------- */
-  /* ④ 물건 모드 — 꺼낸 물건 셋이 같은 화면을 쓴다                       */
+  /* ④ 물건 모드 — 꺼낸 물건 셋과 쓰레기통이 같은 화면을 쓴다            */
   /* ---------------------------------------------------------------- */
 
   /**
-   * 제목 · ① 어디 있는가 · ② 하는 일 · ③ 그림 · 갈 수 있는 곳(단추).
+   * 제목 · ① 어디 있는가 · ② 하는 일 · ③ 그림 · ⑤ 덧붙일 말 · ⑥ 받는 것 · 갈 수 있는 곳(단추).
+   * 차례는 공용 `renderItemView` 가 정한다. 여기서는 **이 실험의 사실**만 채운다.
    *
    * **못 가는 곳을 회색으로 죽여 두지 않는다** (AGENTS.md §2.1) — 그 자리에서 할 수 없는
    * 일이면 아예 안 그린다. 원판이 통 안에 있으면 「꺼내기」만, 렌즈 안이면 「빼내기」만 나온다.
    */
   function renderItemMode() {
+    if (itemId === 'bin') { renderBinMode(); return; }
     const st = store.getState();
     const view = ITEM_VIEW[itemId];
     if (!view) { body.innerHTML = `<h2>${UI.zoom.scopeMode}</h2>`; return; }
@@ -414,7 +381,7 @@ export function createZoom(root, store) {
       if (onStage) {
         acts.push(['item-unmount', UI.bench.unmount(UI.stageShort[itemId]), 'REMOVE_FROM_STAGE', {}]);
       } else if (it.stowed) {
-        acts.push(['item-take-out', UI.zoom.boxTakeOut, 'TAKE_OUT_ITEM', { item: itemId }]);
+        acts.push(['item-take-out', UI.zoom.takeOut, 'TAKE_OUT_ITEM', { item: itemId }]);
       } else if (!it.discarded) {
         // 금 간 것을 올리려 하면 규칙이 결과로 답한다. 단추를 지우지 않는다 —
         // 「왜 못 올리는지」를 듣는 것이 이 실험에서 배우는 내용이다 (AGENTS.md §2.1).
@@ -426,29 +393,45 @@ export function createZoom(root, store) {
       }
     }
 
-    body.innerHTML = `
-      <h2>${name}</h2>
-      <p class="zoom-slide-label">${where ? `${where}.` : UI.zoom.whereInBox(boxName)}</p>
-      ${mat ? `<p class="zoom-empty">${mat.role}</p>` : ''}
-      <div class="zoom-slide-stage" id="item-figure"></div>
-      ${cracked
-        // 이미 내려놓았으면 「내리기」를 시키지 않는다 — 없는 단추를 가리키는 안내가 된다.
-        ? `<p class="zoom-empty" data-why="cracked">${
-            UI.zoom.crackedNote(UI.stageShort[itemId], st.microscope.stage === itemId)}</p>`
-        : ''}
-      <div class="zoom-scope-controls" style="margin-top:12px">
-        ${acts.map(([id, label]) =>
-          `<button type="button" class="zoom-action" id="${id}">${label}</button>`).join('')}
-      </div>`;
-
-    body.querySelector('#item-figure').innerHTML = itemId === 'ocular'
-      ? ASSETS.ocular.render({ flipped: st.eyepiece.flipped, inCase: st.eyepiece.stowed })
-      : ASSETS[view.asset].render({ cracked: st.items[itemId].cracked, seed: st.items[itemId].seed });
-
-    for (const [id, , type, payload] of acts) {
-      body.querySelector(`#${id}`)?.addEventListener('click', () => store.dispatch(type, payload));
-    }
+    renderItemView(body, {
+      title: name,
+      where: where ? `${where}.` : UI.zoom.whereInBox(boxName),
+      role: roleText(mat),
+      figure: itemId === 'ocular'
+        ? ASSETS.ocular.render({ flipped: st.eyepiece.flipped, inCase: st.eyepiece.stowed })
+        : ASSETS[view.asset].render({ cracked: st.items[itemId].cracked, seed: st.items[itemId].seed }),
+      // 이미 내려놓았으면 「내리기」를 시키지 않는다 — 없는 단추를 가리키는 안내가 된다.
+      note: cracked ? UI.zoom.crackedNote(UI.stageShort[itemId], st.microscope.stage === itemId) : null,
+      noteWhy: cracked ? 'cracked' : null,
+      accepts: acceptsFrom(DROPS, itemId, nameOf),
+      acceptsLabel: UI.zoom.acceptsLabel,
+      actions: acts.map(([id, label, type, payload]) => ({ id, label, run: () => store.dispatch(type, payload) })),
+    });
   }
+
+  /**
+   * 쓰레기통 — 받는 곳. **무엇을 받는지**가 몸통이고 단추는 없다 (docs/09-uniformity.md §3).
+   * 버리는 손짓은 끌어다 놓기뿐이다 — 누르면 버려지게 하면 스쳐 누른 것 하나로 표본이 사라진다.
+   * 받는 목록은 놓기 표를 거꾸로 읽는다 — 따로 적으면 조작을 늘릴 때마다 두 곳이 어긋난다.
+   */
+  function renderBinMode() {
+    const st = store.getState();
+    const thrown = ITEM_IDS.filter((id) => st.items[id].discarded).map((id) => UI.stageItems[id]);
+    renderItemView(body, {
+      title: UI.bench.items.bin,
+      where: thrown.length ? UI.zoom.binHolds(thrown.join('·')) : null,
+      role: UI.zoom.binRole,
+      figure: ASSETS.bin.render({ fill: thrown.length ? 1 : 0 }),
+      accepts: acceptsFrom(DROPS, 'bin', nameOf),
+      acceptsLabel: UI.zoom.acceptsLabel,
+    });
+  }
+
+  /**
+   * 준비물 표의 「하는 일」을 물건 화면에 적을 글자로. 공용 화면은 글자를 HTML 로 믿지
+   * 않으므로(`escapeHtml`) 표의 `<b>` 는 여기서 걷는다 — 강조는 준비물 표에서만 보인다.
+   */
+  const roleText = (mat) => (mat ? mat.role.replace(/<[^>]+>/g, '') : null);
 
   /** 준비물 표에 적힌 「하는 일」. 기구를 크게 볼 때 읽을 것이 그 한 줄이다. */
   function materialFor(assetKey) {
@@ -1418,8 +1401,8 @@ export function createZoom(root, store) {
       lastStage = now;
       if (now) pickKind = now === 'specimen' ? PICK_KINDS.CELL : PICK_KINDS.SCALE;
     }
-    if (!root.hidden && !busy) renderBody();
+    if (!busy) shell.repaint();
   });
 
-  return { open, close };
+  return { open, close: shell.close };
 }

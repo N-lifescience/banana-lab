@@ -396,7 +396,7 @@ export const ACTIONS = {
    */
   INSERT_PAPER(state) {
     if (state.vial.capped) {
-      return blocked(state, '바이알 뚜껑이 닫혀 있어 종이를 넣을 수 없습니다. 바이알을 눌러 뚜껑을 먼저 여세요.',
+      return blocked(state, '바이알 뚜껑이 닫혀 있어 종이를 넣을 수 없습니다. 바이알을 눌러 열리는 화면에서 「뚜껑 열기」를 먼저 누르세요.',
         BLOCKING_REASONS.IMPOSSIBLE);
     }
     if (state.paper.torn) {

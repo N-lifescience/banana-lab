@@ -87,7 +87,7 @@ export function initialState(level = 1, seed = 20260826, mode = MODES.GROUP) {
       // 찍을 때 이 값이 종이로 옮겨 간다.
       capillary: { strength: 0, grit: 0 },
       // 지금 집으려는 잎. **이것이 이 실험의 변인 하나다** — 시든 잎을 쓰면 색소가 적다.
-      // 실험대에서 잎을 눌러 바꾼다 (bench.js tapTable).
+      // 실험대에서 잎을 누르면 열리는 잎 화면에서 고른다 (ui/zoom.js, `PICK_LEAF`).
       leafKind: LEAF_KINDS.FRESH,
       // 몇 장째 거름종이인가. 통에 넉넉히 있으므로 바닥나지 않는다 —
       // 소모품이 바닥나면 그건 결과가 아니라 막다른 길이다.

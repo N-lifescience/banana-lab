@@ -9,7 +9,7 @@
  *   · 「대물렌즈를 **100배**로」  — 단추에 적힌 것은 `10배` 다 (총배율과 대물배율)
  *   · 「접안렌즈 돌리기 **슬라이더**」 — 슬라이더를 없애고 단추만 남겼는데 안내가 안 따라왔다
  *   · 「**크기 기록**」            — 단추 글자는 `세포 크기 기록`
- *   · 절차 이름 「…**기록하기**」  — 같은 단추를 「사진찍기」와 두 이름으로 불렀다
+ *   · 절차 이름 「…**기록하기**」  — 같은 단추를 「결과 기록」과 두 이름으로 불렀다
  *
  * 넷 다 사람이 플레이하다 찾았다. 검사가 있었으면 한 번에 걸렸을 것이라 여기 둔다.
  */
@@ -31,7 +31,7 @@ function onScreenNames() {
   const names = new Set([
     // 확대 뷰의 단추와 손잡이 이름
     Z.capture, Z.recordCalibration, Z.recordMeasurement,
-    Z.insert, Z.insertFlipped, Z.remove, Z.takeOut, Z.putAway, Z.newItem,
+    Z.insert, Z.insertFlipped, Z.remove, Z.takeOut, Z.putAway,
     Z.pickScale, Z.pickCell, Z.clearPicks, Z.lampOff, Z.lowerObjective,
     Z.coarseGroup, Z.rotateGroup,
     UI.controls.rotate, UI.controls.focus, UI.controls.diaphragm, UI.controls.objective,
@@ -91,14 +91,16 @@ test('없앤 손잡이 이름이 안내에 남아 있지 않다', () => {
     `안내에 「슬라이더」가 남아 있습니다: ${(all.match(/[^.]*슬라이더[^.]*/g) ?? []).join(' / ')}`);
 });
 
-test('사진찍기를 한 이름으로만 부른다', () => {
+test('결과 기록을 한 이름으로만 부른다', () => {
   // 확대 뷰 단추 · 절차 문구 · 안내 셋이 같은 일을 다른 이름으로 부르면,
   // 학생은 노트를 읽고 실험대에서 그 단추를 찾는데 찾을 이름이 없다.
+  // 그 이름은 여덟 실험이 같다 — 「결과 기록」 (docs/09-uniformity.md §5).
   //
-  // **사진 찍는 칸이 어느 것인지는 안내가 말한다** — 그 칸의 `stepWhere` 가
-  // 사진찍기 단추를 가리킨다. 절차 이름만 보고 고르면 「눈금값 기록하기」(다른 단추)까지
+  // **결과를 기록하는 칸이 어느 것인지는 안내가 말한다** — 그 칸의 `stepWhere` 가
+  // 그 단추를 가리킨다. 절차 이름만 보고 고르면 「눈금값 기록하기」(다른 단추)까지
   // 함께 잡혀서, 검사가 애먼 것을 나무란다.
   const name = UI.zoom.capture;
+  assert.equal(name, '결과 기록', '결과를 남기는 단추의 이름이 여덟 실험과 다릅니다');
   const shotIds = Object.entries(UI.notebook.stepWhere)
     .filter(([, line]) => line.includes(name))
     .map(([id]) => id);
@@ -108,8 +110,8 @@ test('사진찍기를 한 이름으로만 부른다', () => {
     const group = UI.protocol.find((g) => g.id === id[0]);
     const step = group?.steps[id.charCodeAt(1) - 97];
     assert.ok(step, `${id} 에 해당하는 절차가 없습니다`);
-    assert.ok(step.label.includes('사진찍기'),
-      `절차가 사진 찍는 일을 다른 이름으로 부릅니다: 「${step.label}」 (단추는 「${name}」)`);
+    assert.ok(step.label.includes(name),
+      `절차가 결과 기록을 다른 이름으로 부릅니다: 「${step.label}」 (단추는 「${name}」)`);
   }
 });
 

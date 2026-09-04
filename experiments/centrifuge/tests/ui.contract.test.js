@@ -339,7 +339,8 @@ test('실험대만 길게 눌러도 돋보기가 안 뜨게 막는다 — 노트
    *   ② `touch-action:none` 이 아니다  — 무대에 none 이면 그 위에서 밀 때 쪽이 안 넘어간다
    *   ③ 탐구 노트에는 안 걸려 있다      — 걸면 붙여넣기가 죽는다
    */
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // 화면 CSS 는 공용 한 파일이다 (docs/09-uniformity.md §1) — 거기서 읽는다.
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
   const stage = html.match(/\.bench-stage\s*\{[^}]*\}/)?.[0] ?? '';
   assert.ok(stage, '.bench-stage 규칙을 못 찾았습니다 — 검사가 헛돌고 있습니다');
   assert.match(stage, /-webkit-touch-callout:\s*none/, '실험대에서 길게 누르면 돋보기가 뜹니다');

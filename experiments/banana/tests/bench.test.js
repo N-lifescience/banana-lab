@@ -204,20 +204,26 @@ test('말풍선이 없는 조작을 약속하지 않는다 — 세 난이도 모
   }
 });
 
-test('시약병·폐액통·휴지는 눌러도 조작이 일어나지 않는다', () => {
+test('시약병·폐액통·휴지는 눌러도 조작이 일어나지 않는다 — 자기 화면이 열린다', () => {
   /*
    * 손 씻기·마개 닫기·폐액 버리기를 **통째로 걷어냈다.** 가상 실험에서 그것을 따지면
    * 안전 습관이 아니라 **화면 속 단추를 눌렀다는 사실**을 평가하게 된다.
    *
    * 그래도 셋은 실험대에 남아 있고 **하는 일이 있다** — 스포이트를 대면 채우고, 헹구고,
-   * 휴지를 현미경에 대면 렌즈를 닦는다. 끌기는 살아 있고 탭만 없앤 것이다.
-   * 눌렀을 때는 말풍선이 이름과 쓰임을 말한다 — **말없이 먹통인 물건은 남기지 않는다.**
+   * 휴지를 현미경에 대면 렌즈를 닦는다. 끌기는 살아 있다.
+   * 누르면 **자기 화면이 열린다** (docs/09-uniformity.md §2 — 누르면 본다, 끌면 옮긴다,
+   * 단추로 한다). 상태는 바뀌지 않는다 — **말없이 먹통인 물건은 남기지 않는다.**
    */
   const store = fakeStore();
-  const taps = tapTable(store, () => {});
-  for (const kind of ['bottle', 'waste', 'tissue']) {
-    assert.equal(taps[kind], undefined, `${kind} 에 안전 수칙 탭이 남아 있습니다`);
+  const opened = [];
+  const taps = tapTable(store, (mode, id) => opened.push([mode, id]));
+  for (const kind of ['bottle', 'waste', 'tissue', 'sink', 'bin', 'slidebox', 'coverslip', 'dropper', 'forceps']) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = store.calls.length;
+    taps[kind]({ id: kind, kind }, null);
+    assert.equal(store.calls.length, before, `${kind} 를 누르는 것만으로 상태가 바뀝니다`);
   }
+  assert.ok(opened.every(([mode]) => mode === 'item'), `누르면 물건 화면(item)이 열려야 합니다: ${JSON.stringify(opened)}`);
   // 끌기는 살아 있어야 한다 — 여기까지 지우면 스포이트를 채울 길이 없어진다.
   const drops = dropTable(store, () => {});
   assert.ok(drops.dropper.bottle, '스포이트를 시약병에 대는 길이 없어졌습니다');

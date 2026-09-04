@@ -233,10 +233,19 @@ export function dropTable(store, openZoom = () => {}) {
  * 눌렀을 때는 말풍선이 이름과 쓰임을 말한다. **말없이 먹통인 물건은 남기지 않는다.**
  */
 export function tapTable(store, onOpenZoom) {
+  /*
+   * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+   * 눌러서 상태가 바뀌는 물건은 하나도 없다 — 껍질 벗기기도 이제 바나나 화면의 단추다.
+   * 모든 물건이 누르면 자기 화면을 연다. 「무엇을 받는 곳인지」를 그 화면이 말한다.
+   * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기(`dropTable`)뿐이다.
+   */
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    banana: () => store.dispatch('PEEL_BANANA', {}),
+    banana: view,
     slide: (item, el) => onOpenZoom('slide', item.slide, el),
     microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
+    coverslip: view, slidebox: view, dropper: view, forceps: view, bottle: view,
+    waste: view, sink: view, tissue: view, bin: view,
   };
 }
 

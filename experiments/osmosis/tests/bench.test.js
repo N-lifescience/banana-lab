@@ -192,12 +192,28 @@ test('받침 유리를 개수대에 대면 씻는다', () => {
 /*
  * **안전 전용 탭은 걷어냈다** — 안전을 앱이 판정하지 않기로 했기 때문이다.
  * 그런데 셋 다 실험대에 그대로 남아 있다. **끌기 쓰임이 따로 있어서**다.
- * 끌기까지 없었다면 **눌러도 아무 일 없는 물건**이 남았을 것이라 실험대에서 뺐어야 한다.
+ * 누르면 **자기 화면이 열린다** (docs/09-uniformity.md §2 — 누르면 본다, 끌면 옮긴다,
+ * 단추로 한다). 상태는 바뀌지 않는다 — **말없이 먹통인 물건은 남기지 않는다.**
  */
-test('시약병·폐액통·휴지는 눌러도 아무 일이 없다', () => {
-  for (const kind of ['bottle', 'waste', 'tissue']) {
-    assert.equal(tapTable(fakeStore(), () => {})[kind], undefined,
-      `${kind} 에 안전 전용 탭이 남아 있습니다`);
+test('용액병·폐액통·휴지는 눌러도 조작이 일어나지 않는다 — 자기 화면이 열린다', () => {
+  const store = fakeStore();
+  const opened = [];
+  const taps = tapTable(store, (mode, id) => opened.push([mode, id]));
+  for (const kind of ['bottle', 'waste', 'tissue', 'sink', 'bin', 'slidebox', 'coverslip',
+    'dropper', 'forceps', 'blade', 'filterpaper']) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = store.calls.length;
+    taps[kind]({ id: kind, kind }, null);
+    assert.equal(store.calls.length, before, `${kind} 를 누르는 것만으로 상태가 바뀝니다`);
+  }
+  assert.ok(opened.every(([mode]) => mode === 'item'),
+    `누르면 물건 화면(item)이 열려야 합니다: ${JSON.stringify(opened)}`);
+});
+
+test('실험대의 모든 물건이 누르면 무언가를 연다 (말없이 먹통인 물건이 없다)', () => {
+  const taps = tapTable(fakeStore(), () => {});
+  for (const kind of BENCH_KINDS) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 를 눌러도 아무 일이 없습니다`);
   }
 });
 

@@ -426,7 +426,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       <section class="safety-note">
         <h3>${N.valuesLabel}</h3>
         <p class="stage-text values-lead">${emph(N.valuesLead)}</p>
-        <ul class="values-list">${N.valuesPractice.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
+        <ul class="practice-list">${N.valuesPractice.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
       </section>`;
   }
 
@@ -964,7 +964,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       });
     });
     panelEl.querySelectorAll('[data-retry]').forEach((btn) => {
-      btn.addEventListener('click', () => onOpenZoom(btn.dataset.retry, btn));
+      btn.addEventListener('click', () => onOpenZoom('chamber', btn.dataset.retry, btn));
     });
     panelEl.querySelectorAll('[data-del]').forEach((btn) => {
       btn.addEventListener('click', () => {

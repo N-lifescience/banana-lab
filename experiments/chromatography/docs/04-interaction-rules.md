@@ -77,7 +77,7 @@ const load = Math.min(spots * 0.055, 1);   // 렌더러가 흐린 띠를 그린�
 | `EMPTY_TUBE` | 폐액통 · 개수대 | 잘못 만든 추출액 |
 | `EMPTY_VIAL` | 폐액통 · 개수대 | 너무 많이 부은 전개액 |
 | `RINSE_CAPILLARY` | 폐액통 | 잘못 묻힌 상층액 |
-| `UNCAP_VIAL` | 바이알 누르기 | 뚜껑 (하드 게이트 1 을 빠져나가는 길) |
+| `UNCAP_VIAL` | 바이알 화면의 「뚜껑 열기」 | 뚜껑 (하드 게이트 1 을 빠져나가는 길) |
 | `REMOVE_PAPER` | 실험대 위 단추 | 세워 둔 종이 |
 | `DRY_PAPER` | 확대 뷰 | 젖은 종이 (하드 게이트 2 를 피하는 길) |
 | `LIFT_RULER` | 확대 뷰 | 대어 둔 자 |

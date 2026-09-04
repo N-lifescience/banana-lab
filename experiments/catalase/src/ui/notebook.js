@@ -7,6 +7,10 @@
  * **7단계 구조를 조작 절차로 납작하게 만들지 않는다.** 탐구 노트는 「다음에 무엇을 누를까」가
  * 아니라 「무엇을 왜 하려는가」다. 바나나랩에서 납작하게 만들었다가 되돌렸다.
  *
+ * 뼈대(class 이름)는 정본 banana 와 같다 (docs/09-uniformity.md §4) — `note-tabs`·`note-panel`·
+ * `materials-table`·`note-step`/`step-summary`/`step-body`·`substep-list`/`substep`·`likert-row`/
+ * `likert-cell`·`read-mark`/`read-confirm`. 화면 CSS 는 `packages/lab-kit/style/shell.css` 하나다.
+ *
  * 상태는 전부 `store.dispatch('SAVE_NOTE', …)` 를 거쳐 `reduce()` 로 간다 —
  * 이 파일은 `session.notes` 를 직접 대입하지 않는다.
  */
@@ -31,6 +35,9 @@ const N = UI.notebook;
  */
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ESCAPES[c]);
+
+/** `**굵게**` 만 허용한다. 문구에 강조를 넣으려고 HTML 을 통째로 열어 두지 않는다. */
+const emph = (text) => escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 
 /**
  * 관찰 기록 칸에 흐리게 띄울 예시 문구.
@@ -232,33 +239,45 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       <h1>${N.heading}</h1>
       <div id="report-slot" class="report-slot"></div>
     </div>
-    <div class="note-tabs" role="tablist"></div>
-    <div class="note-body" id="note-body"></div>`;
+    <div id="note-tabs" class="note-tabs" role="tablist"></div>
+    <div id="note-panel" class="note-panel"></div>`;
 
-  const tabsEl = root.querySelector('.note-tabs');
-  const bodyEl = root.querySelector('#note-body');
+  const tabsEl = root.querySelector('#note-tabs');
+  const panelEl = root.querySelector('#note-panel');
   let activeStage = N.stages[0].id;
   let wasReady = false;
+
+  // 탭은 한 번만 만든다. 다시 그릴 때는 `aria-selected` 와 `data-read` 만 바꾼다 —
+  // ✓ 는 CSS(`.note-tab[data-read="true"]::after`)가 붙인다.
+  for (const stage of N.stages) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'note-tab';
+    tab.textContent = `${stage.id}. ${stage.title}`;
+    tab.setAttribute('role', 'tab');
+    tab.dataset.stage = stage.id;
+    tabsEl.appendChild(tab);
+  }
 
   /* ---------------- 조각들 ---------------- */
 
   const field = (key, value, placeholder, rows = 2) =>
-    `<textarea class="note-input" data-note="${key}" rows="${rows}"
+    `<textarea data-note="${key}" id="note-${key.replace(/\./g, '-')}" rows="${rows}"
       placeholder="${escapeHtml(placeholder)}">${escapeHtml(value ?? '')}</textarea>`;
 
   /** 첨삭 한 줄. **빈칸에는 아무 말도 하지 않는다** — 쓰기도 전에 부족하다는 말부터 들으면 안 쓴다. */
   function gradeLine(id, text) {
     if (!String(text ?? '').trim()) return '';
     const r = gradeQuestion(id, text);
-    const cls = r.status === STATUS.PASS ? 'ok' : r.status === STATUS.UNAVAILABLE ? 'na' : 'more';
+    const status = r.status === STATUS.PASS ? 'pass' : r.status === STATUS.UNAVAILABLE ? 'unavailable' : 'more';
     const msg = r.status === STATUS.PASS ? (r.message ?? N.gradeOk) : r.message;
-    return msg ? `<p class="grade grade--${cls}">${escapeHtml(msg)}</p>` : '';
+    return msg ? `<p class="grade-line" id="grade-${id}" data-grade="${status}">${escapeHtml(msg)}</p>` : '';
   }
 
   function question(st, id, label, rows = 3) {
     const text = st.session.notes[id] ?? '';
-    return `<div class="note-q">
-      <label class="note-q-label" for="q-${id}">${label}</label>
+    return `<div class="grade-block">
+      <label class="notes-label" for="note-${id}">${label}</label>
       ${field(id, text, N.notePlaceholders[3] ?? '', rows)}
       ${gradeLine(id, text)}
     </div>`;
@@ -267,17 +286,22 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
   /* ---------------- 1. 문제 인식 ---------------- */
 
   function stage1() {
-    return `<h2>${N.problem}</h2><p class="note-lead">${N.problemLead}</p>`;
+    return `<h2>${N.problem}</h2><p class="stage-text">${N.problemLead}</p>`;
   }
 
   /* ---------------- 2. 준비물 ---------------- */
 
+  /**
+   * 2 준비물 — 이름만 늘어놓으면 실험대에서 그것을 못 찾는다.
+   * **그림 · 이름 · 하는 일** 셋을 나란히 둔다. 그림은 실험대에 놓인 것과 같은 애셋이라
+   * 노트에서 본 것을 실험대에서 그대로 알아본다. 카드 상자 없이 표만 (docs/09 §4).
+   */
   function stage2() {
     const rows = N.materials.map((m) => `
       <tr>
         <td class="mat-fig">${ASSETS[m.asset].render(m.state ?? {})}</td>
-        <td class="mat-name">${m.name}</td>
-        <td class="mat-role">${m.role}</td>
+        <th scope="row">${m.name}</th>
+        <td>${m.role}</td>
       </tr>`).join('');
     /**
      * 안전 안내는 **준비물 쪽(2쪽)에 둔다.**
@@ -287,15 +311,15 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
      * 준비물을 보는 자리가 맞다. 여덟 랩이 자리도 UI 도 같아야 학생이 실험을 옮겨 다녀도
      * 같은 곳에서 찾는다 (선생님 지시, 2026-08-29).
      */
-    return `<h2>${N.materialsHeading}</h2>
-      <table class="mat-table">
+    return `<h3>${N.materialsHeading}</h3>
+      <table class="materials-table">
         <thead><tr><th>${N.matHeadFigure}</th><th>${N.matHeadName}</th><th>${N.matHeadRole}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <section class="safety-note">
         <h3>${N.valuesLabel}</h3>
-        <p class="note-lead values-lead">${N.valuesLead}</p>
-        <ul class="values-list">${N.valuesList.map((t) => `<li>${t}</li>`).join('')}</ul>
+        <p class="stage-text values-lead">${emph(N.valuesLead)}</p>
+        <ul class="values-list">${N.valuesList.map((t) => `<li>${emph(t)}</li>`).join('')}</ul>
       </section>`;
   }
 
@@ -303,27 +327,27 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
   function stage3(st) {
     const v = st.design.independent;
-    const lead = N.predictLeadIn.map((t) => `<p class="note-lead">${t}</p>`).join('');
-    if (!v) return `${lead}<p class="note-empty">${N.predictNoVariable}</p>`;
+    const lead = `<div class="predict-lead">${N.predictLeadIn.map((t) => `<p>${emph(t)}</p>`).join('')}</div>`;
+    if (!v) return `${lead}<p class="stage-empty">${N.predictNoVariable}</p>`;
 
     const spec = N.predictByVariable[v];
     const chosen = st.session.notes.predict ?? '';
     // 1단계는 보기에서 고르고, 2·3단계는 직접 쓴다. **조작은 세 단계가 모두 같다** —
     // 예상을 「할 수 있는가」가 아니라 「얼마나 거들어 주는가」만 다르다.
     const body = st.session.level === 1
-      ? `<div class="predict-options" role="radiogroup" aria-label="${N.predictLabel}">
-          ${spec.options.map((o) => `<button type="button" class="predict-opt" role="radio"
-            data-predict="${escapeHtml(o)}" aria-checked="${chosen === o}">${o}</button>`).join('')}
+      ? `<div class="predict-choices" role="group" aria-label="${N.predictLabel}">
+          ${spec.options.map((o) => `<button type="button" class="predict-opt${chosen === o ? ' predict-opt--chosen' : ''}"
+            data-predict="${escapeHtml(o)}" aria-pressed="${chosen === o}">${o}</button>`).join('')}
         </div>`
       : field('predict', chosen, spec.free, 2);
 
     return `${lead}
-      <div class="note-q">
-        <span class="note-q-label">${N.predictLabel}</span>
+      <div class="predict-block">
+        <label class="notes-label"${st.session.level === 1 ? '' : ' for="note-predict"'}>${N.predictLabel}</label>
         ${body}
       </div>
-      <div class="note-q">
-        <label class="note-q-label">${N.predictWhyLabel}</label>
+      <div class="predict-block">
+        <label class="notes-label" for="note-predict-why">${N.predictWhyLabel}</label>
         ${field('predict.why', st.session.notes['predict.why'], spec.why, 2)}
       </div>`;
   }
@@ -369,14 +393,14 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
     const groups = UI.protocol.map((group, gi) => {
       /*
-       * `<details>` 로 그리지 않는다. **열리는 척하다 안 열리는 것이 가장 나쁘다.**
-       * `disabled` 도 `pointer-events` 도 안 쓴다 — 제목은 그대로 남기고, 왜 잠겼는지를 적는다.
-       * 몇 칸짜리 여정인지는 계속 보여야 한다.
+       * 잠긴 STEP 은 `<details>` 로 그리지 않는다. **열리는 척하다 안 열리는 것이 가장 나쁘다.**
+       * `disabled` 도 `pointer-events` 도 안 쓴다 — 제목은 그대로 남기고, 왜 잠겼는지를
+       * **카드 안에** 적는다 (docs/09 §4). 몇 칸짜리 여정인지는 계속 보여야 한다.
        */
       const lockedBy = locks[gi];
       if (lockedBy) {
         return `<div class="note-step note-step--locked" data-step-group="${group.id}"
-          data-state="locked">
+          data-state="locked" data-done="false" data-locked-by="${lockedBy}">
           <div class="step-summary">
             <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
             <span class="step-open-hint">${N.stepLockedHint}</span>
@@ -403,15 +427,18 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
        */
       if (open) everOpened.add(group.id);
 
-      const steps = group.steps.map((step, i) => {
+      const items = group.steps.map((step, i) => {
         const key = substepId(group, i);
         const done = stepDone(st, group.id, i);
         const isNext = key === nextKey;
-        return `<li class="step ${done ? 'step--done' : ''} ${isNext ? 'step--next' : ''}">
-          ${isNext ? `<span class="step-next">${N.stepNext}</span>` : ''}
-          <span class="step-mark" aria-hidden="true">${done ? '✓' : '·'}</span>
-          <span class="step-label">${step.label}</span>
-          <span class="sr-only">${done ? N.stepDone : N.stepTodo}</span>
+        return `<li class="substep${isNext ? ' substep--next' : ''}" data-done="${done}">
+          <div class="substep-title">
+            <span class="substep-mark" aria-hidden="true">${done ? '✓' : '·'}</span>
+            ${step.label}
+            <span class="substep-state">${done ? N.stepDoneMark : N.stepTodoMark}</span>
+          </div>
+          ${isNext ? `<p class="substep-hint">${N.stepNext}</p>` : ''}
+          <label class="notes-label" for="note-${key}">${N.notesLabel}</label>
           ${field(key, st.session.notes[key], notePlaceholder(st.session.level, step), 2)}
         </li>`;
       }).join('');
@@ -420,9 +447,8 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       const hint = isNow ? ''
         : `<span class="step-open-hint">${isDone ? N.stepReopenHint : N.stepPeekHint}</span>`;
 
-
       return `<details class="note-step" data-step-group="${group.id}"
-        data-state="${state}"${open ? ' open' : ''}>
+        data-state="${state}" data-done="${isDone}"${open ? ' open' : ''}>
         <summary class="step-summary">
           <!-- 제목은 접혀도 h3 로 남는다. 다른 절이 전부 h3 라, 여기만 span 이면
                제목만 훑어 내려가는 학생에게 4절이 통째로 사라진다. -->
@@ -431,7 +457,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
           ${isNow ? `<span class="step-now-badge">${N.stepNowBadge}</span>` : ''}
           ${hint}
         </summary>
-        <div class="step-body"><ol class="steps">${steps}</ol></div>
+        <div class="step-body"><ul class="substep-list">${items}</ul></div>
       </details>`;
     }).join('');
 
@@ -442,14 +468,14 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     // 질문 ⓐ 는 원반이 떠오르는 것을 **본 직후**에 묻는다. 6단계까지 미루면
     // 기억을 더듬는 문제가 된다. 아직 안 봤으면 묻지 않는다 — 답할 수 없는 것을 묻지 않는다.
     const seenIt = st.trials.length > 0 || st.bench.beaker.floated;
-    const qa = seenIt ? `<section class="note-aside">
+    const qa = seenIt ? `<section class="note-aside question-a">
         <h3>${N.questionA.heading}</h3>
-        <p class="note-lead">${N.questionA.prompt}</p>
+        <p class="stage-text">${N.questionA.prompt}</p>
         ${question(st, 'qa', N.questionA.label)}
       </section>` : '';
 
-    return `<p class="note-lead">${designSentence(st.design)}</p>
-      <p class="note-lead step-lead">${N.stepLeadIn}</p>
+    return `<p class="stage-empty">${designSentence(st.design)}</p>
+      <p class="stage-text step-lead">${emph(N.stepLeadIn)}</p>
       ${tally}
       <div id="note-step-4">${groups}</div>${qa}`;
   }
@@ -458,7 +484,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
   function stage5(st) {
     if (st.trials.length === 0) {
-      return `<h2>${UI.graph.title}</h2><p class="note-empty">${UI.graph.empty}</p>`;
+      return `<h2>${UI.graph.title}</h2><p class="stage-empty">${UI.graph.empty}</p>`;
     }
     const rows = st.trials.map((t) => `<tr class="${t.offDesign.length ? 'trial--off' : ''}">
       <td>${t.at + 1}</td><td>${escapeHtml(trialSummary(st, t))}</td>
@@ -470,7 +496,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
         <thead><tr><th>${N.trialNo}</th><th>${N.trialWhat}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="note-lead">${N.repeatCount(distinctConditions(st))}</p>`;
+      <p class="stage-text">${N.repeatCount(distinctConditions(st))}</p>`;
   }
 
   /* ---------------- 6. 정리 ---------------- */
@@ -486,7 +512,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     // 설계와 어긋난 시행을 스스로 돌아보게 한다. **나무라지 않는다.**
     const off = st.trials.filter((t) => offDesign(st.design, t.conditions).length > 0);
     const reflect = off.length ? `<section class="note-aside">
-      <p class="note-lead">${N.reflectQuestion(off.map((t) => t.at + 1).join(', '))}</p>
+      <p class="stage-text">${N.reflectQuestion(off.map((t) => t.at + 1).join(', '))}</p>
       ${field('reflect.off', st.session.notes['reflect.off'], N.notePlaceholders[2], 2)}
     </section>` : '';
 
@@ -495,13 +521,13 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       .map((k) => `<li><b>${stepNoteLabel(k)}</b> — ${escapeHtml(st.session.notes[k])}</li>`).join('');
 
     const qaLine = hasNote(st, 'qa')
-      ? `<p class="note-carried">${N.qaCarried}</p>${question(st, 'qa', N.qaContinueLabel)}`
-      : `<p class="note-empty">${N.qaNotYet}</p>`;
+      ? `<p class="stage-empty">${N.qaCarried}</p>${question(st, 'qa', N.qaContinueLabel)}`
+      : `<p class="stage-empty">${N.qaNotYet}</p>`;
 
     const discussion = isGroup(st) ? `<section class="note-aside">
       <h3>${N.discussionHeading}</h3>
-      ${N.discussionItems.map((d) => `<div class="note-q">
-        <label class="note-q-label">${d.label}</label>
+      ${N.discussionItems.map((d) => `<div class="grade-block">
+        <label class="notes-label" for="note-discuss-${d.key}">${d.label}</label>
         ${field(`discuss.${d.key}`, st.session.notes[`discuss.${d.key}`], d.eg, 2)}
       </div>`).join('')}
     </section>` : '';
@@ -518,70 +544,84 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
   /* ---------------- 7. 자기 평가 ---------------- */
 
+  /**
+   * 7 자기 평가 — 리커트 다섯 칸, **숫자와 말이 함께** (docs/09 §4).
+   *
+   * 라디오 버튼을 쓴다. 커스텀 버튼으로 만들면 화살표 이동·그룹 읽기를 직접 구현해야 하는데,
+   * 브라우저가 이미 표준으로 해 주는 일이다. 점수를 합산하지도, 등급을 내지도 않는다.
+   */
   function stage7(st) {
-    const likert = N.selfEvalItems.map((item) => {
-      const key = `selfeval.${item.key}`;
-      const cur = st.session.notes[key];
-      return `<div class="likert">
-        <span class="likert-label">${item.label}</span>
-        <div class="likert-scale" role="radiogroup" aria-label="${item.label}">
-          ${N.likertScale.map((o) => `<button type="button" role="radio" class="likert-opt"
-            data-note-set="${key}" data-value="${o.value}" aria-checked="${cur === o.value}"
-            title="${o.label}">${o.value}</button>`).join('')}
-        </div>
-      </div>`;
+    const scale = N.likertScale;
+    const rows = N.selfEvalItems.map(({ key, label }) => {
+      const saved = st.session.notes[`selfeval.${key}`] ?? '';
+      const cells = scale.map(({ value, label: vLabel }) => `
+        <label class="likert-cell">
+          <input type="radio" name="selfeval.${key}" value="${value}"
+            data-note="selfeval.${key}"${saved === value ? ' checked' : ''}>
+          <span class="likert-num">${value}</span>
+          <span class="likert-word">${vLabel}</span>
+        </label>`).join('');
+      return `
+        <fieldset class="likert-row">
+          <legend>${label}</legend>
+          <div class="likert-scale">${cells}</div>
+        </fieldset>`;
     }).join('');
 
-    const reflection = N.reflectionItems.map((item) => `<div class="note-q">
-      <label class="note-q-label">${item.label}</label>
-      ${field(`feedback.${item.key}`, st.session.notes[`feedback.${item.key}`], item.eg, 2)}
-    </div>`).join('');
+    const reflections = N.reflectionItems.map(({ key, label, eg }) => `
+      <div class="self-eval-item">
+        <label class="notes-label" for="note-feedback-${key}">${label}</label>
+        ${field(`feedback.${key}`, st.session.notes[`feedback.${key}`], eg, 2)}
+      </div>`).join('');
 
-
-    return `<h3>${N.likertHeading}</h3>${likert}
-      <h3>${N.reflectionHeading}</h3>${reflection}
-      `;   // 안전 안내는 준비물 쪽(2쪽)으로 옮겼다 — 다 끝난 뒤에 읽을 것이 아니다.
+    // 안전 안내는 준비물 쪽(2쪽)에 있다 — 다 끝난 뒤에 읽을 것이 아니다.
+    return `<div id="self-eval">
+        <h3>${N.likertHeading}</h3>
+        ${rows}
+        <h3>${N.reflectionHeading}</h3>
+        ${reflections}
+      </div>`;
   }
 
   const STAGE_BODY = { 1: stage1, 2: stage2, 3: stage3, 4: stage4, 5: stage5, 6: stage6, 7: stage7 };
 
   /* ---------------- 읽음 표시 · 보고서 ---------------- */
 
+  /**
+   * 「이 쪽을 읽었습니다」 — 실험대의 자물쇠를 여는 단추. 1~4 쪽 아래에만 붙는다.
+   *
+   * 예상을 세우기 전에는 3쪽에서 못 넘어간다. **`disabled` 를 쓰지 않는다.**
+   * 그 속성은 단추에서 포커스를 빼앗는다. 그러면 키보드로 그 단추에 닿을 수가 없고
+   * 낭독기는 그냥 지나친다 — **왜 못 누르는지를 들을 방법이 사라진다.**
+   * `aria-disabled` 는 「지금은 못 누른다」를 알리면서 포커스를 남기고,
+   * `aria-describedby` 로 까닭을 함께 읽게 한다. 눌러도 안 넘어가는 것은 같다 —
+   * **넘기는 쪽에서 한 번 더 본다.** 표시만 하고 안 막으면 표시가 거짓말이 된다.
+   */
   function readFooter(st) {
-    if (!UI.bench.lock.required.includes(activeStage)) return '';
-    const read = (st.session.readStages ?? []).includes(activeStage);
-    const left = UI.bench.lock.required.filter((id) => !(st.session.readStages ?? []).includes(id));
-    /**
-     * 예상을 세우기 전에는 3쪽에서 못 넘어간다. **`disabled` 를 쓰지 않는다.**
-     *
-     * 그 속성은 단추에서 포커스를 빼앗는다. 그러면 키보드로 그 단추에 닿을 수가 없고
-     * 낭독기는 그냥 지나친다 — **왜 못 누르는지를 들을 방법이 사라진다.**
-     * 막으면서 이유를 말하겠다는 것과 정면으로 부딪힌다.
-     *
-     * `aria-disabled` 는 「지금은 못 누른다」를 알리면서 포커스를 남기고,
-     * `aria-describedby` 로 까닭을 함께 읽게 한다. 눌러도 안 넘어가는 것은 같다 —
-     * **넘기는 쪽에서 한 번 더 본다.** 표시만 하고 안 막으면 표시가 거짓말이 된다.
-     */
+    const required = UI.bench.lock.required;
+    if (!required.includes(activeStage)) return '';
+    const read = st.session.readStages ?? [];
+    const left = required.filter((id) => !read.includes(id));
+    if (read.includes(activeStage)) {
+      return `<p class="read-mark" data-done="true">${N.readDone}${
+        left.length === 0 ? ` ${N.readAllDone}` : ''}</p>`;
+    }
+    // **막을 때는 지금 할 일을 말한다.** 조작변인을 안 골랐으면 예상할 칸이 화면에
+    // 아예 없으므로, 「예상을 고르세요」는 없는 것을 고르라는 말이 된다.
     const blocked = activeStage === '3' && !predictDone(st);
-    /**
-     * **막을 때는 지금 할 일을 말한다.** 조작변인을 안 골랐으면 예상할 칸이 화면에
-     * 아예 없으므로, 「예상을 고르세요」는 없는 것을 고르라는 말이 된다.
-     */
-    const why = !blocked ? (left.length ? N.readLeadIn : N.readAllDone)
-      : predictWhyBlocked(st);
-    return `<div class="read-foot">
-      <p class="note-lead" id="read-why">${why}</p>
-      <button type="button" id="read-confirm" ${read ? 'data-read="true"' : ''}${
-        blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>
-        ${read ? N.readDone : N.readConfirm}</button>
-    </div>`;
+    return `
+      <div class="read-mark">
+        <p id="read-why">${blocked ? predictWhyBlocked(st) : N.readLeadIn}</p>
+        <button type="button" id="mark-read" class="read-confirm"${
+          blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
+      </div>`;
   }
 
   function renderReportSlot(st) {
     const { ready, missing } = reportReadiness(st);
     root.querySelector('#report-slot').innerHTML = ready
-      ? `<button type="button" id="make-report">${N.reportButton}</button>`
-      : `<details class="report-todo"><summary>${N.reportTodoHeading}</summary>
+      ? `<button type="button" id="make-report">${UI.report.button}</button>`
+      : `<details class="report-todo"><summary>${N.reportLockedHint} (${missing.length})</summary>
           <ul>${missing.map((m) => `<li>${m}</li>`).join('')}</ul></details>`;
     if (ready) {
       root.querySelector('#make-report').addEventListener('click', () => onReport());
@@ -593,11 +633,12 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
   function render() {
     const st = store.getState();
-    tabsEl.innerHTML = N.stages.map((s) => `<button type="button" role="tab"
-      class="note-tab ${s.id === activeStage ? 'note-tab--on' : ''}"
-      data-stage="${s.id}" aria-selected="${s.id === activeStage}">
-      ${s.id}. ${s.title}${stageDone(st, s.id) ? ' ✓' : ''}</button>`).join('');
-    bodyEl.innerHTML = STAGE_BODY[activeStage](st) + readFooter(st);
+    tabsEl.querySelectorAll('.note-tab').forEach((tab) => {
+      tab.setAttribute('aria-selected', String(tab.dataset.stage === activeStage));
+      // 끝낸 쪽에는 표시를 남긴다. 어디가 남았는지 탭만 보고 알 수 있어야 한다.
+      tab.dataset.read = String(stageDone(st, tab.dataset.stage));
+    });
+    panelEl.innerHTML = STAGE_BODY[activeStage](st) + readFooter(st);
     renderReportSlot(st);
   }
 
@@ -610,8 +651,6 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     if (tab) { activeStage = tab.dataset.stage; render(); return; }
     const opt = e.target.closest('[data-predict]');
     if (opt) { store.dispatch('SAVE_NOTE', { step: 'predict', text: opt.dataset.predict }); return; }
-    const set = e.target.closest('[data-note-set]');
-    if (set) { store.dispatch('SAVE_NOTE', { step: set.dataset.noteSet, text: set.dataset.value }); return; }
     /**
      * STEP 을 손으로 여닫았다. **`toggle` 이 아니라 `summary` 의 `click` 을 듣는다.**
      *
@@ -682,7 +721,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
      * 4쪽은 탐구 과정이라 실험대에서 따라 하며 보는 쪽이고, 마침 그때 실험대가 열린다 —
      * 5쪽(결과)으로 보내면 아직 아무 시행도 없는 빈 쪽이 나온다.
      */
-    const readBtn = e.target.closest('#read-confirm');
+    const readBtn = e.target.closest('#mark-read');
     if (readBtn) {
       // 막힌 단추는 눌려도 아무 일이 없다. `disabled` 를 안 쓰므로 여기서 한 번 더 본다 —
       // 화면에만 표시하고 넘기기를 안 막으면 **표시가 거짓말이 된다.**
@@ -696,10 +735,6 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
   });
 
   /**
-   * 글자를 칠 때마다 다시 그리면 커서가 튄다. `input` 으로 상태만 저장하고 화면은 그대로 두었다가,
-   * 칸을 떠날 때(`change`) 한 번 다시 그린다 — 그때 첨삭이 붙는다.
-   */
-  /**
    * **판은 그대로 두고 단추만 제자리에서 고친다.**
    *
    * 치는 동안에는 다시 그리지 않는다(그러면 치던 칸이 갈려 나간다). 그런데 그러면
@@ -710,7 +745,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
    * 그래서 그리지 않고 **단추의 잠금과 까닭 글자만** 바꾼다. 치던 칸은 건드리지 않는다.
    */
   function patchGate() {
-    const btn = root.querySelector('#read-confirm');
+    const btn = root.querySelector('#mark-read');
     if (!btn) return;
     const st = store.getState();
     const blocked = activeStage === '3' && !predictDone(st);
@@ -722,12 +757,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       btn.removeAttribute('aria-describedby');
     }
     const why = root.querySelector('#read-why');
-    if (why) {
-      const left = UI.bench.lock.required.filter((id) => !(st.session.readStages ?? []).includes(id));
-      why.textContent = blocked
-        ? predictWhyBlocked(st)
-        : (left.length ? N.readLeadIn : N.readAllDone);
-    }
+    if (why) why.textContent = blocked ? predictWhyBlocked(st) : N.readLeadIn;
   }
 
   /**
@@ -737,18 +767,17 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
    * 여기가 열립니다」라고 말한다. **방금 적은 학생에게 거짓말을 하는 것이다.**
    *
    * 판은 안 그린다(치던 칸이 갈려 나간다). 아직 `<div>` 인 채로 남지만, **말은 지금을**
-   * 말하게 한다 — 「곧 열립니다 · 칸에서 손을 떼 보세요」. 손을 떼면 그때 판이 그려지며
-   * 실제로 열린다.
+   * 말하게 한다 — 「눌러서 여세요」. 손을 떼면 그때 판이 그려지며 실제로 열린다.
+   * 누구를 기다리는지는 잠긴 카드가 스스로 말한다(`data-locked-by`) — 문구를 다시 읽지 않는다.
    */
   function patchLocks() {
     const st = store.getState();
-    for (const el of root.querySelectorAll('.note-step--locked')) {
-      const why = el.querySelector('.step-locked-why');
-      const blockerId = why?.textContent?.match(/STEP\s*(\S+)/)?.[1];
-      const blocker = UI.protocol.find((g) => g.id === blockerId);
+    for (const el of root.querySelectorAll('.note-step--locked[data-locked-by]')) {
+      const blocker = UI.protocol.find((g) => g.id === el.dataset.lockedBy);
       if (!blocker) continue;
       const ready = stepNotesWritten(st, blocker);
       const hint = el.querySelector('.step-open-hint');
+      const why = el.querySelector('.step-locked-why');
       if (hint) hint.textContent = ready ? N.stepAboutToOpen : N.stepLockedHint;
       if (why) why.textContent = ready ? N.stepAboutToOpenWhy : N.stepLockedWhy(blocker.id);
     }

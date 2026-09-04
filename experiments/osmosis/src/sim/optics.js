@@ -109,3 +109,10 @@ export function focusTolerance(objective) {
   if (objective === 10) return 0.12;
   return 0.03;
 }
+
+/**
+ * 나사가 도는 폭. 조동 ±1 · 미동 ±0.2 — `rules.js` 의 clamp 와 같은 값이다.
+ * 다이얼 그림(호)·낭독기 범위(`aria-valuemin/max`)·「끝까지 갔습니다」 판정이 이 값을 읽는다.
+ * 10배 허용 범위(0.12)가 미동 폭(0.2)보다 좁아, 저배율에서 맞춘 어느 자리에서도 미동만으로 40배에 닿는다.
+ */
+export const KNOB_SPAN = { coarse: 1, fine: 0.2 };

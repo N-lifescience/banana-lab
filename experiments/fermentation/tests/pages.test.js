@@ -135,9 +135,10 @@ test('다른 실험의 배포 주소를 가리키지 않는다', () => {
  * 잴 수 있는 것(`touch-action`·`user-select`)은 화면 검사가 폰 폭에서 잰다.
  */
 test('아이폰에서 실험대를 길게 눌러도 돋보기·글자 선택이 안 뜬다 (소스)', () => {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
 
-  const stage = html.match(/\.bench-stage\{[^}]*\}/s)?.[0];
+  const stage = html.match(/\.bench-stage\s*\{[^}]*\}/s)?.[0];
   assert.ok(stage, '`.bench-stage` 규칙을 못 찾았습니다 — 이 검사가 아무것도 안 지키고 있습니다');
 
   for (const need of ['-webkit-touch-callout:none', 'user-select:none', '-webkit-user-select:none']) {

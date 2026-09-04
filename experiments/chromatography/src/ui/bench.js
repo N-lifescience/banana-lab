@@ -133,7 +133,7 @@ export function dropTable(store, openZoom = () => {}) {
   return {
     // 잎을 원심관에 넣는다. 시든 잎도 막지 않는다 — 뽑을 색소가 적을 뿐이다.
     leaf: {
-      // 어느 잎인지는 **선반에서 고른 것**을 따른다 (tapTable 의 leaf).
+      // 어느 잎인지는 **잎 화면에서 고른 것**을 따른다 (zoom.js 의 잎 화면, `PICK_LEAF`).
       tube: () => store.dispatch('ADD_LEAF', { kind: store.getState().tools.leafKind }),
     },
     bottle: {
@@ -181,24 +181,25 @@ export function dropTable(store, openZoom = () => {}) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때.
+ *
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 눌러서 상태가 바뀌는 물건은 하나도 없다 — 잎 바꾸기(`PICK_LEAF`)는 잎 화면의 고르기,
+ * 뚜껑 여닫기(`CAP_VIAL`·`UNCAP_VIAL`)는 바이알 화면의 단추가 됐다.
+ * 모든 물건이 누르면 자기 화면을 연다. 「무엇을 받는 곳인지」를 그 화면이 말한다.
  *
  * (예전에는 여기서 안전 수칙을 판정해 자기 평가의 「위반 기록」을 지웠다. 그 판정도,
  *  휴지도 걷어냈다 — 가상 실험에서 그것을 따지면 **화면 속 단추를 눌렀다는 사실**을
  *  평가하게 된다. 안전은 이제 준비물 쪽에 **가만히 적힌 안내**로만 있다.)
  */
 export function tapTable(store, onOpenZoom) {
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    // 신선한 잎과 시든 잎을 오간다. 이것이 이 실험의 변인 하나다 —
-    // 화면이 알아서 신선한 것을 집어 주면 학생이 고를 것이 없어진다.
-    leaf: () => store.dispatch('PICK_LEAF', {
-      kind: store.getState().tools.leafKind === 'fresh' ? 'wilted' : 'fresh',
-    }),
     tube: (item, el) => onOpenZoom('tube', null, el),
     paper: (item, el) => onOpenZoom('paper', null, el),
-    // 뚜껑은 열고 닫는 한 쌍이다. 지금 상태의 반대로 간다 —
-    // 열려 있을 때만 종이가 들어가고, 덮여 있어야 용매가 안 날아가고 빛도 안 든다.
-    vial: () => store.dispatch(store.getState().vial.capped ? 'UNCAP_VIAL' : 'CAP_VIAL', {}),
+    vial: (item, el) => onOpenZoom('vial', null, el),
+    leaf: view, bottle: view, paperbox: view, capillary: view, pencil: view, ruler: view,
+    waste: view, sink: view, bin: view,
   };
 }
 
@@ -1071,9 +1072,8 @@ export function createBench(root, store, { onOpenZoom, edit: editStart = false }
       el.className = `token token--${item.kind}`;
       el.dataset.id = item.id;
       el.dataset.tool = item.asset;
-      // 클릭으로 확대 뷰가 열리는 물건. 조작표(tapTable)와 같은 것을 가리켜야 한다.
-      if (item.kind === 'paper') el.dataset.zoom = 'paper';
-      else if (item.kind === 'tube') el.dataset.zoom = 'tube';
+      // 누르면 화면이 열리는 물건 — 이제 전부다. 조작표(tapTable)와 같은 것을 가리켜야 한다.
+      el.dataset.zoom = item.kind;
       // 크기와 위치를 전부 무대 비율로 낸다. 배경 애셋과 같은 자로 재어지므로
       // 창 크기가 바뀌어도 realSizeMm 비례와 배경 위 자리가 함께 유지된다.
       el.style.left = `${xPct(item.x)}%`;

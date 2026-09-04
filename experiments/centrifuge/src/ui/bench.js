@@ -12,7 +12,7 @@
 
 import { ASSETS } from '../assets/index.js';
 import { CONTRACT, CONTENT_BOX, drawnBoxMm } from '../assets/contract.js';
-import { isSpinning, sampleSlot, SLOT_ITEMS, SLOTS, TUBE_KINDS } from '../sim/state.js';
+import { isSpinning, sampleSlot, SLOT_ITEMS, SLOTS } from '../sim/state.js';
 import { UI } from './strings.js';
 
 /**
@@ -110,7 +110,7 @@ function defaultItems() {
     surface(120, { id: 'finger', asset: 'finger', kind: 'finger', labelKey: 'finger' }),
     surface(300, { id: 'capillary', asset: 'capillary', kind: 'capillary', labelKey: 'capillary' }),
     surface(470, { id: 'rotor', asset: 'rotor', kind: 'rotor', labelKey: 'rotor' }),
-    // 폐기물 통. **버리는 곳이 아니라 되돌리는 곳이다** — 잘못 채운 모세관을 여기 대면
+    // 쓰레기통. **버리는 곳이 아니라 되돌리는 곳이다** — 잘못 채운 모세관을 여기 대면
     // 버리고 새것을 꺼낸다. 침 폐기함·개수대·휴지는 안전 조작을 걷어내면서 함께 뺐다:
     // 그 물건들은 오직 안전 조작에만 쓰여서, 남겨 두면 **눌러도 아무 일 없는 물건**이 된다.
     // 손상성 폐기물·손 씻기·지혈은 2쪽(준비물)에 적어 두기만 한다.
@@ -147,9 +147,9 @@ export function dropTable(store, openZoom = () => {}) {
       // 막는 것도 손끝 일이다 — 누르는 깊이가 결과를 가른다.
       clay: () => openZoom('seal'),
       rotor: () => store.dispatch('LOAD_ROTOR', { what: SLOT_ITEMS.SAMPLE }),
-      // 잘못 채운 것을 되돌리는 길 둘. 통에 대면 새것, 폐기물 통에 대면 버리고 새것.
+      // 잘못 채운 것을 되돌리는 길 둘. 통에 대면 새것, 쓰레기통에 대면 버리고 새것.
       capbox: () => store.dispatch('NEW_CAPILLARY', {}),
-      // 폐기물 통에 대면 쓰던 것을 버리고 새것을 꺼낸다. **이 통은 안전 점검이 아니라
+      // 쓰레기통에 대면 쓰던 것을 버리고 새것을 꺼낸다. **이 통은 안전 점검이 아니라
       // 되돌리는 길이다** — 잘못 채운 모세관에서 빠져나가는 두 갈래 중 하나.
       bin: () => store.dispatch('NEW_CAPILLARY', {}),
     },
@@ -165,26 +165,28 @@ export function dropTable(store, openZoom = () => {}) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때.
+ *
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 눌러서 상태가 바뀌는 물건은 하나도 없다 — 모세관 통을 눌러 헤파린/민무늬가 말없이
+ * 바뀌던 것도 이제 **통 화면의 「… 꺼내기」 단추**다. 모든 물건이 누르면 자기 화면을 연다.
+ * 「무엇을 받는 곳인지」를 그 화면이 말한다. 실험대에서 상태를 바꾸는 손짓은
+ * 끌어다 놓기(`dropTable`)뿐이다.
  *
  * **안전 수칙을 위한 탭은 없다.** 손 씻기·침 버리기·지혈은 조작으로 두지 않고
  * 2쪽(준비물)에 **적어 두기만 한다** — 이 앱은 그것을 확인하지 않는다.
- * 그 넷만 쓰이던 물건(개수대·휴지·침 폐기함)은 눌러도 아무 일 없는 물건이 되므로
- * 실험대에서 함께 뺐다. **말없이 먹통인 물건을 남기지 않는다.**
+ * 그 넷만 쓰이던 물건(개수대·휴지·침 폐기함)은 실험대에서 뺐다.
  */
 export function tapTable(store, onOpenZoom) {
+  const view = (item, el) => onOpenZoom('item', el, item.id);
   return {
     // 회전판을 누르면 끈을 당기는 확대 뷰가 열린다. **이 실험의 몸통이다.**
     rotor: (item, el) => onOpenZoom('spin', el),
     // 모세관을 누르면 막는 확대 뷰가 열린다. 고무찰흙까지 끌고 가지 않아도 되는 지름길이다.
     capillary: (item, el) => onOpenZoom('seal', el),
-    // 헤파린 칸과 민무늬 칸을 오간다. **이것이 변인이다** — 화면이 대신 고르지 않는다.
-    capbox: () => {
-      const now = store.getState().tools.pickKind;
-      store.dispatch('PICK_CAPILLARY', {
-        kind: now === TUBE_KINDS.HEPARIN ? TUBE_KINDS.PLAIN : TUBE_KINDS.HEPARIN,
-      });
-    },
+    // 손끝을 누르면 빨아올리는 화면 — 손끝의 상태(소독·핏방울)가 거기 그려진다.
+    finger: (item, el) => onOpenZoom('draw', el),
+    capbox: view, clay: view, lancet: view, swab: view, ruler: view, bin: view,
   };
 }
 
@@ -333,7 +335,7 @@ export function createBench(root, store, { onOpenZoom, edit = false }) {
     else store.dispatch('UNLOAD', {});
   });
 
-  // 확대 뷰는 셋뿐이다 — 빨아올리기(draw) · 막기(seal) · 끈 당기기(spin).
+  // 손끝으로 하는 확대 뷰 셋 — 빨아올리기(draw) · 막기(seal) · 끈 당기기(spin). 물건 화면은 tapTable 이 연다.
   // 어느 물건에서 열렸는지를 함께 넘겨, 닫을 때 그 물건으로 포커스를 돌려준다.
   const DROPS = dropTable(store, (mode) => onOpenZoom(mode, elFor(mode === 'spin' ? 'rotor' : 'capillary')));
 

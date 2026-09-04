@@ -1,25 +1,30 @@
 /**
- * 확대 뷰 — **손끝으로 하는 일**만 여기 있다.
+ * 확대 뷰 — **손끝으로 하는 일**과 **물건 화면**.
  *
  * 실험대에서는 물건을 집어 옮기는 큰 동작만 한다. 결과를 가르는 값(각도 · 누르는 깊이 ·
  * 당기는 세기와 박자)은 전부 이 화면에서 손이 정한다 (PLAYBOOK §4).
  *
- * 모드 셋:
- *   draw  손끝에 모세관을 **비스듬히** 대어 혈액을 빨아올린다
+ * 모드 넷:
+ *   draw  손끝에 모세관을 **비스듬히** 대어 혈액을 빨아올린다 — 손끝을 누르면 여기다
  *   seal  모세관 끝을 고무찰흙에 **눌러** 막는다
  *   spin  끈을 **박자에 맞춰** 당긴다 — 이 실험의 몸통
+ *   item  물건 화면 — 누르면 본다 (docs/09-uniformity.md §2·§3). 모세관 통·고무찰흙·채혈침·
+ *         소독솜·자·쓰레기통. 종류를 골라 꺼내는 것(헤파린/민무늬)은 통 화면의 단추다.
  *
- * Esc 로 나간다. 여는 요소가 <button> 이므로 키보드로도 들어올 수 있다 (bench.js 참조).
- * 열렸을 때 포커스를 뷰 안으로 옮기고, 닫으면 열었던 곳으로 되돌린다.
+ * 덮개·패널·「닫기 (Esc)」·포커스 되돌리기·스크롤은 공용 틀(`createZoomShell`)이 한다.
+ * 여기는 **무엇을 그릴지**만 갖는다.
  */
 
 import { renderTube } from '../render/tube.js';
 import { observability } from '../sim/quality.js';
 import {
-  tubeParams, imbalanceOf, isSpinning, rhythmQuality, sampleSlot, columnLength,
-  ENDS, SLOTS, ANGLE_RANGE_DEG, ANGLE_BEST_DEG, PRESS_BREAK, PRESS_GOOD,
+  tubeParams, imbalanceOf, rhythmQuality, sampleSlot, columnLength,
+  ENDS, SLOTS, TUBE_KINDS, ANGLE_RANGE_DEG, ANGLE_BEST_DEG, PRESS_BREAK, PRESS_GOOD,
 } from '../sim/state.js';
 import { timingError, MAX_SPEED } from '../sim/spin.js';
+import { createZoomShell } from '../../../../packages/lab-kit/ui/zoom-shell.js';
+import { renderItemView, acceptsFrom } from '../../../../packages/lab-kit/ui/item-view.js';
+import { dropTable } from './bench.js';
 import { UI } from './strings.js';
 import { ASSETS } from '../assets/index.js';
 
@@ -37,23 +42,19 @@ function clamp(v, a, b) {
 const BEAT_WINDOW = 0.11;
 
 export function createZoom(root, store) {
-  root.className = 'zoom-overlay';
-  root.hidden = true;
-  // 닫기 단추는 패널의 **첫 자식**이고 sticky 다. 절대 위치로 두면 창보다 긴 내용이
-  // 들어간 작은 화면에서 아래로 스크롤할 때 화면 밖으로 밀려 나가, 나갈 방법이 없어진다.
-  root.innerHTML = `
-    <div class="zoom-panel" role="dialog" aria-modal="true" tabindex="-1">
-      <button type="button" id="zoom-close" class="zoom-close"></button>
-      <div class="zoom-body"></div>
-    </div>`;
-  const panel = root.querySelector('.zoom-panel');
-  const body = root.querySelector('.zoom-body');
-  const closeBtn = root.querySelector('.zoom-close');
-  closeBtn.textContent = UI.zoom.close;
+  const shell = createZoomShell(root, {
+    closeLabel: UI.zoom.close,
+    // 회전 중에는 skipNotify 로 조용히 갱신됐다. 닫을 때 한 번 전체를 동기화해
+    // 실험대(배경) 뷰가 최신 상태를 반영하게 한다.
+    onClose: () => store.notify(),
+  });
+  const { body } = shell;
+  /** 놓기 표 — 「여기에 끌어다 놓을 수 있는 것」을 거꾸로 읽는다. 실행하지 않는다. */
+  const DROPS = dropTable(store);
 
   let mode = null;
-  let opener = null;
-  let openerId = null;
+  /** 물건 화면에 열린 물건 (실험대의 id — 이 실험은 id 와 종류가 같다). */
+  let itemId = null;
   /** 결과를 기록한 직후 화면에 남길 확인 문구. 열 때마다 지운다. */
   let captureNotice = null;
   /**
@@ -74,58 +75,35 @@ export function createZoom(root, store) {
    */
   let busy = false;
 
-  function onKeydown(e) {
-    if (e.key === 'Escape') close();
-  }
-
-  function close() {
-    if (root.hidden) return;
-    root.hidden = true;
-    mode = null;
-    document.removeEventListener('keydown', onKeydown);
-    // 회전 중에는 skipNotify 로 조용히 갱신됐다. 닫을 때 한 번 전체를 동기화해
-    // 실험대(배경) 뷰가 최신 상태를 반영하게 한다.
-    // 이 notify 가 bench 를 다시 그리면 opener 로 잡아 둔 버튼 자체가 새 요소로 바뀌므로,
-    // notify 를 먼저 하고 나서 data-id 로 같은 자리를 찾아 포커스한다.
-    store.notify();
-    const target = openerId ? document.querySelector(`[data-id="${openerId}"]`) : opener;
-    if (target && target.isConnected) target.focus();
-    opener = null;
-    openerId = null;
-  }
-  closeBtn.addEventListener('click', close);
-  root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
+  function close() { shell.close(); }
 
   /**
-   * @param {'draw'|'seal'|'spin'} openMode
-   * @param {HTMLElement} openerEl
+   * @param {'draw'|'seal'|'spin'|'item'} openMode
+   * @param {HTMLElement|null} openerEl  닫을 때 포커스를 돌려줄 물건
+   * @param {string|null} openId  item 이면 실험대 물건 id
    */
-  function open(openMode, openerEl) {
+  function open(openMode, openerEl = null, openId = null) {
     mode = openMode;
+    itemId = openMode === 'item' ? openId : null;
     captureNotice = null;
     pressNow = 0;
     pullNow = 0;
-    opener = openerEl ?? document.activeElement;
-    openerId = opener?.dataset?.id ?? null;
-    root.hidden = false;
-    document.addEventListener('keydown', onKeydown);
-    renderBody();
-    panel.focus();
+    shell.open(renderBody, openerEl);
   }
 
+  /**
+   * 다시 그린다. **다시 그려도 손은 그 자리에 남는다** — 틀의 `repaint` 가 같은 id 의
+   * 새 요소로 포커스를 되돌린다. Enter 로 링을 당기면 그 링이 새 요소로 바뀌면서 포커스가
+   * `<body>` 로 떨어지던 자리다 (PLAYTEST-REVIEW #8). 이 실험의 몸통이 마우스 전용이
+   * 되지 않게 하는 줄이니, 조작 뒤에는 `renderBody()` 가 아니라 이것을 부른다.
+   */
+  const repaint = () => shell.repaint();
+
   function renderBody() {
-    /*
-     * **다시 그려도 손은 그 자리에 남는다.** 이 판은 조작 하나마다 `innerHTML` 로 통째로
-     * 새로 만들어지는데, Enter 로 링을 당기면 그 링이 새 요소로 바뀌면서 포커스가 `<body>`
-     * 로 떨어졌다 — 키보드로는 **한 번 당기고 나면 Tab 으로 되돌아와야** 다음을 당길 수
-     * 있어서 박자를 맞출 길이 없었다. 이 실험의 몸통이 마우스 전용이 되는 자리다
-     * (플레이테스트 키보드 경로 — PLAYTEST-REVIEW #8). 같은 id 의 새 요소로 되돌려 준다.
-     */
-    const focusedId = body.contains(document.activeElement) ? document.activeElement.id : null;
     if (mode === 'draw') renderDraw();
     else if (mode === 'seal') renderSeal();
     else if (mode === 'spin') renderSpin();
-    if (focusedId) body.querySelector(`#${CSS.escape(focusedId)}`)?.focus();
+    else if (mode === 'item') renderItemMode();
   }
 
   /* ---------------------------------------------------------------- */
@@ -147,7 +125,7 @@ export function createZoom(root, store) {
 
   function captureButton() {
     return `<button type="button" class="zoom-action" id="zoom-capture">${esc(UI.zoom.capture)}</button>`
-      + (captureNotice ? `<p class="zoom-note">${esc(captureNotice)}</p>` : '');
+      + (captureNotice ? `<p class="zoom-hint" data-good="true">${esc(captureNotice)}</p>` : '');
   }
 
   function bindCapture() {
@@ -156,7 +134,7 @@ export function createZoom(root, store) {
       if (r.outcome !== 'blocked') {
         captureNotice = UI.zoom.captureSaved(r.state.session.captures.length);
       }
-      renderBody();
+      repaint();
     });
   }
 
@@ -167,6 +145,73 @@ export function createZoom(root, store) {
     } catch {
       return '';
     }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* item — 물건 화면. 누르면 본다 (docs/09 §2·§3)                      */
+  /* ---------------------------------------------------------------- */
+
+  /** 종류 → 화면에 쓸 이름. 끄는 쪽 이름이라 짧은 것(`UI.assetNames`)을 쓴다. */
+  const nameOfKind = (kind) => UI.assetNames[kind] ?? kind;
+  /** 준비물 표의 「하는 일」. 두 곳에 따로 쓰면 반드시 갈린다. */
+  const roleOf = (asset) => UI.notebook.materials.find((m) => m.asset === asset)?.role ?? null;
+
+  /**
+   * 물건 하나의 화면. 제목 · 어디에 있나 · 하는 일 · 그림 · 덧붙일 말 · 받는 것 · 단추 —
+   * 차례는 공용 `renderItemView` 가 정한다. 여기서는 **이 실험의 사실**만 채운다.
+   *
+   * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기뿐이다. 눌러서 하던 것(모세관 통에서
+   * 헤파린/민무늬 고르기)은 **이 화면의 단추**로 왔다 — 말없이 종류가 바뀌던 자리다.
+   */
+  function renderItemMode() {
+    const st = store.getState();
+    const kind = itemId;
+    const Z = UI.zoom.item;
+    const v = {
+      title: UI.bench.items[kind] ?? nameOfKind(kind),
+      where: null, role: roleOf(kind), note: null, figure: '', actions: [],
+    };
+    const act = (id, label, run, quiet = false) => v.actions.push({ id, label, quiet, run });
+    const go = (type, payload = {}) => () => store.dispatch(type, payload);
+
+    if (kind === 'capbox') {
+      // 통 — 열린 통 안 그림 + 종류별 「… 꺼내기」. 꺼내면 새 모세관이라 처음부터 다시다
+      // (NEW_CAPILLARY). 어느 쪽을 쓸지가 변인이니 화면이 대신 집어 주지 않는다.
+      const pick = st.tools.pickKind;
+      v.where = Z.capboxHolds(UI.tubeKinds[pick]);
+      v.note = Z.capboxNote;
+      v.figure = assetSvg('capbox', { kind: pick });
+      act('act-take-heparin', Z.takeKind(UI.tubeKinds.heparin), go('NEW_CAPILLARY', { kind: TUBE_KINDS.HEPARIN }));
+      act('act-take-plain', Z.takeKind(UI.tubeKinds.plain), go('NEW_CAPILLARY', { kind: TUBE_KINDS.PLAIN }));
+    } else if (kind === 'clay') {
+      const dents = Math.min(6, st.session.log.filter((l) => l.action === 'SEAL_END').length);
+      v.where = dents > 0 ? Z.clayDents(dents) : Z.clayFresh;
+      v.figure = assetSvg('clay', { dents });
+      // 막는 화면으로 가는 지름길. 모세관을 끌어다 대는 것과 같은 화면이 열린다.
+      act('act-seal', Z.sealNow, () => { mode = 'seal'; pressNow = 0; repaint(); });
+    } else if (kind === 'lancet') {
+      v.where = st.lancet.used ? Z.lancetUsed : Z.lancetNew;
+      v.figure = assetSvg('lancet', { used: st.lancet.used });
+    } else if (kind === 'swab') {
+      v.where = st.finger.swabbed ? Z.swabUsed : Z.swabNew;
+      v.figure = assetSvg('swab', { used: st.finger.swabbed });
+    } else if (kind === 'ruler') {
+      v.where = st.tools.rulerPlaced ? Z.rulerPlaced : Z.rulerIdle;
+      v.figure = assetSvg('ruler', {});
+      if (st.tools.rulerPlaced) act('act-lift-ruler', Z.liftRuler, go('LIFT_RULER'), true);
+    } else if (kind === 'bin') {
+      // 받는 곳 — 「무엇을 받는지」가 몸통이다. 버리는 곳이 아니라 되돌리는 길이기도 하다.
+      v.note = Z.binNote;
+      v.figure = assetSvg('bin', { fill: 1 });
+    } else if (kind === 'sharpsbin') {
+      v.note = Z.sharpsbinNote;
+      v.figure = assetSvg('sharpsbin', { fill: st.lancet.disposed ? 0.7 : 0.3 });
+    } else {
+      v.figure = assetSvg(kind, kind === 'sink' ? { water: 0 } : kind === 'tissue' ? { used: 0 } : {});
+    }
+    v.accepts = acceptsFrom(DROPS, kind, nameOfKind);
+    v.acceptsLabel = UI.zoom.acceptsLabel;
+    renderItemView(body, v);
   }
 
   /* ---------------------------------------------------------------- */
@@ -184,9 +229,10 @@ export function createZoom(root, store) {
     const t = st.tube;
     const good = Math.abs(angleDeg - ANGLE_BEST_DEG) <= 22;
     body.innerHTML = `
-      <h2>${esc(UI.zoom.drawMode)}</h2>
+      <h2>${esc(UI.bench.items.finger)}</h2>
+      <p class="zoom-slide-label">${esc(UI.zoom.drawMode)}</p>
       <p class="zoom-hint">${esc(UI.zoom.drawHint)}</p>
-      ${st.finger.drop <= 0 ? `<p class="zoom-warn">${esc(UI.zoom.drawNoDrop)}</p>` : ''}
+      ${st.finger.drop <= 0 ? `<p class="zoom-hint" data-good="false">${esc(UI.zoom.drawNoDrop)}</p>` : ''}
       <div class="zoom-stage">
         <div class="zoom-figure zoom-figure--finger">${assetSvg('finger', {
     swabbed: st.finger.swabbed, drop: st.finger.drop, wiped: st.finger.wiped,
@@ -197,7 +243,7 @@ export function createZoom(root, store) {
           ${assetSvg('capillary', { fill: t.fill, kind: t.kind, seal: t.seal, broken: t.broken })}
         </button>
       </div>
-      <p class="zoom-note ${good ? 'zoom-note--good' : 'zoom-note--warn'}">
+      <p class="zoom-hint" id="draw-angle-note" data-good="${good}">
         ${esc(good ? UI.zoom.drawAngleGood : UI.zoom.drawAngleBad)}</p>
       <dl class="zoom-readout">
         ${row(UI.zoom.drawAngle, UI.units.deg(Math.round(angleDeg)))}
@@ -263,12 +309,11 @@ export function createZoom(root, store) {
       // 「비스듬히」가 몇 도인지 손으로 익힐 방법이 없다.
       const dd = body.querySelectorAll('.zoom-readout dd');
       if (dd[0]) dd[0].textContent = UI.units.deg(Math.round(angleDeg));
-      const note = body.querySelector('.zoom-note');
+      const note = body.querySelector('#draw-angle-note');
       if (note) {
         const good = Math.abs(angleDeg - ANGLE_BEST_DEG) <= 22;
         note.textContent = good ? UI.zoom.drawAngleGood : UI.zoom.drawAngleBad;
-        note.classList.toggle('zoom-note--good', good);
-        note.classList.toggle('zoom-note--warn', !good);
+        note.dataset.good = String(good);
       }
     });
 
@@ -279,7 +324,7 @@ export function createZoom(root, store) {
       drag = null;
       busy = false;
       store.notify();
-      renderBody();
+      repaint();
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
@@ -291,7 +336,7 @@ export function createZoom(root, store) {
     el.addEventListener('click', (e) => {
       if (e.detail !== 0) return;   // 포인터로 이미 처리한 것은 넘긴다
       store.dispatch('DRAW_BLOOD', { angleDeg, dwell: 0.5 });
-      renderBody();
+      repaint();
     });
   }
 
@@ -309,13 +354,14 @@ export function createZoom(root, store) {
     const label = UI.ends[sealEnd];
     const sealed = t.seal[sealEnd] > 0;
     body.innerHTML = `
-      <h2>${esc(UI.zoom.sealMode)}</h2>
+      <h2>${esc(UI.bench.items.capillary)}</h2>
+      <p class="zoom-slide-label">${esc(UI.zoom.sealMode)}</p>
       ${compass()}
       <p class="zoom-hint">${esc(UI.zoom.sealHint)}</p>
-      <div class="zoom-endpick" role="group" aria-label="${esc(UI.zoom.sealPickEnd)}">
-        <span class="zoom-endpick-label">${esc(UI.zoom.sealPickEnd)}</span>
+      <div class="ctrl-group" role="group" aria-label="${esc(UI.zoom.sealPickEnd)}">
+        <span>${esc(UI.zoom.sealPickEnd)}</span>
         ${Object.values(ENDS).map((e) => `
-          <button type="button" data-end="${e}" class="${e === sealEnd ? 'is-on' : ''}"
+          <button type="button" data-end="${e}" id="seal-end-${e}"
             aria-pressed="${e === sealEnd}">${esc(UI.ends[e])}${t.seal[e] > 0 ? ' ✓' : ''}</button>`).join('')}
       </div>
       <div class="zoom-stage zoom-stage--seal">
@@ -342,15 +388,15 @@ export function createZoom(root, store) {
         ${row(UI.ends.outer, t.seal.outer > 0 ? UI.units.percent(Math.round(t.seal.outer * 100)) : '—')}
         ${row(UI.ends.inner, t.seal.inner > 0 ? UI.units.percent(Math.round(t.seal.inner * 100)) : '—')}
       </dl>
-      <p class="zoom-note">${esc(sealed ? UI.zoom.sealDone(label) : UI.zoom.sealOpen(label))}</p>
+      <p class="zoom-hint" data-good="${sealed}">${esc(sealed ? UI.zoom.sealDone(label) : UI.zoom.sealOpen(label))}</p>
       ${sealed ? `<button type="button" class="zoom-secondary" id="seal-peel">${esc(UI.zoom.sealPeel(label))}</button>` : ''}`;
 
     body.querySelectorAll('[data-end]').forEach((b) => {
-      b.addEventListener('click', () => { sealEnd = b.dataset.end; pressNow = 0; renderBody(); });
+      b.addEventListener('click', () => { sealEnd = b.dataset.end; pressNow = 0; repaint(); });
     });
     body.querySelector('#seal-peel')?.addEventListener('click', () => {
       store.dispatch('PEEL_CLAY', { end: sealEnd });
-      renderBody();
+      repaint();
     });
     bindSealTool(body.querySelector('#seal-tool'));
   }
@@ -386,7 +432,7 @@ export function createZoom(root, store) {
       // 화면이 하지도 않은 일을 나무란다.
       if (pressNow > 0.05) store.dispatch('SEAL_END', { end: sealEnd, press: pressNow });
       pressNow = 0;
-      renderBody();
+      repaint();
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
@@ -395,7 +441,7 @@ export function createZoom(root, store) {
     el.addEventListener('click', (e) => {
       if (e.detail !== 0) return;
       store.dispatch('SEAL_END', { end: sealEnd, press: 0.72 });
-      renderBody();
+      repaint();
     });
   }
 
@@ -411,16 +457,25 @@ export function createZoom(root, store) {
     return words[i];
   }
 
+  /**
+   * 게이지 밑 한 줄. **100 아래면 언제나 무엇을 하면 되는지 말한다** (docs/09 §3.1) —
+   * 난이도와 무관하다 (banana·micrometer 와 같다). 난이도가 가르는 것은 알림의 「다음 행동」이다.
+   */
+  function gaugeHint(obs) {
+    if (!obs.worst) return UI.observability.allGood;
+    return UI.observability.hint(UI.observability.worst[obs.worst], UI.observability.fix[obs.worst]);
+  }
+
   function renderSpin() {
     const st = store.getState();
     const level = st.session.level;
     const imbalance = imbalanceOf(st.rotor);
     const params = tubeParams(st);
     const obs = observability(params);
-    const worstLabel = obs.worst ? UI.observability.worst[obs.worst] : null;
 
     body.innerHTML = `
-      <h2>${esc(UI.zoom.spinMode)}</h2>
+      <h2>${esc(UI.bench.items.rotor)}</h2>
+      <p class="zoom-slide-label">${esc(UI.zoom.spinMode)}</p>
       ${level === 1 ? `<p class="zoom-hint">${UI.zoom.pullHint.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p>` : ''}
       <div class="zoom-stage zoom-stage--spin">
         <div class="zoom-figure zoom-figure--rotor" id="rotor-figure">${assetSvg('rotor', {
@@ -448,9 +503,9 @@ export function createZoom(root, store) {
         <dd id="spin-rhythm">${esc(UI.units.percent(Math.round(rhythmQuality(st.rotor) * 100)))}</dd>
         ${row(UI.controls.strength, UI.units.percent(Math.round(pullNow * 100)))}
       </dl>
-      <p class="zoom-note" id="spin-note">${esc(UI.zoom.pullCount(st.rotor.pulls))}</p>
+      <p class="zoom-hint" id="spin-note">${esc(UI.zoom.pullCount(st.rotor.pulls))}</p>
       ${balanceNote(st, imbalance)}
-      ${!st.rotor.slots.A && !st.rotor.slots.B ? `<p class="zoom-warn">${esc(UI.zoom.pullEmpty)}</p>` : ''}
+      ${!st.rotor.slots.A && !st.rotor.slots.B ? `<p class="zoom-hint" data-good="false">${esc(UI.zoom.pullEmpty)}</p>` : ''}
 
       ${seatControls(st)}
 
@@ -460,7 +515,7 @@ export function createZoom(root, store) {
       <div class="zoom-gauge">
         <div class="bar"><i class="fill" id="spin-obs-fill" style="width:${obs.score}%"></i></div>
         <div class="cap"><span>${esc(UI.observability.label)}</span><span id="spin-obs">${obs.score}</span></div>
-        ${level === 1 ? `<p class="hint">${esc(worstLabel ? UI.observability.hint(worstLabel) : UI.observability.allGood)}</p>` : ''}
+        <p class="hint" id="spin-obs-hint">${esc(gaugeHint(obs))}</p>
       </div>
 
       <button type="button" class="zoom-secondary" id="spin-stop">${esc(UI.zoom.stopButton)}</button>
@@ -468,7 +523,7 @@ export function createZoom(root, store) {
 
     body.querySelector('#spin-stop')?.addEventListener('click', () => {
       store.dispatch('STOP_ROTOR', {});
-      renderBody();
+      repaint();
     });
     body.querySelectorAll('[data-seat]').forEach((input) => {
       input.addEventListener('pointerdown', () => { busy = true; });
@@ -477,7 +532,7 @@ export function createZoom(root, store) {
           { skipNotify: true });
         paintSpin();
       });
-      const done = () => { busy = false; store.notify(); renderBody(); };
+      const done = () => { busy = false; store.notify(); repaint(); };
       input.addEventListener('pointerup', done);
       input.addEventListener('change', done);
     });
@@ -497,9 +552,9 @@ export function createZoom(root, store) {
    */
   function balanceNote(st, imbalance) {
     if (sampleSlot(st.rotor) === null) {
-      return `<p class="zoom-note">${esc(UI.zoom.sampleOut)}</p>`;
+      return `<p class="zoom-hint">${esc(UI.zoom.sampleOut)}</p>`;
     }
-    return `<p class="zoom-note ${imbalance > 0.25 ? 'zoom-note--warn' : 'zoom-note--good'}">
+    return `<p class="zoom-hint" data-good="${imbalance <= 0.25}">
         ${esc(imbalance > 0.25 ? UI.zoom.pullWobble : UI.zoom.pullBalanced)}</p>`;
   }
 
@@ -561,12 +616,14 @@ export function createZoom(root, store) {
     if (speed) speed.textContent = speedWord(st.rotor.speed);
     const rhythm = body.querySelector('#spin-rhythm');
     if (rhythm) rhythm.textContent = UI.units.percent(Math.round(rhythmQuality(st.rotor) * 100));
-    // 「결과의 읽을 만함」도 손을 놓은 뒤에 오른다 — 회전이 잦아드는 동안에도 계속 갈리므로.
+    // 「관찰 가능성」도 손을 놓은 뒤에 오른다 — 회전이 잦아드는 동안에도 계속 갈리므로.
     const obs = observability(params);
     const obsFill = body.querySelector('#spin-obs-fill');
     if (obsFill) obsFill.style.width = `${obs.score}%`;
     const obsNum = body.querySelector('#spin-obs');
     if (obsNum) obsNum.textContent = String(obs.score);
+    const obsHint = body.querySelector('#spin-obs-hint');
+    if (obsHint) obsHint.textContent = gaugeHint(obs);
   }
 
   /**
@@ -604,7 +661,7 @@ export function createZoom(root, store) {
       busy = false;
       store.dispatch('PULL', { strength: pullNow });
       pullNow = 0;
-      renderBody();
+      repaint();
     };
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
@@ -619,19 +676,14 @@ export function createZoom(root, store) {
     el.addEventListener('click', (e) => {
       if (e.detail !== 0) return;
       store.dispatch('PULL', { strength: 0.75 });
-      renderBody();
+      repaint();
     });
   }
 
   /* ---------------------------------------------------------------- */
 
+  store.subscribe(() => { if (!busy) repaint(); });
+
   /** 확대 뷰가 열려 있는가. 시계(main.js)가 얼마나 자주 알릴지 정할 때 본다. */
-  const isOpen = () => !root.hidden;
-
-  store.subscribe(() => {
-    if (root.hidden || busy) return;
-    renderBody();
-  });
-
-  return { open, close, isOpen, paint: paintSpin };
+  return { open, close, isOpen: shell.isOpen, paint: paintSpin };
 }

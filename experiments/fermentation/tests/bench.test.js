@@ -19,11 +19,12 @@ const STAGE_W_MM = CONTRACT.bench.realSizeMm;
 /** 조작표는 함수를 담고 있어 그냥은 못 본다. 아무것도 안 하는 store 로 종류 쌍만 뽑는다. */
 function tableShape() {
   const calls = [];
+  const opened = [];
   const store = {
     getState: () => ({ session: { level: 1 }, bench: {} }),
     dispatch: (type, payload) => { calls.push({ type, payload }); },
   };
-  return { drops: dropTable(store), taps: tapTable(store), calls, store };
+  return { drops: dropTable(store), taps: tapTable(store, (mode, id) => opened.push([mode, id])), calls, opened, store };
 }
 
 /* ================== 배치 ================== */
@@ -87,7 +88,7 @@ test('물건마다 긴 이름과 짧은 이름이 다 있다', () => {
 /* ================== 조작표 ================== */
 
 test('조작표가 부르는 액션이 전부 규칙 엔진에 있다', () => {
-  const { drops, taps, calls, store } = tableShape();
+  const { drops, calls, store } = tableShape();
   for (const [from, targets] of Object.entries(drops)) {
     for (const [to, run] of Object.entries(targets)) {
       calls.length = 0;
@@ -98,13 +99,27 @@ test('조작표가 부르는 액션이 전부 규칙 엔진에 있다', () => {
       }
     }
   }
-  for (const [kind, run] of Object.entries(taps)) {
-    calls.length = 0;
-    run({ kind }, null);
-    assert.ok(calls.length > 0, `${kind} 탭이 아무 액션도 부르지 않습니다`);
-    for (const c of calls) assert.ok(ACTIONS[c.type], `${kind} 탭이 없는 액션 ${c.type} 을 부릅니다`);
-  }
   void store;
+});
+
+/**
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ *
+ * 앞서는 발효관을 누르면 솜마개가 빠지고, 항온기를 누르면 꺼내졌다 — 눌러서 상태가 바뀌었다.
+ * 그리고 병·휴지·쓰레기통은 눌러도 아무 일이 없었다. 이제 **모든 물건이 누르면 자기 화면(item)을
+ * 열고, 상태는 바뀌지 않는다.** 솜마개 빼기·꺼내기·비우기·기록은 그 화면의 단추다.
+ */
+test('실험대의 모든 물건은 눌러도 조작이 일어나지 않는다 — 자기 화면이 열린다', () => {
+  const { taps, calls, opened } = tableShape();
+  const kinds = [...new Set(benchLayout().map((i) => i.kind))];
+  for (const kind of kinds) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = calls.length;
+    taps[kind]({ id: kind, kind }, null);
+    assert.equal(calls.length, before, `${kind} 를 누르는 것만으로 상태가 바뀝니다`);
+  }
+  assert.equal(opened.length, kinds.length);
+  assert.ok(opened.every(([mode]) => mode === 'item'), `누르면 물건 화면(item)이 열려야 합니다: ${JSON.stringify(opened)}`);
 });
 
 /**

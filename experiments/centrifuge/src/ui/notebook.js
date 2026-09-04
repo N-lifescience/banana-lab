@@ -448,9 +448,9 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
      * 해야 하는지**를 말한다.
      */
     const blockingWritten = groupNotesWritten(st, groups[blockingIdx], level);
-    const lockedHint = blockingWritten && nowIdx >= 0
+    const lockedWhy = blockingWritten && nowIdx >= 0
       ? N.stepLockedNeedBench(groups[nowIdx].id)
-      : N.stepLockedHint(blockingId);
+      : N.stepLockedWhy(blockingId);
     const stepsHtml = groups.map((group, gi) => {
       const isDone = groupsDone[gi];
       const isNow = gi === nowIdx;
@@ -526,12 +526,26 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         body = `<ul class="substep-list">${items}</ul>`;
       }
 
+      /*
+       * 잠긴 STEP 은 `<details>` 가 아니라 다른 껍데기로 그린다 — 열리는 척하다가 안 열리는
+       * 것이 가장 나쁘다. 제목은 그대로 남긴다 (몇 칸짜리 여정인지는 계속 보여야 한다).
+       * **왜 안 열리는지는 카드 안에** 적는다 (docs/09 §4) — 말 없는 회색 제목은 고장으로 읽힌다.
+       */
+      if (locked) {
+        return `
+        <div class="note-step note-step--locked" data-step-group="${group.id}"
+          data-state="locked" data-done="false" data-locked="true" data-locked-by="${blockingId}">
+          <div class="step-summary">
+            <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
+            <span class="step-open-hint">${N.stepLockedHint}</span>
+          </div>
+          <p class="step-locked-why">${lockedWhy}</p>
+        </div>`;
+      }
+
       // 접힌 STEP 에도 **「눌러서 열립니다」**를 적어 둔다. 말하지 않으면 잠긴 것으로 읽힌다.
-      // 잠긴 STEP 에는 **왜 안 열리는지**를 적는다 — 말 없는 회색 제목은 고장으로 읽힌다.
       const openHint = isNow ? ''
-        : `<span class="step-open-hint"${locked ? ' tabindex="-1" role="status"' : ''}>${
-          locked ? lockedHint
-            : (isDone ? N.stepReopenHint : N.stepPeekHint)}</span>`;
+        : `<span class="step-open-hint">${isDone ? N.stepReopenHint : N.stepPeekHint}</span>`;
 
       return `
         <details class="note-step" data-step-group="${group.id}"
@@ -823,14 +837,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     // **영영 접히지 않는다.** `click` 은 사람이 눌렀을 때만 온다
     // (summary 는 포커스를 받으므로 Enter·Space 도 click 으로 온다 — 키보드도 같이 산다).
     panelEl.querySelectorAll('details[data-step-group] > summary').forEach((el) => {
-      el.addEventListener('click', (e) => {
-        // 잠긴 STEP 은 열리지 않는다. **아무 일도 안 일어나면 고장으로 읽히므로**,
-        // 왜 안 열리는지 적어 둔 자리로 데려간다 (그 글은 이미 제목 줄에 있다).
-        if (el.parentElement.dataset.locked === 'true') {
-          e.preventDefault();
-          el.querySelector('.step-open-hint')?.focus();
-          return;
-        }
+      el.addEventListener('click', () => {
+        // 잠긴 STEP 은 <details> 가 아니라 여기 안 걸린다 — 카드 안에 왜 잠겼는지 적혀 있다.
         // 기본 동작이 아직 일어나기 전이라 `open` 은 누르기 **전**의 값이다.
         const id = el.parentElement.dataset.stepGroup;
         const willOpen = !el.parentElement.open;

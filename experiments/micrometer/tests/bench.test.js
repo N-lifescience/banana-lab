@@ -297,7 +297,26 @@ test('쓰레기통이 실험대에 있고 현미경과 겹치지 않는다', () 
   const box = benchLayout().find((it) => it.id === 'bin');
   const scope = benchLayout().find((it) => it.id === 'microscope');
   assert.ok(box.x + box.w < scope.x, '쓰레기통이 현미경 왼쪽에 있지 않습니다');
-  assert.equal(typeof UI.bench.items.bin, 'string');
-  assert.ok(/깨진|버리/.test(UI.bench.items.bin),
-    '이름이 무엇을 버리는 곳인지 말하지 않습니다 — 통이 넷이라 그냥 「쓰레기통」이면 모릅니다');
+  // 이름은 여덟 실험이 같다 (docs/09-uniformity.md §5). 통이 넷이라 무엇을 버리는 곳인지는
+  // **누르면 열리는 화면**이 말한다 — 그 문구가 버리는 일을 말하는지 여기서 본다.
+  assert.equal(UI.bench.items.bin, '쓰레기통');
+  assert.ok(/금이 간|깨진|버리/.test(UI.zoom.binRole),
+    '쓰레기통 화면이 무엇을 버리는 곳인지 말하지 않습니다 — 통이 넷이라 이름만으로는 모릅니다');
+});
+
+/**
+ * 쓰레기통도 누르면 자기 화면이 열린다 (docs/09-uniformity.md §2) — 눌러도 아무 일 없는
+ * 물건은 고장으로 읽힌다. 버리는 일은 여전히 끌어다 놓는 손짓뿐이다 (`dropTable`).
+ */
+test('쓰레기통은 눌러도 버려지지 않는다 — 자기 화면이 열린다', () => {
+  const opened = [];
+  let dispatched = 0;
+  const store = { getState: () => ({ microscope: { stage: null } }), dispatch: () => { dispatched++; } };
+  const taps = tapTable(store, (mode, id) => opened.push([mode, id]));
+  assert.equal(typeof taps.bin, 'function', '쓰레기통은 눌러도 아무 일이 없습니다');
+  taps.bin({ id: 'bin', kind: 'bin' }, null);
+  assert.deepEqual(opened, [['item', 'bin']]);
+  assert.equal(dispatched, 0, '누르는 것만으로 상태가 바뀌었습니다');
+  // 모든 물건이 누르면 화면을 연다 — 표에 빠진 종류가 없다.
+  for (const kind of BENCH_KINDS) assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
 });

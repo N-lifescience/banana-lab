@@ -48,7 +48,11 @@ test('observability 가 돌려주는 worst 는 모두 사람이 읽는 말이 �
   for (const key of Object.keys(factors)) {
     assert.equal(typeof UI.observability.worst[key], 'string',
       `UI.observability.worst.${key} 가 없습니다 — 게이지에 undefined 가 뜹니다`);
+    // 100 아래면 **무엇을 하면 되는지**까지 말한다 (docs/09 §3). 항목 이름만으로는 손이 안 간다.
+    assert.equal(typeof UI.observability.fix[key], 'string',
+      `UI.observability.fix.${key} 가 없습니다 — 게이지가 항목 이름만 대고 무엇을 하라는지 말하지 않습니다`);
   }
+  assert.equal(UI.observability.hint('실린 색소량', '더 찍으세요'), '지금 가장 크게 깎이는 항목: 실린 색소량 — 더 찍으세요');
 });
 
 test('실제로 나올 수 있는 worst 값이 모두 문자열 표에 있다', () => {

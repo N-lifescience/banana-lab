@@ -265,16 +265,17 @@ test('온도계 기둥은 실온에서도 서 있다 — 빈 관은 0 ℃ 로 �
 /**
  * **단추 이름은 여섯 군데에 적혀 있다.**
  *
- * 화면(`UI.zoom.record`) 하나가 출처인데, 안내문·탐구 노트의 예시·방침·플레이 문서가
+ * 화면(`UI.zoom.capture`) 하나가 출처인데, 안내문·탐구 노트의 예시·방침·플레이 문서가
  * 그 이름을 **손으로** 적는다. 이름을 고치는 사람은 자기가 연 파일만 보므로,
  * 나머지가 옛 이름으로 남아 **없는 단추를 누르라고** 말하게 된다.
- * (실제로 「지금 결과 기록」에서 「두 챔버 결과 기록」으로 고치며 다섯 곳이 낡을 뻔했다)
+ * (실제로 「지금 결과 기록」에서 「두 챔버 결과 기록」으로, 다시 통일 규격의 「결과 기록」으로
+ * 고치며 다섯 곳이 낡을 뻔했다)
  *
  * 방침(`privacy.html`)이 특히 그렇다 — 무엇을 언제 보내는지 적는 문서라
  * 없는 단추 이름이 적혀 있으면 **읽는 사람이 그 항목을 못 찾는다.**
  */
 test('결과 기록 단추 이름이 적힌 곳이 화면과 같다', () => {
-  const label = UI.zoom.record;
+  const label = UI.zoom.capture;
   assert.ok(label && label.length > 3, '결과 기록 단추 이름을 못 찾았습니다');
 
   // 방침은 **사이트 것**이라 뿌리에 있다 (실험이 여덟이어도 하나다).
@@ -285,8 +286,8 @@ test('결과 기록 단추 이름이 적힌 곳이 화면과 같다', () => {
   let found = 0;
   for (const [f, base] of where) {
     const text = readFileSync(new URL(f, base), 'utf8');
-    // 화면에 낼 이름 그 자체(`record:` 정의)는 세지 않는다 — 그것이 출처다.
-    const body = text.replace(/record: '[^']*'/, '');
+    // 화면에 낼 이름 그 자체(`capture:` 정의)는 세지 않는다 — 그것이 출처다.
+    const body = text.replace(/capture: '[^']*'/, '');
     for (const [, quoted] of body.matchAll(/「([^」]*결과 기록[^」]*)」/g)) {
       found += 1;
       const plain = quoted.replace(/\*/g, '').trim();   // 마크다운 굵게 표시를 벗긴다

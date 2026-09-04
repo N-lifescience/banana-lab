@@ -27,7 +27,7 @@ import { advance, sensorReading, OBSERVE_LIMIT_MIN } from './metabolism.js';
  * TICK 을 무르는 데 쓰여 사라진다.
  */
 export const TRANSIENT_ACTIONS = new Set([
-  'TICK', 'NOTE_PRACTICE', 'MARK_READ',
+  'TICK', 'MARK_READ',
 ]);
 
 /**
@@ -78,22 +78,6 @@ function withChamber(state, id, patch) {
 function snapshot(state) {
   return { ...state, session: { ...state.session, history: [] } };
 }
-
-/**
- * 실제 실험에서 해야 하는 일 — **적어 두기만 한다.**
- *
- * 문구를 `src/ui/strings.js` 가 아니라 여기 둔다. `src/sim/` 은 `src/ui/` 를 보지 않는다 —
- * 그 경계가 있어야 규칙을 `node --test` 로 검증할 수 있다. 다른 조작 문구도 전부 여기 있다.
- *
- * **앱은 이것을 확인하지 않는다**는 말을 문구마다 담는다. 안 밝히면 학생이
- * 「어딘가 채점되고 있나」 하고 눈치를 본다.
- */
-const PRACTICE_NOTES = {
-  waste: '실제 실험에서는 BTB 폐액을 싱크대에 붓지 않고 폐액통에 모읍니다. '
-    + '이 앱은 그것을 확인하지 않습니다.',
-  bin: '실제 실험에서는 쓰고 난 콩과 종이를 쓰레기통에 버리고, 실험대를 닦아 둡니다. '
-    + '이 앱은 그것을 확인하지 않습니다.',
-};
 
 /* ------------------------------------------------------------------ */
 /* 액션                                                                */
@@ -471,22 +455,11 @@ export const ACTIONS = {
     return ok({ ...state, session: { ...state.session, readStages: [...read, stage] } });
   },
 
-  /**
-   * 실제 실험에서 해야 하는 일을 **말해 준다.** 판정하지 않는다.
-   *
-   * 앞서는 손 씻기·마개 닫기·폐액 버리기를 조작으로 두고 **지켰는지 세었다.** 그러면
-   * 평가되는 것이 안전 습관이 아니라 **화면 속 단추를 눌렀다는 사실**이다 — 조작 순서
-   * 외우기가 된다. 진짜 마개는 교실에서 닫는다. 그래서 세는 것을 전부 걷어내고,
-   * 그 자리에 **가만히 적힌 안내**만 남겼다.
-   *
-   * 상태를 하나도 바꾸지 않는다. 기록도 점수도 남지 않는다 —
-   * 누른 물건이 자기 쓰임을 한 번 말할 뿐이다.
+  /*
+   * 폐액통·쓰레기통을 누르면 뜨던 안내(`NOTE_PRACTICE`)는 걷어냈다 — 누르는 것만으로
+   * dispatch 하는 물건은 없다 (docs/09-uniformity.md §2). 그 말은 물건 화면의 덧붙일 말이
+   * 됐다 (`UI.zoom.item.wastePractice`·`binPractice`). 안전 수칙은 여전히 세지 않는다.
    */
-  NOTE_PRACTICE(state, { kind }) {
-    const line = PRACTICE_NOTES[kind];
-    if (!line) return ok(state);
-    return ok(state, line, 'practice');
-  },
 
   /** 세부 단계별 관찰 기록 */
   SAVE_NOTE(state, { step, text = '' }) {

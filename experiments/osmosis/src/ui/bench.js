@@ -242,21 +242,25 @@ export function dropTable(store, openZoom = () => {}) {
 }
 
 /**
- * 물건을 클릭(또는 Enter/Space)했을 때. 끌어다 놓는 조작과 달리 대상이 필요 없는 것들.
+ * 물건을 클릭(또는 Enter/Space)했을 때.
  *
- * 시약병·폐액통·휴지의 안전 수칙은 늦게라도 하면 자기 평가의 위반 기록에서 지워진다
- * (rules.js 의 safetyAction). 그 셋을 부르는 곳이 여기 말고는 없다 —
- * 없으면 위반 기록이 한 번 남고 영영 지워지지 않는다.
+ * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+ * 눌러서 상태가 바뀌는 물건은 하나도 없다 — 칼집·표피 벗기기도 비늘잎 화면의 단추다.
+ * 모든 물건이 누르면 자기 화면을 연다. 「무엇을 받는 곳인지」를 그 화면이 말한다.
+ * 실험대에서 상태를 바꾸는 손짓은 끌어다 놓기(`dropTable`)뿐이다.
+ *
+ * 용액병·폐액통·휴지의 안전 수칙 탭(마개 닫기·폐액 버리기·손 씻기)은 걷어냈다 — 가상 실험에서
+ * 그것을 따지면 안전 습관이 아니라 화면 속 단추를 눌렀다는 사실을 평가하게 된다.
  */
 export function tapTable(store, onOpenZoom) {
+  const view = (item, el) => onOpenZoom('item', item.id, el);
   return {
-    // 어느 면을 벗길지 고르고 벗기는 것은 손끝 일이다. 확대 뷰에서 한다.
+    // 어느 면을 벗길지 고르고 벗기는 것은 손끝 일이다. 비늘잎 화면에서 한다.
     onion: (item, el) => onOpenZoom('onion', null, el),
     slide: (item, el) => onOpenZoom('slide', item.slide, el),
     microscope: (item, el) => onOpenZoom('scope', store.getState().microscope.stage, el),
-    // 시약병·폐액통·휴지는 **누르는 조작이 없다.** 안전·정리 판정을 걷어내면서 함께 뺐다.
-    // 셋 다 **끌기 쓰임은 그대로**다 — 휴지→현미경(렌즈 닦기), 폐액통·시약병←스포이트.
-    // 끌기까지 없었다면 눌러도 아무 일 없는 물건이 남으므로 실험대에서 뺐어야 한다.
+    blade: view, coverslip: view, slidebox: view, dropper: view, forceps: view,
+    filterpaper: view, bottle: view, waste: view, sink: view, tissue: view, bin: view,
   };
 }
 

@@ -206,22 +206,32 @@ test('눌러도 아무 일도 안 나는 물건이 실험대에 없다', () => {
   }
 });
 
-test('폐액통과 쓰레기통은 실제 실험에서 할 일을 말한다 — 판정하지 않는다', () => {
-  // 판정을 걷어낸 자리에 **가만히 적힌 안내**만 남긴다. 상태는 하나도 바뀌지 않는다.
-  for (const kind of ['waste', 'bin']) {
-    const store = fakeStore();
-    tapTable(store, () => {})[kind]({ kind }, null);
-    assert.deepEqual(store.calls, [{ type: 'NOTE_PRACTICE', payload: { kind } }],
-      `${kind} 을 눌러도 안내가 안 나옵니다`);
+test('모든 물건은 눌러도 조작이 일어나지 않는다 — 자기 화면이 열린다', () => {
+  /*
+   * **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+   * 폐액통·쓰레기통은 한동안 누르면 알림(`NOTE_PRACTICE`)을 띄웠다 — 이제 그 말은
+   * 물건 화면의 덧붙일 말이고, 누르는 것만으로 dispatch 하는 물건은 하나도 없다.
+   * **말없이 먹통인 물건도 남기지 않는다** — 실험대의 모든 종류가 표에 있어야 한다.
+   */
+  const store = fakeStore();
+  const opened = [];
+  const taps = tapTable(store, (mode, id) => opened.push([mode, id]));
+  for (const kind of BENCH_KINDS) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = store.calls.length;
+    taps[kind]({ id: kind === 'chamber' ? 'chamberR' : kind, kind, chamber: 'R' }, null);
+    assert.equal(store.calls.length, before, `${kind} 를 누르는 것만으로 상태가 바뀝니다`);
   }
+  assert.ok(opened.every(([mode]) => mode === 'chamber' || mode === 'item'),
+    `누르면 챔버 화면이나 물건 화면이 열려야 합니다: ${JSON.stringify(opened)}`);
 });
 
-test('챔버와 센서를 누르면 그 챔버의 확대 뷰가 열린다', () => {
-  for (const kind of ['chamber', 'sensor']) {
-    const opened = [];
-    tapTable(fakeStore(), (...a) => opened.push(a))[kind]({ kind, chamber: 'R' }, null);
-    assert.deepEqual(opened, [['R', null]], `${kind} 를 눌러도 확대 뷰가 안 열린다`);
-  }
+test('챔버를 누르면 그 챔버의 확대 뷰가, 센서를 누르면 센서 자기 화면이 열린다', () => {
+  const opened = [];
+  const taps = tapTable(fakeStore(), (...a) => opened.push(a));
+  taps.chamber({ id: 'chamberR', kind: 'chamber', chamber: 'R' }, null);
+  taps.sensor({ id: 'sensorR', kind: 'sensor', chamber: 'R' }, null);
+  assert.deepEqual(opened, [['chamber', 'R', null], ['item', 'sensorR', null]]);
 });
 
 /* ---------------- 편집 모드가 내는 코드 ---------------- */
@@ -317,7 +327,8 @@ test('편집 모드 안내문이 실제 배치 동작과 같은 말을 한다', 
  * 실기 확인은 아이폰 사파리라야 한다. 여기서 지키는 것은 **규칙이 사라지지 않는 것**뿐이다.
  */
 test('폰에서 길게 누르기 메뉴를 막는 규칙이 실험대에 남아 있다', () => {
-  const css = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const css = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
 
   // [앞 조건] 실험대 CSS 를 실제로 읽었는가. 못 읽으면 「0곳이 다 맞다」가 된다.
   assert.match(css, /\.bench-stage\s*[,{]/, '실험대 CSS 를 못 찾았습니다 — 이름이 바뀌었으면 이 검사도 고치세요');
@@ -330,7 +341,8 @@ test('폰에서 길게 누르기 메뉴를 막는 규칙이 실험대에 남아 
     .map(([, sel]) => sel.replace(/\s+/g, ' ').trim());
   assert.ok(rules.length > 0, '길게 누르기 메뉴를 막는 규칙이 하나도 없습니다');
 
-  const covered = (name) => rules.some((sel) => sel.includes(name));
+  // 공용 CSS 는 `.bench-stage *` 로 무대 안 전부(물건 층 포함)를 한 번에 막는다 — 그것도 덮은 것으로 센다.
+  const covered = (name) => rules.some((sel) => sel.includes(name) || (name !== '.bench-stage' && /\.bench-stage \*/.test(sel)));
   const missing = ['.bench-stage', '.bench-tokens', '.token'].filter((n) => !covered(n));
   assert.deepEqual(missing, [], [
     `실험대에서 길게 누르면 복사 메뉴가 뜹니다 — 안 막힌 자리: ${missing.join(' · ')}`,

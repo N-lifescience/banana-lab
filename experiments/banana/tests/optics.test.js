@@ -58,3 +58,15 @@ test('초점 심도는 고배율일수록 얕다', () => {
   assert.ok(a > b && b > c, '4배 > 10배 > 40배 순으로 넉넉해야 합니다');
   assert.ok(c < 0.05, '400배는 매우 좁아야 저배율 선행의 이유가 생깁니다');
 });
+
+/*
+ * 저배율에서 합격한 어떤 자리에서도 **미동나사만으로** 고배율 초점에 닿아야 한다 (docs/09 §3.1).
+ * micrometer 가 10배 허용 범위(0.24)가 미동 폭(0.2)보다 커서 「40배에서 조동나사를 돌리려다
+ * 깨지는」 자리를 겪었다. 여기는 0.12 < 0.2 라 닿는다 — 그 관계가 무너지면 여기서 운다.
+ */
+import { KNOB_SPAN } from '../src/sim/optics.js';
+test('저배율(10배)에서 맞춘 잔차는 미동나사 폭 안에 든다 — 조동나사 없이 40배에 닿는다', () => {
+  assert.ok(focusTolerance(10) < KNOB_SPAN.fine,
+    `10배 허용 ${focusTolerance(10)} 이 미동 폭 ${KNOB_SPAN.fine} 보다 커서 미동만으로는 못 닿습니다`);
+  assert.ok(focusTolerance(4) <= KNOB_SPAN.coarse);
+});

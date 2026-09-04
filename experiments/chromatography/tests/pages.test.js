@@ -54,6 +54,8 @@ const PAGES = ['index.html'];   // 방침·선생님 화면은 사이트 것 —
 
 const read = (name) => readFileSync(
   new URL(SITE_WIDE.has(name) ? `../../../${name}` : `../${name}`, import.meta.url), 'utf8');
+/** 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1). */
+const readShell = () => readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
 
 /**
  * 사람 눈에 닿는 부분만 남긴다 — `<style>` · `<script>` · 주석을 걷어낸다.
@@ -140,7 +142,7 @@ test('다른 실험의 배포 주소를 가리키지 않는다', () => {
  * ------------------------------------------------------------------ */
 
 test('실험대는 길게 눌러도 돋보기·글자 고르기가 안 뜬다 (소스에서 본다)', () => {
-  const html = read('index.html');
+  const html = readShell();
   const stage = html.match(/\.bench-stage\s*\{[^}]*\}/s)?.[0] ?? '';
   assert.ok(stage, '.bench-stage 규칙을 못 찾았습니다 — 이 검사가 헛돕니다');
 
@@ -157,7 +159,7 @@ test('실험대는 길게 눌러도 돋보기·글자 고르기가 안 뜬다 (�
 });
 
 test('탐구 노트에는 글자 고르기를 막지 않는다 — 붙여넣기가 죽는다', () => {
-  const html = read('index.html');
+  const html = readShell();
   for (const sel of ['#notebook', '#note-panel']) {
     const rule = html.match(new RegExp(`\\${sel}\\s*\\{[^}]*\\}`, 's'))?.[0] ?? '';
     assert.doesNotMatch(rule, /user-select\s*:\s*none/,

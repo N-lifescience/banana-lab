@@ -191,8 +191,9 @@ test('실험대 무대가 길게 누르기를 막는다 — 노트는 안 막는
    *
    * ★ **탐구 노트에는 걸리면 안 된다** — 붙여넣기와 글자 고르기가 죽는다.
    */
-  const html = stripComments(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const rule = html.match(/\.bench-stage\{[^}]*\}/)?.[0];
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = stripComments(readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8'));
+  const rule = html.match(/\.bench-stage\s*\{[^}]*\}/)?.[0]?.replace(/\s+/g, '');
   assert.ok(rule, '.bench-stage 규칙을 못 찾았습니다 — 이름이 바뀌었으면 이 검사도 고치세요');
 
   for (const need of ['user-select:none', '-webkit-user-select:none', '-webkit-touch-callout:none']) {
@@ -593,11 +594,12 @@ test('통·상자 셋이 한 화면을 쓰고, 열린 통 안을 그리고, 단�
   // 통 그림은 **열린 상태**로 그린다 — 닫힌 통을 그리면 안이 안 보인다.
   assert.ok(/ASSETS\[view\.asset\]\.render\(\{ open: true/.test(src),
     '통을 열린 상태로 그리지 않습니다 — 「진짜 통 내부처럼」이 되지 않습니다');
-  // 단추는 하나뿐이다.
+  // 단추는 하나뿐이다. 화면은 공용 `renderItemView` 가 그리므로 단추는 `actions` 의 id 로 센다.
   const boxBtns = src.slice(src.indexOf('function renderBoxMode'), src.indexOf('function renderItemMode'));
-  const ids = boxBtns.match(/id="[a-z-]+"/g) ?? [];
-  assert.deepEqual([...new Set(ids)], ['id="box-figure"', 'id="box-take"'],
+  const ids = boxBtns.match(/id: '[a-z-]+'/g) ?? [];
+  assert.deepEqual([...new Set(ids)], ["id: 'box-take'"],
     `통 화면에 단추가 「꺼내기」 말고 더 있습니다: ${ids.join(', ')}`);
+  assert.ok(/label: UI\.zoom\.takeOut/.test(boxBtns), '통 화면의 단추가 「꺼내기」(UI.zoom.takeOut)가 아닙니다');
 
   // 설명 세 줄이 다 있다 — ① 무엇이 들었나 ② 하는 일 ③ 그림.
   assert.equal(typeof UI.zoom.boxHolds('접안 마이크로미터'), 'string');

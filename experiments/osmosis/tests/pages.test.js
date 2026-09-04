@@ -328,7 +328,8 @@ test('편집 모드 안내가 「자동으로 붙는다」고 말하지 않는�
  *   그쪽은 화면에서 `auto` 인지 잰다.
  */
 test('실험대 무대에 아이폰 길게 누르기 막이가 걸려 있다', () => {
-  const html = read('index.html');
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const html = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
   const block = html.match(/\.bench-stage\s*\{[^}]*\}/)?.[0];
   assert.ok(block, '   (앞 조건) .bench-stage 규칙을 찾았다');
   assert.match(block, /-webkit-touch-callout\s*:\s*none/,

@@ -1,0 +1,538 @@
+/*
+ * 실험 화면의 껍데기 — 여덟 실험이 **이 파일 하나**를 쓴다.
+ *
+ * ── 왜 한 파일인가 ──────────────────────────────────────────────────
+ * 실험마다 index.html 에 CSS 를 통째로 복제해 두었더니, 저마다 다른 자리에서 다른 것을
+ * 고쳐 여덟 화면이 전부 조금씩 달라졌다 (2026-09-03 조사 — 정본인 banana 에는 탐구 과정
+ * STEP 카드의 CSS 가 아예 없었고, 알림 닫기 단추 크기·잠긴 STEP 의 모양·자기 평가 척도가
+ * 실험마다 달랐다). 사장님 지시: 「실험간, 실험기기간 통일성이 중요해」.
+ *
+ * 규칙은 `docs/09-uniformity.md` 에 있다. 여기 있는 선택자는 **실험 index.html 의 <style>
+ * 에 다시 적지 않는다** — `tests/uniformity.test.js` 가 잡는다. 실험 고유의 위젯
+ * (원심분리기의 끈·박자, 크로마토그래피의 띠, 챔버 카드 …)만 실험 쪽에 남긴다.
+ *
+ * 색 토큰은 라이트/다크 두 벌뿐이다. 새 색을 여기 더하지 말고 토큰을 쓴다.
+ */
+
+:root{
+  --ground:#F4F6F1; --surface:#FFFFFF; --sunk:#EDF0E9;
+  --ink:#171A22; --ink-mute:#5B6172; --rule:#D7DCCF;
+  --indigo:#26348C; --good:#2F6B4F; --warn:#9C5A12;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ground:#12141A; --surface:#1A1D25; --sunk:#22262F;
+    --ink:#E9ECE4; --ink-mute:#949BAA; --rule:#2E3441;
+    --indigo:#94A4F2; --good:#7EC6A2; --warn:#E3A868;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;
+  word-break:keep-all}
+/* 단추는 배경까지 물려받는다. color 만 물려받으면 다크 모드에서 밝은 글자가 밝은 기본 바탕에 얹힌다. */
+button{font:inherit;color:var(--ink);background:var(--sunk);
+  border:1px solid var(--rule);border-radius:5px;cursor:pointer}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+/* 결과 렌더러가 내는 SVG 의 글자색 — 다크 모드에서 검정 글자가 검정 바탕에 묻히던 자리. */
+svg[data-render]{color:var(--ink)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── 큰 틀: 왼쪽 실험대 · 오른쪽 탐구 노트 ───────────────────────── */
+.layout{display:grid;grid-template-columns:1.5fr 1fr;gap:0;height:100vh}
+@media (max-width:860px){.layout{grid-template-columns:1fr;height:auto}}
+/* 실험대 판이 무대 밖으로 몇 px 삐져나가면 윈도우·크롬북에서 가로 스크롤바가 생긴다. */
+#bench{position:relative;overflow:auto;overflow-x:hidden;background:var(--sunk);display:flex;
+  flex-direction:column;gap:10px;padding:12px}
+/* 오른쪽 기둥. 설계 실험(catalase·fermentation)은 노트 아래에 실험 설계·결과 그래프가 더 오므로
+   `#side` 가 기둥이고 `#notebook` 은 그 안의 한 칸이다. 나머지는 `#notebook` 이 곧 기둥이다. */
+#notebook,#side{overflow-y:auto;padding:20px 22px;border-left:1px solid var(--rule);background:var(--surface)}
+#side #notebook{overflow:visible;padding:0;border:0;background:none}
+#side > * + *{margin-top:18px}
+
+/* ── 실험대 상단 막대 — 되돌리기 · 남은 횟수 · 문맥 단추 ─────────────── */
+.bench-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  position:sticky;top:-12px;z-index:10;background:var(--sunk);padding:12px 0 8px;margin-top:-12px}
+.bench-bar button{border:1px solid var(--rule);background:var(--surface);border-radius:5px;
+  padding:7px 12px;cursor:pointer;font-size:13px}
+.bench-bar span{font-size:12.5px;color:var(--ink-mute);font-family:ui-monospace,monospace}
+/* 시계·시행 수처럼 살아 움직이는 숫자. 실제 시간이 아니라 빨리 돌린 시간이라는 것을 색으로 말한다. */
+.bench-clock{font-family:inherit!important;color:var(--good)!important;font-weight:600}
+.bench-clock[hidden]{display:none}
+/* 실험대 위에 크게 보이는 결과 그릇 (설계 실험의 비커·발효관). */
+.bench-watch{background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+  padding:8px;display:flex;justify-content:center}
+.bench-watch svg{width:auto;max-height:200px;display:block}
+
+/* ── 무대 ─────────────────────────────────────────────────────────────
+   아이폰에서 길게 누르면 돋보기가 뜨고 글자가 골라진다. 무대 안에서만 막는다.
+   ★ `touch-action:none` 이 아니다 — 무대에 `none` 을 걸면 그 위에서 세로로 밀 때 쪽이 안 넘어간다.
+   ★ 탐구 노트에는 절대 걸지 않는다 — 글칸에서 붙여넣기·고르기가 죽는다. */
+.bench-stage{position:relative;width:100%;aspect-ratio:4/3;
+  background:#DDE3DA;border-radius:6px;
+  touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.bench-stage *{-webkit-touch-callout:none}
+.bench-bg{position:absolute;inset:0}
+.bench-bg svg{width:100%;height:100%;display:block}
+.bench-tokens{position:absolute;inset:0}
+.token{position:absolute;background:none;border:none;padding:0;margin:0;cursor:grab;
+  touch-action:none;line-height:0;border-radius:6px;pointer-events:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.token svg{width:100%;height:auto;display:block;pointer-events:auto;
+  -webkit-user-drag:none;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+.token[data-small="true"]::after{pointer-events:auto}
+.token:active,.token--dragging{cursor:grabbing;z-index:5}
+/* 끄는 물건은 살짝 비친다 — 큰 것을 끌 때 아래 놓을 곳의 강조가 가려지면 어디에 놓이는지 안 보인다. */
+.token--dragging{opacity:.72}
+.token:hover::after,.token:focus-visible::after{background:rgba(255,255,255,.18)}
+.token-name{position:absolute;user-select:none;-webkit-user-select:none;
+  transform:translate(-50%,calc(2px + var(--name-row,0) * 15px));
+  white-space:nowrap;pointer-events:none;font-style:normal;
+  font-size:10.5px;line-height:1.3;color:#2F2A20;
+  background:rgba(255,255,255,.82);border-radius:3px;padding:0 3px}
+/* 그림은 그대로 두고 잡는 영역만 44px 로 넓힌다 — realSizeMm 비례를 지키면서 손가락이 빗나가지 않게. */
+.token::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  min-width:44px;min-height:44px;width:100%;height:100%;border-radius:8px}
+.token:focus-visible{outline:none}
+.token:focus-visible::after{outline:2px solid var(--indigo);outline-offset:2px}
+/* 끌고 있을 때 「여기에 무언가 일어난다」 표시. 된다/안 된다가 아니다. */
+.token--target::after{outline:2px dashed var(--indigo);outline-offset:3px;
+  background:rgba(38,52,140,.10)}
+.token--target-hot::after{outline-style:solid;outline-width:3px;background:rgba(38,52,140,.22)}
+.token--inert{opacity:.45}
+/* 얼마나 됐는지 보여 주는 작은 띠 (문지르기 등). 없으면 하는 중인 줄을 모른다. */
+.smear-meter{position:absolute;left:50%;top:-12px;transform:translateX(-50%);
+  width:56px;height:6px;border-radius:3px;background:var(--sunk);
+  border:1px solid var(--rule);overflow:hidden;pointer-events:none;line-height:0}
+.smear-meter i{display:block;height:100%;background:var(--indigo);width:0}
+
+/* ── 말풍선 ─────────────────────────────────────────────────────────
+   몸통은 포인터를 통과시킨다 — 말풍선이 덮은 자리의 물건이 눌러도 안 집히면 콘솔 오류 한 줄 없이
+   아무 일도 안 일어난다. 「여기에 놓기」 **단추만** 포인터를 받는다. */
+.bench-tip{position:absolute;transform:translate(-50%,calc(-100% - 10px));
+  z-index:20;pointer-events:none;max-width:min(280px,60%);
+  background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+  border-radius:7px;padding:8px 10px;box-shadow:0 4px 14px rgba(0,0,0,.18);
+  font-size:12.5px;line-height:1.45}
+.bench-tip[data-below="true"]{transform:translate(-50%,10px)}
+.bench-tip [data-onto]{pointer-events:auto}
+.tip-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;
+  border-top:1px solid var(--rule);padding-top:8px}
+.tip-actions-label{flex:0 0 100%;font-size:11.5px;color:var(--ink-mute)}
+.tip-actions button{font-size:11.5px;padding:4px 8px;border-radius:4px}
+.bench-tip b{display:block;font-size:13px;margin-bottom:2px}
+.bench-tip span{display:block;color:var(--ink-mute);margin-top:3px}
+.bench-tip[hidden]{display:none}
+
+/* ── 배치 편집 ──────────────────────────────────────────────────── */
+.edit-panel{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:12px 14px}
+.edit-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+.edit-head button{padding:5px 10px;font-size:12.5px}
+.edit-note{font-size:12px;color:var(--ink-mute);margin:6px 0 10px}
+.edit-table{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px}
+.edit-table td{padding:2px 14px 2px 0;white-space:nowrap}
+.edit-table .edit-x{text-align:right;font-weight:700}
+.edit-table .edit-span{text-align:right;color:var(--ink-mute)}
+.edit-warn{font-size:12.5px;color:var(--warn);margin:0 0 10px;line-height:1.5}
+.edit-table .edit-bad td{color:var(--warn);font-weight:700}
+.edit-x-tag{position:absolute;left:50%;top:-2px;transform:translate(-50%,-100%);
+  background:var(--indigo);color:#fff;border-radius:3px;padding:1px 4px;
+  font:700 11px/1.3 ui-monospace,monospace;font-style:normal;pointer-events:none}
+
+/* ── 실험대 자물쇠 — 노트 1~4 쪽을 읽어야 열린다 ─────────────────── */
+.bench-lock{position:absolute;inset:0;z-index:30;border-radius:6px;
+  background:rgba(18,20,26,.62);display:flex;align-items:center;justify-content:center;
+  padding:16px;text-align:center}
+.bench-lock[hidden]{display:none}
+.bench-lock-card{background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+  border-radius:9px;padding:16px 18px;max-width:380px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+.bench-lock-card b{display:block;font-size:14.5px;margin-bottom:6px}
+.bench-lock-card p{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;line-height:1.5}
+.bench-lock-card ul{margin:0;padding-left:18px;text-align:left;font-size:13px}
+
+/* ── 탐구 노트 ──────────────────────────────────────────────────── */
+#notebook h1{font-size:17px;margin:0 0 14px}
+#notebook h2{font-size:15px;margin:0 0 8px}
+#notebook h3{font-size:13.5px;margin:16px 0 8px}
+#notebook h4{font-size:12.5px;margin:0 0 4px;color:var(--ink-mute)}
+.note-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.note-head h1{margin-bottom:14px}
+.note-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
+.note-tab{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+  padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
+.note-tab[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+.note-tab[data-read="true"]::after{content:" ✓";color:var(--good);font-weight:700}
+.note-tab[aria-selected="true"][data-read="true"]::after{color:var(--surface)}
+.note-lead,.stage-text{font-size:14px}
+.note-empty,.stage-empty{color:var(--ink-mute);font-size:13.5px}
+.note-aside{background:var(--sunk);border-radius:6px;padding:12px 14px;margin:12px 0}
+.note-aside h3{margin-top:0}
+/* 쪽 머리의 안내 상자 (예상 쪽 머리말, 탐구 과정 머리말). */
+.predict-lead{background:var(--sunk);border-radius:8px;padding:12px 14px;margin:0 0 14px;
+  font-size:13.5px;line-height:1.65}
+.predict-lead p{margin:0 0 8px}
+.predict-lead p:last-child{margin:0}
+.step-lead{background:var(--sunk);border-radius:8px;padding:10px 13px;margin:0 0 14px;font-size:13px}
+/* 보고서 만들기 자리 — 노트 머리 오른쪽. */
+.report-slot{flex:0 0 auto;max-width:58%}
+#make-report{padding:6px 11px;font-size:12.5px;white-space:nowrap}
+.report-todo{font-size:12px;color:var(--warn);border:1px solid var(--rule);
+  border-radius:6px;padding:6px 9px;background:var(--sunk)}
+.report-todo summary{cursor:pointer;white-space:nowrap}
+.report-todo ul{margin:6px 0 0;padding-left:16px;color:var(--ink-mute);line-height:1.5}
+
+/* 글칸 — 노트 어디서나 같은 모양. */
+textarea[data-note],input[data-note],.note-input{width:100%;min-height:64px;resize:vertical;
+  border:1px solid var(--rule);border-radius:5px;background:var(--sunk);color:var(--ink);
+  padding:8px;font:inherit;font-size:13px}
+input[data-note]{min-height:0}
+.notes-label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-mute);margin-bottom:6px}
+/* 서술형 첨삭 한 줄. */
+.grade-block{margin-bottom:18px}
+.grade-line{font-size:12.5px;margin:6px 0 0}
+.grade-line[data-grade="more"]{color:var(--warn)}
+.grade-line[data-grade="pass"]{color:var(--good)}
+.grade-line[data-grade="unavailable"]{color:var(--ink-mute)}
+
+/* 4쪽 탐구 과정 — STEP 카드.
+   지금 할 STEP 하나만 펼쳐 두고, 앞으로 올 것도 지우지 않는다 — 몇 칸짜리 여정인지 보여야 자기가
+   어디쯤인지 안다. 잠긴 것은 회색으로 죽이지 않고 **왜 잠겼는지**를 적는다. */
+.step-tally{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;font-weight:600}
+.step-tally--done{color:var(--good)}
+.note-step{margin-bottom:12px}
+.step-summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;cursor:pointer;
+  list-style:none;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;
+  background:var(--sunk)}
+.step-summary::-webkit-details-marker{display:none}
+.step-summary::before{content:'▸';color:var(--ink-mute);flex:none;font-size:11px}
+.note-step[open] > .step-summary::before{content:'▾'}
+.step-summary:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+.step-summary-title{font-size:13.5px;font-weight:700;margin:0;display:inline}
+.step-done-mark{color:var(--good);font-weight:700;margin-left:6px}
+.step-now-badge{font-size:11.5px;font-weight:700;color:var(--surface);background:var(--indigo);
+  border-radius:999px;padding:2px 9px;flex:none}
+.step-open-hint{margin-left:auto;font-size:11.5px;color:var(--ink-mute);flex:none}
+.note-step[data-state="now"] > .step-summary{border-color:var(--indigo);background:var(--surface)}
+.note-step[data-state="done"] > .step-summary{border-color:var(--good)}
+.note-step[data-state="later"] > .step-summary{opacity:.6}
+.note-step[data-state="later"] > .step-summary:hover,
+.note-step[data-state="later"] > .step-summary:focus-within{opacity:1}
+.step-body{padding:12px 0 4px 14px;border-left:2px solid var(--rule);margin-left:11px}
+.note-step[data-state="now"] > .step-body{border-left-color:var(--indigo)}
+/* 잠긴 STEP — 제목은 그대로, 눌러도 안 열리니 손가락 커서를 주지 않는다. */
+.note-step--locked > .step-summary{cursor:default;border-style:dashed;opacity:.6}
+.note-step--locked > .step-summary::before{content:'🔒';font-size:11px}
+.step-locked-why{margin:6px 0 0 25px;font-size:12.5px;color:var(--ink-mute);line-height:1.6}
+/* 기록이 빈 STEP 을 눈에 띄게 — 「틀렸다」로 읽히지 않게 경고색을 쓴다. */
+.step-note-badge{font-size:11.5px;font-weight:700;color:var(--warn);
+  border:1px solid var(--warn);border-radius:999px;padding:1px 8px;flex:none}
+.note-step[data-notes-empty="true"] > .step-summary{border-color:var(--warn)}
+.step-note-hint{margin:0 0 10px;font-size:12.5px;color:var(--warn);font-weight:600;
+  background:var(--sunk);border-radius:6px;padding:8px 10px}
+.step-note-hint b{color:var(--ink)}
+/* 세부 단계 카드. */
+.substep-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.substep{border:1px solid var(--rule);border-radius:6px;padding:10px}
+.substep[data-has-note="false"]{padding:8px 10px}
+.substep--next{border-color:var(--indigo)}
+.substep-title{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;font-size:13.5px;font-weight:600;margin-bottom:6px}
+.substep-mark{font-weight:700;color:var(--rule);width:1em;flex:none;text-align:center}
+.substep[data-done="true"] .substep-mark{color:var(--good)}
+.substep-state{margin-left:auto;font-size:11.5px;color:var(--ink-mute);
+  border:1px solid var(--rule);border-radius:999px;padding:1px 8px;flex:none}
+.substep[data-done="true"] .substep-state{color:var(--good);border-color:var(--good)}
+.substep[data-done="false"] textarea{opacity:.72}
+.substep-hint{margin:4px 0 6px;font-size:12.5px;color:var(--indigo);font-weight:600}
+.substep-hint b{color:var(--ink)}
+.step-notes-recap,.materials-list,.safety-list,.recap{margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.6}
+/* 생각해 볼 물음 ⓐ 와 값·태도 기록. */
+.values-lead{font-size:13px;margin:0 0 8px}
+.values-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.value-item{display:flex;align-items:baseline;gap:8px;font-size:13.5px}
+.value-mark{font-weight:700;color:var(--good);width:1em;flex:none;text-align:center}
+.value-item[data-missed="true"] .value-mark{color:var(--warn)}
+.value-state{margin-left:auto;font-size:11.5px;color:var(--ink-mute);flex:none}
+.value-item[data-missed="true"] .value-state{color:var(--warn);font-weight:600}
+.value-note{margin:2px 0 0 1.6em;font-size:12.5px;color:var(--ink-mute)}
+.safety-note{background:var(--sunk);border-radius:8px;padding:12px 14px;margin:14px 0 0}
+.safety-note h3{margin:0 0 6px}
+#violations,#values-list{margin:0;padding-left:18px;font-size:13px;line-height:1.7}
+.no-violations{color:var(--ink-mute)}
+/* 「이 쪽을 읽었습니다」 — 실험대 자물쇠를 여는 단추. 1~4 쪽 맨 밑에만 있다. */
+.read-mark{border-top:1px solid var(--rule);margin-top:18px;padding-top:12px;
+  font-size:12.5px;color:var(--ink-mute)}
+.read-mark p{margin:0 0 8px}
+.read-mark[data-done="true"]{color:var(--good)}
+.read-confirm{background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+  padding:9px 14px;font-size:13.5px;font-weight:600}
+.read-confirm[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.read-blocked,.read-why{margin:6px 0 0;font-size:12.5px;color:var(--warn)}
+/* 2쪽 준비물 표 — 생김새 · 이름 · 하는 일. */
+.materials-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:16px}
+.materials-table th,.materials-table td{border-bottom:1px solid var(--rule);
+  padding:8px 6px;text-align:left;vertical-align:middle}
+.materials-table thead th{font-size:11.5px;color:var(--ink-mute);font-weight:600;
+  border-bottom-width:2px}
+.materials-table tbody th{font-weight:600;width:1%}
+.mat-fig{width:56px}
+.mat-fig svg{width:52px;height:auto;display:block}
+.mat-off td,.trial--off td{color:var(--warn)}
+.mat-off-tag{font-size:11px;color:var(--warn);border:1px solid var(--warn);border-radius:999px;padding:0 6px;margin-left:6px}
+/* 3쪽 예상 — 보기 고르기. */
+.predict-block{margin-bottom:16px}
+.predict-choices{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.predict-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+  padding:6px 10px;font-size:12.5px;color:var(--ink-mute)}
+.predict-opt--chosen,.predict-opt[aria-checked="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+.predict-compare-row{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px}
+.compare-pair{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:6px 0 0}
+.compare-pair dt{color:var(--ink-mute);font-size:12px;white-space:nowrap}
+.compare-pair dd{margin:0}
+/* 5쪽 결과 — 기록 카드. */
+.capture-card{border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:12px}
+.capture-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.capture-head h3{margin:0}
+.capture-del,.trial-delete{font-size:11.5px;padding:4px 8px;border-radius:4px;color:var(--warn);white-space:nowrap}
+.capture-fov,.capture-strip,.capture-tube,.capture-graph{background:var(--sunk);border-radius:5px;padding:8px;margin:6px 0}
+.capture-fov svg,.capture-strip svg,.capture-tube svg,.capture-graph svg{width:100%;max-width:200px;height:auto;display:block;margin:0 auto}
+.capture-readout{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
+.capture-readout dt{color:var(--ink-mute)}
+.capture-readout dd{margin:0}
+.result-card{border:1px solid var(--rule);border-radius:8px;padding:16px;background:var(--surface)}
+.result-card h2{font-size:15px;margin:0 0 10px}
+.result-card svg,.note-graph svg{width:100%;height:auto;display:block}
+.graph-notes{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--ink-mute);line-height:1.6}
+.graph-notes li{margin-bottom:4px}
+.trial-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.trial-table th{text-align:left;font-size:11.5px;color:var(--ink-mute);border-bottom:1px solid var(--rule);padding:4px 6px}
+.trial-table td{border-bottom:1px solid var(--rule);padding:6px;vertical-align:top}
+/* 6쪽 정리 — 흐린 결과에 붙는 성찰. */
+#reflect{border-top:1px solid var(--rule);padding-top:12px;margin-top:12px}
+.reflect-options{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.reflect-opt{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+  padding:5px 9px;font-size:12.5px;cursor:pointer;color:var(--ink-mute)}
+.reflect-opt--chosen{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+.reflect-retry{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+  padding:5px 9px;font-size:12.5px;cursor:pointer}
+/* 7쪽 자기 평가 — 다섯 칸에 숫자와 말이 함께 있다. 숫자만 있으면 3 이 무엇인지 모른다. */
+.likert-row{border:1px solid var(--rule);border-radius:6px;padding:10px 12px 12px;
+  margin:0 0 12px;min-width:0}
+.likert-row legend{font-size:13px;font-weight:600;padding:0 4px}
+.likert-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+.likert-cell{display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 2px;border:1px solid transparent;border-radius:5px;cursor:pointer;text-align:center}
+.likert-cell:hover{background:var(--sunk)}
+.likert-cell input{margin:0;accent-color:var(--indigo)}
+.likert-num{font-size:12.5px;font-weight:600}
+.likert-word{font-size:10.5px;color:var(--ink-mute);line-height:1.25}
+.likert-cell:has(input:checked){border-color:var(--indigo);background:var(--sunk)}
+.likert-cell:has(input:focus-visible){outline:2px solid var(--indigo);outline-offset:1px}
+#self-eval .self-eval-item{margin-bottom:16px}
+
+/* ── 알림 ─────────────────────────────────────────────────────────── */
+#toast-region{position:fixed;left:50%;top:14px;transform:translateX(-50%);
+  display:flex;flex-direction:column;gap:8px;z-index:200;width:min(92vw,520px);
+  pointer-events:none}
+/* 확대 뷰가 열려 있을 때 폰에서는 머리 아래로 내린다 — 닫기 단추를 가리지 않게. */
+@media (max-width:767px){ body:has(#zoom:not([hidden])) #toast-region{top:76px} }
+.toast{color:#fff;border-radius:8px;padding:11px 15px;font-size:14px;line-height:1.5;
+  font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.28);
+  border:1px solid rgba(255,255,255,.22);
+  display:flex;align-items:flex-start;gap:10px;
+  animation:toast-in .22s ease-out both, toast-flash .5s ease-out .22s 1}
+.toast--done{background:#1B7048}
+.toast--warn{background:#A82920}
+.toast--note{background:#26348C}
+.toast--still{animation:none}
+.toast-text{flex:1;min-width:0}
+/* 보이는 것은 26px, 닿는 자리는 44px — 폰에서 작은 단추는 두 번에 한 번 빗나간다. */
+.toast-x{pointer-events:auto;flex:0 0 auto;position:relative;
+  width:26px;height:26px;border:0;border-radius:6px;cursor:pointer;
+  background:rgba(255,255,255,.16);color:#fff;font-size:14px;line-height:1;
+  display:flex;align-items:center;justify-content:center;padding:0}
+.toast-x:hover{background:rgba(255,255,255,.3)}
+.toast-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.toast-x::after{content:'';position:absolute;inset:-9px}
+@keyframes toast-in{from{opacity:0;transform:translateY(-10px) scale(.97)}
+  to{opacity:1;transform:none}}
+@keyframes toast-flash{0%{filter:brightness(1)}35%{filter:brightness(1.45)}100%{filter:brightness(1)}}
+
+/* ── 확대 뷰 — 실험대는 큰 동작, 여기는 손끝 동작 ──────────────────
+   덮개(#zoom) 자체가 스크롤된다. 창보다 긴 내용이 작은 화면에서 잘리지 않게. */
+#zoom{position:fixed;inset:0;background:rgba(10,12,8,.55);display:flex;
+  justify-content:center;z-index:100;padding:16px;
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#zoom[hidden]{display:none}
+.zoom-panel{position:relative;background:var(--surface);border-radius:10px;
+  max-width:640px;width:100%;margin:auto;padding:22px;
+  max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column}
+/* 닫기는 패널의 첫 자식이고 sticky — 아래로 스크롤해도 나갈 길이 늘 보인다. */
+.zoom-close{position:sticky;top:0;align-self:flex-end;z-index:3;
+  border:1px solid var(--rule);
+  background:var(--sunk);border-radius:5px;padding:6px 10px;cursor:pointer;font-size:12.5px}
+.zoom-body h2{font-size:16px;margin:0 0 14px}
+.zoom-body h3{font-size:13.5px;margin:14px 0 6px}
+/* 제목 밑 한 줄 — 어디에 있나 · 무엇이 들었나. */
+.zoom-slide-label{font-size:12.5px;color:var(--ink-mute);margin:-8px 0 10px}
+.zoom-empty{color:var(--ink-mute);font-size:13.5px;margin:0 0 10px}
+.zoom-mag-line{font-size:12.5px;color:var(--ink-mute);margin:2px 0 0;
+  font-family:ui-monospace,monospace}
+/* 그림 자리. */
+.zoom-slide-stage,.zoom-fov{background:var(--sunk);border-radius:6px;padding:10px;
+  display:flex;justify-content:center;touch-action:pan-y}
+.zoom-slide-stage svg{width:100%;max-width:320px;height:auto}
+.zoom-fov svg{width:100%;max-width:360px;height:auto;user-select:none}
+.zoom-slide-workspace{position:relative;padding-top:104px}
+.zoom-slide-workspace--flat{padding-top:0}
+/* 손에 쥔 도구 (덮개 유리·스포이트) — 끄는 것이라 스크롤·고르기를 끈다. */
+.cover-tool,.dropper-tool{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.cover-tool{position:absolute;top:0;left:calc(50% - 75px);width:150px;height:112px;padding:0;
+  background:none;border:none;cursor:grab;line-height:0}
+.cover-tool svg{width:100%;height:100%;display:block;pointer-events:none;overflow:visible}
+.cover-tool--dragging{cursor:grabbing;z-index:3}
+.dropper-tool{position:absolute;top:0;left:calc(50% - 22px);width:44px;height:104px;padding:0;
+  background:none;border:none;cursor:grab;line-height:0}
+.dropper-tool svg{width:100%;height:100%;display:block;pointer-events:none}
+.dropper-tool[data-over="true"]{filter:drop-shadow(0 0 6px var(--indigo))}
+.dropper-svg{width:100%;height:100%}
+/* 읽음표 — 이름 · 값. */
+.zoom-readout{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:14px 0;font-size:13px}
+.zoom-readout dt{color:var(--ink-mute)}
+.zoom-readout dd{margin:0;font-family:ui-monospace,monospace}
+/* 상태 한 줄 — 잘 됐으면 초록, 아니면 경고색. 막지 않고 말한다. */
+.zoom-hint{font-size:12.5px;color:var(--ink-mute);margin:8px 0 0;line-height:1.6}
+.zoom-hint[data-good="true"]{color:var(--good)}
+.zoom-hint[data-good="false"]{color:var(--warn)}
+.zoom-hint b{color:var(--ink)}
+.capture-note{font-size:13px;color:var(--good);margin:10px 0 0;font-weight:600}
+/* 단추 — 가로로 꽉 찬 진한 단추가 「할 수 있는 일」이다. 순서가 곧 권하는 순서다. */
+.zoom-scope-controls{display:flex;flex-direction:column;gap:10px}
+.zoom-action{width:100%;background:var(--indigo);color:var(--surface);
+  border-color:var(--indigo);padding:10px 14px;font-size:13.5px;font-weight:600}
+/* 단추가 묶음 밖에 낱개로 설 때의 위 여백 — 실험마다 따로 만들지 않게. */
+.zoom-body > .zoom-action{margin-top:8px}
+.zoom-body > .ctrl-group{margin:10px 0}
+.zoom-action--quiet{background:var(--sunk);color:var(--ink);border-color:var(--rule);font-weight:500}
+/* 선택 — 대물렌즈 4·10·40 처럼 몇 개 중 하나. aria-pressed 로 지금 것을 표시한다. */
+.ctrl-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px}
+.ctrl-group span,.ctrl-group label{color:var(--ink-mute);min-width:70px}
+.ctrl-group button{border:1px solid var(--rule);background:var(--sunk);border-radius:4px;
+  padding:5px 9px;cursor:pointer}
+.ctrl-group button[aria-pressed="true"]{background:var(--indigo);color:var(--surface);
+  border-color:var(--indigo);font-weight:600}
+.ctrl-group input[type=range]{flex:1;accent-color:var(--indigo)}
+/* 연속값 — 얼마나. 이름과 지금 값이 위에, 슬라이더가 아래. */
+.zoom-slider{margin:12px 0 4px}
+.zoom-slider-head{display:flex;justify-content:space-between;font-size:12.5px;
+  color:var(--ink-mute);margin-bottom:4px}
+.zoom-slider-head span{font-family:ui-monospace,monospace;color:var(--ink)}
+.zoom-slider input[type=range]{width:100%;accent-color:var(--indigo)}
+/* 현미경 — 그림과 시야를 나란히. */
+.scope-stage{display:flex;align-items:flex-start;gap:14px}
+.scope-figure{flex:0 0 176px}
+.scope-figure-col{flex:0 0 176px;display:flex;flex-direction:column;gap:8px}
+.scope-figure svg,.scope-figure-col svg{width:100%;height:auto;display:block}
+.scope-figure-col .zoom-action{font-size:12.5px;padding:7px 6px;line-height:1.35}
+.zoom-fov{flex:1;min-width:0}
+.zoom-fov svg{max-width:290px;margin:0 auto}
+@media (max-width:560px){
+  .scope-stage{flex-direction:column-reverse;align-items:stretch}
+  .scope-figure,.scope-figure-col{flex:0 0 auto;width:160px;margin:0 auto}
+  .zoom-fov svg{max-width:min(100%,320px)}
+}
+/* 나사 — 돌리는 물건. 호가 「0에서 얼마나 돌렸는가」, 초점이 맞으면 색이 든다. */
+.dial-row{display:flex;gap:22px;align-items:flex-start}
+.dial-cell{display:flex;flex-direction:column;align-items:center;gap:4px}
+.dial{width:58px;height:58px;cursor:grab;touch-action:none;line-height:0;border-radius:50%}
+.dial:active{cursor:grabbing}
+.dial svg{width:100%;height:100%;display:block;pointer-events:none}
+.dial-label{font-size:11.5px;color:var(--ink-mute)}
+.dial-state{font-size:11px;color:var(--ink-mute);text-align:center;max-width:132px;line-height:1.4}
+.dial[data-focused="true"]{box-shadow:0 0 0 2px var(--good)}
+/* 관찰 가능성 게이지 — 합격선이 아니라 상태. 100 아래면 무엇을 하면 되는지 함께 말한다. */
+.zoom-gauge{margin:14px 0}
+.zoom-gauge .bar{height:7px;border-radius:99px;background:var(--rule);overflow:hidden}
+.zoom-gauge .fill{height:100%;background:var(--good);border-radius:99px;transition:width .2s ease}
+.zoom-gauge .cap{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-mute);margin-top:4px}
+.zoom-gauge .hint{font-size:12px;color:var(--ink-mute)}
+.gauge-jump{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;
+  text-align:left;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.ctrl-hilite{outline:2px solid var(--indigo);outline-offset:3px;border-radius:6px}
+/* 폰 가로 — 창이 낮아 그림을 줄이고 여백을 뺀다. */
+@media (orientation:landscape) and (max-height:560px){
+  #zoom{padding:8px}
+  .zoom-panel{padding:14px 16px;max-height:calc(100dvh - 16px);max-width:min(96vw,860px)}
+  .zoom-slide-stage svg{max-width:250px}
+  .zoom-fov svg{max-width:270px}
+  .zoom-readout{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 12px;margin:10px 0}
+  .zoom-body h2{margin:0 0 8px}
+}
+
+/* ── 시작 화면 — 난이도 · 혼자/모둠 ─────────────────────────────── */
+.start-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:var(--ground)}
+.start-screen[hidden]{display:none}
+.start-card{width:100%;max-width:620px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:12px;padding:28px 26px}
+.start-card h1{font-size:20px;margin:0 0 8px}
+.start-lead{font-size:13.5px;color:var(--ink-mute);margin:0 0 20px}
+.start-levels{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.start-level{display:block;width:100%;text-align:left;border:1px solid var(--rule);
+  background:var(--sunk);border-radius:8px;padding:14px 16px}
+.start-level[aria-checked="true"]{border-color:var(--indigo);border-width:2px;padding:13px 15px;
+  background:var(--surface)}
+.start-level-name{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+.start-level-desc{display:block;font-size:12.5px;color:var(--ink-mute);line-height:1.5}
+.start-go{width:100%;background:var(--indigo);color:var(--surface);border-color:var(--indigo);
+  padding:12px;font-size:15px;font-weight:600}
+.start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
+.start-sub{font-size:13.5px;margin:0 0 10px}
+.start-modes{margin-bottom:20px}
+
+/* ── 보고서 만들기 창 ──────────────────────────────────────────── */
+.report-dialog{border:1px solid var(--rule);border-radius:10px;background:var(--surface);
+  color:var(--ink);max-width:460px;width:calc(100% - 32px);padding:22px;
+  max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+.report-dialog::backdrop{background:rgba(10,12,8,.55)}
+.report-dialog h2{font-size:16px;margin:0 0 10px}
+.rp-kinds{display:flex;gap:6px;margin:0 0 8px}
+.rp-kind{flex:1;padding:8px 10px;font-size:13px;border-radius:5px}
+.rp-kind[aria-selected="true"]{background:var(--indigo);color:var(--surface);border-color:var(--indigo)}
+.rp-kind-note{font-size:12px;color:var(--ink-mute);margin:0 0 14px;min-height:1.4em}
+.rp-fields--group{margin-top:10px}
+.rp-fields--group[hidden]{display:none}
+.rp-privacy{font-size:12.5px;color:var(--ink-mute);margin:0 0 16px;line-height:1.55}
+.rp-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rp-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute);min-width:0}
+.rp-field--wide{grid-column:1/-1}
+.rp-field input{min-width:0;border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
+  color:var(--ink);padding:8px;font:inherit}
+.rp-howto{font-size:12.5px;color:var(--ink-mute);margin:14px 0 0}
+.rp-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.rp-actions button{padding:9px 14px;font-size:13.5px}
+#rp-make{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
+.report-sheet{display:none}
+
+/* ── 사이트 구석 — 개인정보처리방침 ──────────────────────────────── */
+.site-foot{position:fixed;right:10px;bottom:6px;z-index:40;font-size:11px;
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:2px 7px;
+  opacity:.75}
+.site-foot:hover,.site-foot:focus-within{opacity:1}
+.site-foot a{color:var(--ink-mute);text-decoration:none}
+.site-foot a:hover,.site-foot a:focus-visible{color:var(--ink);text-decoration:underline}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{
+  @page{margin:14mm}
+  html,body{height:auto;background:#fff;color:#000}
+  .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
+  .report-sheet{display:block}
+}
+/* 손가락으로 쓰는 화면 — 단추는 44px. 물건(.token)은 ::after 로 이미 보장한다. */
+@media (pointer:coarse){
+  button:not(.token):not(.likert-cell):not(.toast-x){min-height:44px;padding-left:14px;padding-right:14px}
+}

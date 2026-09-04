@@ -134,12 +134,29 @@ test('회전판을 누르면 끈을 당기는 확대 뷰가 열린다', () => {
   assert.equal(opened[0][0], 'spin');
 });
 
-test('모세관 통을 누르면 헤파린과 민무늬가 오간다', () => {
+test('모세관 통을 누르면 통 화면이 열린다 — 헤파린/민무늬는 그 화면의 단추로 고른다', () => {
   // **이것이 이 실험의 변인이다.** 화면이 알아서 헤파린을 집어 주면
-  // "왜 헤파린이 발린 것을 쓰는가" 가 학생 손을 떠난다.
+  // "왜 헤파린이 발린 것을 쓰는가" 가 학생 손을 떠난다. 그렇다고 눌러서 **말없이** 바뀌어서도
+  // 안 된다 — 누르면 본다, 단추로 한다 (docs/09-uniformity.md §2).
   const store = fakeStore();
-  tapTable(store, () => {}).capbox({ kind: 'capbox' }, null);
-  assert.deepEqual(store.calls, [{ type: 'PICK_CAPILLARY', payload: { kind: 'plain' } }]);
+  const opened = [];
+  tapTable(store, (...a) => opened.push(a)).capbox({ id: 'capbox', kind: 'capbox' }, null);
+  assert.deepEqual(store.calls, [], '모세관 통을 누르는 것만으로 상태가 바뀝니다');
+  assert.deepEqual(opened, [['item', null, 'capbox']]);
+});
+
+test('실험대의 모든 물건이 누르면 화면을 연다 — 상태는 바뀌지 않는다', () => {
+  // 눌러도 아무 일 없는 물건은 고장으로 읽힌다. 눌러서 상태가 바뀌는 물건은 하나도 없다.
+  const store = fakeStore();
+  const opened = [];
+  const taps = tapTable(store, (mode) => opened.push(mode));
+  for (const kind of BENCH_KINDS) {
+    assert.equal(typeof taps[kind], 'function', `${kind} 는 눌러도 아무 일이 없습니다`);
+    const before = opened.length;
+    taps[kind]({ id: kind, kind }, null);
+    assert.equal(opened.length, before + 1, `${kind} 를 눌러도 화면이 안 열립니다`);
+  }
+  assert.deepEqual(store.calls, [], '누르는 것만으로 상태가 바뀌는 물건이 있습니다');
 });
 
 test('모세관을 회전판에 대면 시료로, 모세관 통을 대면 균형추로 들어간다', () => {
@@ -153,7 +170,7 @@ test('모세관을 회전판에 대면 시료로, 모세관 통을 대면 균형
 });
 
 test('잘못 채운 모세관에서 빠져나가는 길이 실험대에 있다', () => {
-  // 막다른 길을 만들지 않는다. 통에 대면 새것, 폐기물 통에 대면 버리고 새것.
+  // 막다른 길을 만들지 않는다. 통에 대면 새것, 쓰레기통에 대면 버리고 새것.
   const box = fakeStore();
   dropTable(box).capillary.capbox({ kind: 'capillary' }, { kind: 'capbox' }, {});
   assert.deepEqual(box.calls.map((c) => c.type), ['NEW_CAPILLARY']);
@@ -174,10 +191,14 @@ test('안전 수칙은 조작이 아니라 **적어 둔 안내**다', () => {
   // 억지로 정리를 시키는 것은 배우는 일이 아니고, 세는 순간 화면이 「지켰다/놓쳤다」 를
   // 말해야 하는데 그 판정이 학생을 대신해 거짓말을 하기 쉽다.
   // 대신 2쪽(준비물)에 **실제 실험 기준으로** 적어 두고, 앱이 확인하지 않는다는 것도 밝힌다.
-  const taps = tapTable(fakeStore(), () => {});
-  for (const kind of ['sink', 'bin', 'sharpsbin', 'tissue']) {
+  const tapStore = fakeStore();
+  const taps = tapTable(tapStore, () => {});
+  for (const kind of ['sink', 'sharpsbin', 'tissue']) {
     assert.equal(taps[kind], undefined, `${kind} 에 안전 조작이 남아 있습니다`);
   }
+  // 쓰레기통은 실험대에 있으니 누르면 자기 화면이 열린다 — 상태는 바뀌지 않는다.
+  taps.bin({ id: 'bin', kind: 'bin' }, null);
+  assert.deepEqual(tapStore.calls, [], '쓰레기통을 누르는 것만으로 상태가 바뀝니다');
   const drops = dropTable(fakeStore());
   assert.equal(drops.tissue, undefined, '휴지에 조작이 남아 있습니다');
   assert.equal(drops.lancet.sharpsbin, undefined, '채혈침을 침 폐기함에 버리는 조작이 남아 있습니다');

@@ -159,7 +159,8 @@ function boot(level, mode = MODES.GROUP) {
   if (import.meta.env.DEV) window.__store = store;
 
   const zoom = createZoom($('#zoom'), store);
-  const openZoom = (mode, opener) => zoom.open(mode, opener);
+  // 셋째 인자는 물건 화면의 물건 id (tapTable 의 `view`).
+  const openZoom = (mode, opener, id) => zoom.open(mode, opener, id);
   const report = createReport($('#report'), store);
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {

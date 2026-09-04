@@ -177,11 +177,19 @@ ok(tipText.includes('바나나'), '말풍선에 한글 이름이 있다', JSON.s
 ok(tipText.includes('문질러') || tipText.includes('문지'), '말풍선에 조작 안내가 있다',
    JSON.stringify(tipText.replace(/\n/g, ' | ').slice(0, 120)));
 
-// 클릭하면 껍질이 벗겨지는가 (안 벗기면 문질러도 과육이 묻지 않는다 — 막지는 않는다)
+// **누르면 본다, 끌면 옮긴다, 단추로 한다** (docs/09-uniformity.md §2).
+// 누르면 바나나 화면이 열리고, 껍질은 그 화면의 단추로 벗긴다. 누르는 것만으로는 아무것도 안 바뀐다.
 await page.mouse.down();
 await page.mouse.up();
+await page.waitForTimeout(120);
+ok(!(await page.evaluate(() => window.__store.getState().tools.banana.peeled)), '바나나를 누르는 것만으로는 껍질이 안 벗겨진다');
+ok(await page.evaluate(() => !document.querySelector('#zoom').hidden && document.querySelector('#zoom h2')?.textContent === '바나나'),
+   '바나나를 누르면 바나나 화면이 열린다 (제목 = 실험대 이름)');
+await page.locator('#act-peel').click();
 await page.waitForTimeout(80);
-ok(await page.evaluate(() => window.__store.getState().tools.banana.peeled), '바나나를 누르면 껍질이 벗겨진다');
+ok(await page.evaluate(() => window.__store.getState().tools.banana.peeled), '화면의 「껍질 벗기기」 단추로 껍질이 벗겨진다');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
 
 // 끌기 시작하면 놓을 수 있는 곳이 표시되는가
 const slideBox = await box('[data-id="slideB"]');
@@ -299,7 +307,13 @@ ok(bottleTip.trim().length > 0,
   await kb.locator('[data-id="banana"]').focus();
   await kb.keyboard.press('Enter');
   await kb.waitForTimeout(150);
-  ok((await state()).tools.banana.peeled, '키보드 — Enter 로 껍질을 벗긴다');
+  ok(await kb.evaluate(() => !document.querySelector('#zoom').hidden), '키보드 — Enter 로 바나나 화면이 열린다');
+  await kb.locator('#act-peel').focus();
+  await kb.keyboard.press('Enter');
+  await kb.waitForTimeout(150);
+  ok((await state()).tools.banana.peeled, '키보드 — 화면의 단추로 껍질을 벗긴다');
+  await kb.keyboard.press('Escape');
+  await kb.waitForTimeout(150);
 
   ok(await put('banana', 'slideB'), '키보드 — 말풍선에 놓을 곳 버튼이 나온다');
   ok((await state()).slides.B.sample !== null, '키보드 — 받침 유리에 문질러 바른다',
@@ -518,7 +532,7 @@ await page.mouse.down();
 await page.mouse.move(sBox.x + sBox.width / 2, sBox.y + sBox.height / 2, { steps: 10 });
 await page.mouse.up();
 await page.waitForTimeout(150);
-const overHint = await page.locator('#cover-hint').innerText();
+const overHint = await page.locator('#tool-hint').innerText();
 ok(overHint.includes('고무를 누르면'), '받침 유리 위로 오면 누르라고 알려 준다', JSON.stringify(overHint));
 
 await bulbTap();
@@ -536,7 +550,7 @@ ok(await page.locator('#dropper-tool').getAttribute('data-over') === 'true',
 await page.waitForTimeout(2200);
 const afterTicks = await page.evaluate(() => ({
   over: document.querySelector('#dropper-tool')?.dataset.over,
-  hint: document.querySelector('#cover-hint')?.textContent ?? '',
+  hint: document.querySelector('#tool-hint')?.textContent ?? '',
   reaction: window.__store.getState().slides.B.reactionT,
 }));
 ok(afterTicks.over === 'true' && afterTicks.hint.includes('고무를 누르면'),
@@ -561,14 +575,15 @@ await page.waitForTimeout(150);
 
 // 슬라이드 제작 뷰 — 제목이 시약 이름을 미리 알려 주지 않는가
 const title = await page.locator('.zoom-body h2').innerText();
-ok(title === '(나) 슬라이드 제작', '제목이 무엇을 떨어뜨릴지 미리 알려 주지 않는다', JSON.stringify(title));
+// 제목은 물건의 실험대 이름이다 (docs/09 §5) — 무엇을 떨어뜨릴지는 여전히 말하지 않는다.
+ok(title === '받침 유리 (나)', '제목이 무엇을 떨어뜨릴지 미리 알려 주지 않는다', JSON.stringify(title));
 
 // 시료가 눈에 보이는가 (덮기 전)
 const smearOpacity = await page.locator('#slide-stage #smear').getAttribute('fill-opacity');
 ok(Number(smearOpacity) >= 0.5, '얇게 발라도 시료가 보인다', `fill-opacity=${smearOpacity}`);
 
 // 핀셋이 잡은 덮개 유리 — 처음부터 45°, 좌우로 움직이면 기울기가 바뀐다
-const startHint = await page.locator('#cover-hint').innerText();
+const startHint = await page.locator('#tool-hint').innerText();
 ok(/45°/.test(startHint), '핀셋을 잡으면 45° 에서 시작한다', JSON.stringify(startHint));
 
 const tool = await box('#cover-tool');
@@ -577,16 +592,16 @@ const [tx0, ty0] = center(tool);
 await page.mouse.move(tx0, ty0);
 await page.mouse.down();
 await page.mouse.move(tx0 + 80, ty0, { steps: 8 });   // 좌우만 — 각도만 바뀌어야 한다
-const tiltedHint = await page.locator('#cover-hint').innerText();
+const tiltedHint = await page.locator('#tool-hint').innerText();
 const tiltedDeg = Number((tiltedHint.match(/(\d+)°/) ?? [])[1]);
 ok(tiltedDeg > 45, '좌우로 움직이면 기울기가 바뀐다', `45° → ${tiltedDeg}°`);
-ok(await page.locator('#cover-hint').getAttribute('data-good') === 'false',
+ok(await page.locator('#tool-hint').getAttribute('data-good') === 'false',
    '기포가 생기는 각도라고 알려 준다', `${tiltedDeg}°`);
 
 // 다시 45° 로 돌린 뒤 **곧장 아래로만** 내린다 — 가로로 움직이지 않으므로 각도가 유지돼야 한다
 await page.mouse.move(tx0, ty0, { steps: 6 });
 await page.mouse.move(tx0, stageBox.y + stageBox.height / 2, { steps: 10 });
-const dropHint = await page.locator('#cover-hint').innerText();
+const dropHint = await page.locator('#tool-hint').innerText();
 ok(/\d+°/.test(dropHint), '내리는 동안에도 기울기가 숫자로 보인다', JSON.stringify(dropHint));
 await page.mouse.up();
 await page.waitForTimeout(200);
@@ -606,7 +621,7 @@ const after = await page.evaluate(() => ({
 }));
 ok(after.placed === false && after.holding === 'usedCoverslip',
    '들어낸 덮개 유리는 핀셋에 물린 채 남는다', JSON.stringify(after));
-const usedHint = await page.locator('#cover-hint').innerText();
+const usedHint = await page.locator('#tool-hint').innerText();
 ok(usedHint.includes('쓰레기통'), '쓴 것은 버리라고 알려 준다', JSON.stringify(usedHint));
 
 await page.keyboard.press('Escape');
@@ -1403,6 +1418,8 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
       // 빈 곳으로 끌어 놓는다. 여기서 떼면 탭이 아니다.
       await gp.mouse.move(EMPTY.x, EMPTY.y, { steps: 3 });
       await gp.mouse.up();
+      // 누르고 뗀 것은 탭이고, 탭은 그 물건의 화면을 연다 (docs/09 §2). 다음 점을 재기 전에 닫는다.
+      await gp.keyboard.press('Escape');
       if (!got) missed++;
       else if (got !== pt.id) stray.push(`${pt.id}→${got}`);
     }
@@ -1450,6 +1467,8 @@ ok(marked3 === 3, '3단계에서도 끌어다 놓을 곳은 똑같이 표시된�
         await gp.mouse.down();
         const got = await gp.evaluate(() => document.querySelector('.token--dragging')?.dataset.id ?? null);
         await gp.mouse.up();
+        // 누르고 뗀 것은 탭이고, 탭은 그 물건의 화면을 연다 (docs/09 §2). 다음 점을 재기 전에 닫는다.
+        await gp.keyboard.press('Escape');
         if (got && got !== id) edgeStray.push(`${id}→${got}`);
       }
     }

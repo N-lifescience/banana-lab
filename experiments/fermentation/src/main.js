@@ -10,6 +10,7 @@ import { UI } from './ui/strings.js';
 import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createDesign, designSentence } from './ui/design.js';
 import { createBench, CLOCK_SPEED } from './ui/bench.js';
+import { createZoom } from './ui/zoom.js';
 import { renderGraph, graphNotes } from './render/graph.js';
 import { createNotebook } from './ui/notebook.js';
 import { createReport } from './ui/report.js';
@@ -130,7 +131,10 @@ function start(level, mode) {
   $('#shell-harness').textContent = UI.shellHarnessLink;
 
   createDesign($('#design-root'), store);
-  createBench($('#bench'), store, { edit: fromQuery().edit });
+  // 확대 뷰 — 물건을 누르면 열린다. 눌러서 하던 조작은 전부 그 화면의 단추다 (docs/09 §2).
+  const zoom = createZoom($('#zoom'), store);
+  const openZoom = (mode, id, opener) => zoom.open(mode, id, opener);
+  createBench($('#bench'), store, { edit: fromQuery().edit, onOpenZoom: openZoom });
   createClock(store);
   const report = createReport($('#report'), store);
   createNotebook($('#notebook'), store, {

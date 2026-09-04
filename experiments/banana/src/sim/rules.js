@@ -470,9 +470,9 @@ export const ACTIONS = {
     const on = state.microscope.stage;
     // 아무것도 안 올려 뒀는데 내리려 하면 — 말없이 넘기지 않는다. 스무 번을 눌러도
     // 값도 화면도 그대로면 학생은 단추가 고장 난 줄 안다 (AGENTS.md §2.1).
-    if (!on) return happened(state, '재물대에 올려 둔 슬라이드가 없습니다.', 'nothing-mounted');
+    if (!on) return happened(state, '재물대에 올려 둔 받침 유리가 없습니다.', 'nothing-mounted');
     return ok(withScope(state, { stage: null }),
-      `${SLIDE_NAME[on]} 슬라이드를 재물대에서 내렸습니다.`, 'unmounted');
+      `${SLIDE_NAME[on]}를 재물대에서 내렸습니다.`, 'unmounted');
   },
 
   /**
@@ -503,7 +503,7 @@ export const ACTIONS = {
     const m = state.microscope;
     if (m.objective === 40 && m.stage) {
       const next = withScope(withSlide(state, m.stage, { cracked: true }), { stage: null });
-      return happened(next, '고배율에서 조동나사를 돌려 슬라이드에 금이 갔습니다. 새로 만들어야 합니다.', 'cracked');
+      return happened(next, '고배율에서 조동나사를 돌려 받침 유리에 금이 갔습니다. 재물대에서 내려왔습니다 — 쓰레기통이나 받침 유리 통에 대어 새것으로 바꾸세요.', 'cracked');
     }
     const coarse = Math.max(-1, Math.min(1, m.coarse + delta));
     let next = withScope(state, { coarse });

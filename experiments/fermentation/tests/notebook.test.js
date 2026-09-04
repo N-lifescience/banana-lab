@@ -176,10 +176,19 @@ test('한 번 열어 본 STEP 은 계속 열린다', () => {
 });
 
 test('잠긴 STEP 에도 무엇을 하면 열리는지가 적혀 있다', () => {
-  // 「잠겼습니다」만 적으면 막다른 길이다. 어디로 가야 하는지까지 문장에 담는다.
-  assert.ok(UI.notebook.stepLockedHint.length > 0);
-  assert.ok(/기록|적으면/.test(UI.notebook.stepLockedHint),
-    `잠금 안내가 무엇을 하라는 말인지 알려 주지 않습니다 — 「${UI.notebook.stepLockedHint}」`);
+  /*
+   * 「잠겼습니다」만 적으면 막다른 길이다. 어디로 가야 하는지까지 말한다.
+   *
+   * 말은 **두 자리로 나뉜다** (docs/09-uniformity.md §4). 접힌 머리에는 짧은 `stepLockedHint`
+   * 가 붙고, 펼쳐진 카드 안에는 **어느 STEP 을 적어야 하는지**를 번호로 짚는 `stepLockedWhy`
+   * 가 붙는다. 짧은 쪽은 여덟 실험이 글자까지 같아야 하므로(`tests/uniformity.test.js`)
+   * 「무엇을 하라」는 긴 쪽에서 본다 — 짧은 쪽에 다 담으라고 하면 통일 규격과 부딪힌다.
+   */
+  assert.equal(UI.notebook.stepLockedHint, '앞 STEP 을 먼저 적으세요');
+  const why = UI.notebook.stepLockedWhy('3');
+  assert.ok(/기록|적어야|적으면/.test(why),
+    `잠금 안내가 무엇을 하라는 말인지 알려 주지 않습니다 — 「${why}」`);
+  assert.ok(why.includes('3'), `어느 STEP 을 적어야 하는지 번호로 짚지 않습니다 — 「${why}」`);
 });
 
 /**

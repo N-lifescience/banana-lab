@@ -508,7 +508,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       el.querySelector('.step-summary')?.setAttribute('aria-disabled', String(locked));
       const hint = el.querySelector('.step-open-hint');
       if (hint) hint.textContent = locked ? N.stepLockedHint : N.stepPeekHint;
-      const why = el.querySelector('.step-why');
+      el.classList.toggle('note-step--locked', locked);
+      const why = el.querySelector('.step-locked-why');
       if (why) why.hidden = !locked;
     }
   }
@@ -614,10 +615,10 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       // 막힌 STEP 을 눌렀을 때 읽을 한 줄. 낭독기에도 붙인다(`aria-describedby`).
       const whyId = `step-why-${group.id}`;
       const why = locked
-        ? `<p class="step-why" id="${whyId}">${N.stepLockedWhy(groups[nowIdx].title)}</p>` : '';
+        ? `<p class="step-locked-why" id="${whyId}">${N.stepLockedWhy(groups[nowIdx].id)}</p>` : '';
 
       return `
-        <details class="note-step" data-step-group="${group.id}"
+        <details class="note-step${locked ? ' note-step--locked' : ''}" data-step-group="${group.id}"
           data-state="${state}" data-done="${isDone}"
           data-locked="${locked}"${open ? ' open' : ''}>
           <summary class="step-summary" aria-disabled="${locked}"${

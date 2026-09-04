@@ -35,8 +35,8 @@ test('실험대 말풍선의 놓기 단추가 포인터를 받는다 (주석이 
    * 그 물건이 포커스를 받아 이 단추가 나오므로 마우스만 쓰는 학생도 이 막다른 길을 본다.
    * 키보드는 Enter 가 포커스된 단추로 바로 가서 멀쩡했다 — 그래서 여태 안 보였다.
    */
-  const html = src('../index.html');
-  const style = html.match(/<style>([\s\S]*?)<\/style>/)[1];
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const style = src('../../../packages/lab-kit/style/shell.css');
 
   // 주석을 걷어낸 자리에 닫는 표시가 남아 있으면 어딘가 일찍 닫힌 것이다.
   const withoutComments = style.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ''));

@@ -192,9 +192,29 @@ const hasNote = (st, key) => String(st.session.notes[key] ?? '').trim().length >
  * 칸이 있는 단계만 본다. 칸이 없는 STEP 은 적을 것이 없으므로 「다 적었다」로 본다.
  */
 export function stepNotesWritten(st, group) {
+  if (qaEmpty(st, group)) return false;
   if (st.session.level >= 3) return hasNote(st, group.id);
   return group.steps.every((s, i) => !s.note || hasNote(st, substepId(group, i)));
 }
+
+/**
+ * 질문 ⓐ 를 어느 STEP 밑에 붙이는가 — **STEP 4 (용액 치환하기)**. 종이를 대기 전과 후를
+ * 눈으로 본 **직후**의 자리다 (`docs/06`). 그리는 곳과 「다 적었는가」(`qaEmpty`)가 같은 번호를 본다.
+ */
+export const QUESTION_A_STEP = '4';
+
+/**
+ * 질문 ⓐ 가 붙은 STEP 은 **ⓐ 까지 적어야 「다 적은 것」이다** (정본 banana 와 같다).
+ *
+ * 앞서는 4d 를 적는 순간 STEP 4 가 「다 적었다」가 되어 접히고 ⓐ 가 눈앞에서 사라져서,
+ * 접히지 않게 따로 붙잡아 두었다. 이제 ⓐ 를 그 STEP 의 관찰 기록 칸 하나로 센다 —
+ * 비워 두면 STEP 4 가 펼쳐진 채 남고 다음 STEP 은 잠겨 있다. 다른 기록칸과 똑같다.
+ * **막는 것이 아니다** (AGENTS.md §2.1) — 실험대 조작은 아무것도 막지 않는다.
+ */
+function qaEmpty(st, group) {
+  return group.id === QUESTION_A_STEP && !hasNote(st, 'q.a');
+}
+
 
 /** 실험대가 아직 잠겨 있는가. 노트가 「실험대에서 해 보세요」라고 말해도 되는지 가른다. */
 const benchLocked = (st) =>
@@ -406,95 +426,44 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
 
   function renderStage4(st) {
     const level = st.session.level;
-    const groups = UI.protocol;
-    const groupsDone = groups.map((g) => groupDone(st, g.id));
-    const unwritten = groups.map((g) => !stepNotesWritten(st, g));
-    /*
-     * 「지금 할 차례」는 **조작을 마쳤고 적기까지 한** 첫 STEP 의 다음이다.
-     *
-     * 조작만 보고 정하면 이렇게 된다 — STEP 의 조작을 끝내는 순간 그것이 접히는데,
-     * 적지 않았으니 다음 STEP 은 잠겨 있다. **아무것도 펼쳐지지 않은 화면**이 남고
-     * 학생은 벽을 본다. 안 적었으면 적을 자리가 계속 펼쳐져 있어야 한다.
-     */
-    const nowIdx = groupsDone.findIndex((d, i) => !(d && !unwritten[i]));
+    // 잠금 판정은 `lockInfo` 한 곳에서 — 그리는 쪽·글자 고치는 쪽·누르는 쪽이 **같은 것**을 본다.
+    const { groups, groupsDone, unwritten, nowIdx, openableUpTo, blockerIdx } = lockInfo(st);
     const doneCount = groupsDone.filter(Boolean).length;
     const panels = stepPanelStates(groups, groupsDone, manualOpen, nowIdx);
 
     const stepsHtml = groups.map((group, gi) => {
       const isDone = groupsDone[gi];
       const isNow = gi === nowIdx;
-      const { state } = panels[gi];
-      let { open } = panels[gi];
+      const { state, open } = panels[gi];
       /*
-       * **ⓐ 를 적기 전에는 STEP 4 를 접지 않는다.**
+       * **한 칸씩만 열린다** (docs/09 §4 — 여덟 실험이 같은 규칙, 정본은 banana):
+       *   아직 안 적은 첫 STEP 까지 열리고, 그것을 적으면 **그 다음 하나**가 열린다.
+       * 그 너머는 잠근다. 다만 **한 번이라도 열어 본 것은 안 잠근다** — 열려 있던 것이
+       * 눈앞에서 사라지면 고장으로 읽힌다. `<details>` 를 죽이지 않고 **아예 다른 껍데기**로
+       * 그린다 — 열리는 척하다가 안 열리는 것이 가장 나쁘다. `disabled` 도 `pointer-events:none` 도 안 쓴다.
        *
-       * 질문 ⓐ(거름종이를 대는 까닭)는 STEP 4 **안**, 기록칸 4d 바로 아래에 있다 — 종이를
-       * 대기 전과 후를 눈으로 본 직후에 물어야 답이 나오기 때문이다 (`docs/06`, 순서가 곧
-       * 논증이다). 그런데 4d 를 적고 손을 떼는 순간 STEP 4 는 「다 적었다」가 되어 접히고,
-       * 다음 STEP 이 펼쳐진다. **ⓐ 가 눈앞에서 사라진다** — 학생은 6쪽에 가서야
-       * 「STEP 4 를 마치면 여기에 답이 옮겨집니다」를 보고 되짚어야 한다.
-       * osmosis 플레이테스트(2026-09-02)에서 1단계 정상 경로 그대로 밟다 잡았다.
-       * 손으로 접은 것은 그대로 둔다. 잠금과는 무관하다 — 다음 STEP 은 그대로 열린다.
+       * 문이 되는 STEP(`blockerIdx`)은 언제나 **아직 안 적은, 기록칸이 있는 STEP** 이다 (`lockInfo`).
+       * 이 실험은 STEP 1·2 에 칸이 없어서, 실험대 진행으로 잠그면 「STEP 2 의 관찰 기록을
+       * 적어야」라고 **없는 칸을 시켰다.** 배포본을 플레이하다 찾았다.
        */
-      if (group.id === '4' && isDone && !hasNote(st, 'q.a') && !manualOpen.has(group.id)) open = true;
-
-      /*
-       * **잠그는 자리는 셋을 다 지나야 한다:**
-       *   ① 지금 STEP 보다 **뒤**여야 한다 — 지나온 것과 지금 것은 안 잠근다.
-       *   ② 지금 STEP 의 관찰 기록이 **비어** 있어야 한다.
-       *   ③ 그 STEP 을 **한 번도 열어 본 적이 없어야** 한다 — 열려 있던 것이 사라지면 고장이다.
-       *
-       * ③ 이 있어야 「앞으로 올 STEP 도 눌러서 열린다」가 산다. 한 번 열어 본 것은 다시 안 잠긴다.
-       * `<details>` 를 죽이지 않고 **아예 다른 껍데기**로 그린다 — 열리는 척하다가 안 열리는
-       * 것이 가장 나쁘다. `disabled` 도 `pointer-events:none` 도 쓰지 않는다.
-       */
-      /*
-       * **한 칸씩만 열린다.** 앞서는 「지금 STEP 의 기록이 비었을 때만」 잠갔는데,
-       * 그러면 지금 STEP 을 적는 순간 **뒤가 통째로 다 열렸다.** 사장님 말씀 그대로다 —
-       * 「step1 의 관찰 기록을 작성하면 step2 가 열리도록 해야지, 왜 나머지까지 다 열려」.
-       *
-       * 지금 STEP 을 **안 적었으면 거기까지**, **다 적었으면 그 다음 하나까지** 연다.
-       * 기록칸이 없는 STEP(여기 1·2)은 `unwritten` 이 거짓이라 곧바로 다음 하나가 열린다 —
-       * 적을 것이 없는데 기다리게 하면 안 되기 때문이다.
-       */
-      const openableUpTo = nowIdx < 0 ? groups.length
-        : (unwritten[nowIdx] ? nowIdx : nowIdx + 1);
-      const locked = gi > openableUpTo && !everOpened.has(group.id);
-      /*
-       * **막힌 까닭이 둘이라 말도 둘이다.**
-       *   · 지금 STEP 의 기록이 비었으면 → 그 기록을 적어야 열린다
-       *   · 다 적었으면 → **그 다음 STEP 을 실험대에서 마쳐야** 열린다
-       *
-       * 하나로만 쓰다가 **없는 일을 시켰다.** STEP 1·2 는 기록칸이 없는데도
-       * 「STEP 2 의 관찰 기록을 적어야」라고 해서, 학생이 STEP 2 를 열면 적을 칸이 없었다.
-       */
-      const blockerIdx = Math.min(openableUpTo, groups.length - 1);
-      const lockedBy = locked ? groups[blockerIdx].id : null;
-      const lockedWhy = !locked ? '' : (unwritten[nowIdx]
-        ? N.stepLockedWhy(groups[blockerIdx].id)
-        : N.stepLockedUntilDone(groups[blockerIdx].id));
+      const lockedBy = gi > openableUpTo && !everOpened.has(group.id) ? groups[blockerIdx].id : null;
       /*
        * **「열어 본 적 있다」는 실제로 펼쳐져 있었다는 뜻이다.**
        *
-       * 정본은 잠기지 않은 STEP 을 전부 여기 담는다. 거기는 STEP 1 에도 기록칸이 있어서
-       * **첫 그림부터 뒤엣것이 잠기므로** 담기는 것이 펼쳐진 것뿐이다.
-       * 이 실험은 STEP 1·2 에 칸이 없어 **첫 그림에서 아무것도 안 잠긴다** — 그대로 따라 하면
-       * 여섯이 전부 담겨서 그 뒤로는 **영영 잠기지 않는다.** 실제로 그렇게 만들어 놓고
-       * 「잠금이 왜 안 걸리지」로 한참 봤다.
-       *
-       * 접혀 있던 것은 열어 본 것이 아니다. 손으로 펼친 것(`manualOpen`)은 `open` 이 참이라
-       * 그대로 담긴다 — 한 번 열어 본 것은 다시 안 잠긴다는 뜻이 그대로 산다.
+       * 정본은 STEP 1 에도 기록칸이 있어 첫 그림부터 뒤엣것이 잠기지만, 이 실험은 STEP 1·2 에
+       * 칸이 없어 **첫 그림에서 셋이 안 잠긴다** — 접힌 것까지 담으면 그 뒤로 영영 안 잠긴다.
+       * 손으로 펼친 것(`manualOpen`)은 `open` 이 참이라 그대로 담긴다.
        */
       if (!lockedBy && open) everOpened.add(group.id);
       if (lockedBy) {
         return `
         <div class="note-step note-step--locked" data-step-group="${group.id}"
-          data-state="locked" data-done="false">
+          data-state="locked" data-done="false" data-locked-by="${lockedBy}">
           <div class="step-summary">
             <h3 class="step-summary-title">STEP ${group.id} · ${group.title}</h3>
             <span class="step-open-hint">${N.stepLockedHint}</span>
           </div>
-          <p class="step-locked-why">${lockedWhy}</p>
+          <p class="step-locked-why">${N.stepLockedWhy(lockedBy)}</p>
         </div>`;
       }
 
@@ -560,7 +529,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
           </summary>
           <div class="step-body">
             ${body}
-            ${group.id === '4' ? questionA(st) : ''}
+            ${group.id === QUESTION_A_STEP ? questionA(st) : ''}
           </div>
         </details>`;
     }).join('');
@@ -1124,25 +1093,49 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const groups = UI.protocol;
     const groupsDone = groups.map((g) => groupDone(st, g.id));
     const unwritten = groups.map((g) => !stepNotesWritten(st, g));
+    /*
+     * 「지금 할 차례」는 **조작을 마쳤고 적기까지 한** 첫 STEP 의 다음이다.
+     * 조작만 보고 정하면 STEP 의 조작을 끝내는 순간 그것이 접히는데, 적지 않았으니 다음은
+     * 잠겨 있다 — **아무것도 펼쳐지지 않은 화면**이 남는다. 안 적었으면 적을 자리가 계속 펼쳐져 있어야 한다.
+     */
     const nowIdx = groupsDone.findIndex((d, i) => !(d && !unwritten[i]));
-    const openableUpTo = nowIdx < 0 ? groups.length : (unwritten[nowIdx] ? nowIdx : nowIdx + 1);
-    return { groups, nowIdx, openableUpTo, unwritten,
+    /*
+     * **문은 관찰 기록으로만 정한다** — 「STEP n 의 관찰 기록을 적어야 여기가 열립니다」가
+     * 언제나 참이 되게. 아직 안 적은 첫 STEP 까지 열리고, 그 너머는 잠긴다. 그 STEP 을 적으면
+     * 다음 하나가 열린다 (docs/09 §4).
+     *
+     * 정본은 여기에 실험대 진행(`nowIdx`)을 함께 본다. 그러면 실험대에서 STEP 1 을 안 한 채
+     * STEP 3 의 기록을 적었을 때 STEP 4 가 「STEP 3 의 관찰 기록을 적어야」라며 잠긴 채 남는다 —
+     * 방금 적었는데. 정상 경로(실험대에서 하고 나서 적는다)에서는 두 규칙이 같은 답을 낸다.
+     * 기록칸이 없는 STEP(여기 1·2)은 `unwritten` 이 거짓이라 문이 되지 않는다 — 적을 것이
+     * 없는데 기다리게 하지 않는다.
+     */
+    const firstUnwritten = unwritten.findIndex(Boolean);
+    const openableUpTo = firstUnwritten < 0 ? groups.length : firstUnwritten;
+    return { groups, groupsDone, unwritten, nowIdx, openableUpTo,
       blockerIdx: Math.min(openableUpTo, groups.length - 1) };
   }
 
+  /**
+   * 잠긴 STEP 의 **말**을 지금 적은 것에 맞춘다 (정본과 같다).
+   *
+   * 잠긴 STEP 은 `<div>` 라 열어 줄 수는 없다 — 여는 것은 **누르는 순간** 일어난다
+   * (`pointerdown` 에서 저장하고, 그 덕에 풀렸으면 펼친다). 여기서는 **말만** 바꾼다.
+   * 손보는 것은 **맨 앞의 잠긴 STEP 하나뿐**이다 — 실제로 열리는 것은 그것 하나이고,
+   * 뒤엣것까지 「눌러서 여세요」로 바꾸면 눌러도 안 열리는 거짓말이 새로 생긴다.
+   * 잠긴 STEP 이 스스로 누구를 기다리는지 말한다(`data-locked-by`) — 표시가 아니라 상태를 본다.
+   */
   function patchStepHints(st) {
-    const { groups, nowIdx, openableUpTo, unwritten, blockerIdx } = lockInfo(st);
-    for (const [gi, group] of groups.entries()) {
-      const el = panelEl.querySelector(`[data-step-group="${group.id}"]`);
-      if (!el || el.dataset.state !== 'locked') continue;
-      const why = el.querySelector('.step-locked-why');
-      if (!why) continue;
-      const stillLocked = gi > openableUpTo;
-      why.textContent = !stillLocked ? N.stepLockedFreed
-        : (unwritten[nowIdx]
-          ? N.stepLockedWhy(groups[blockerIdx].id)
-          : N.stepLockedUntilDone(groups[blockerIdx].id));
-    }
+    const next = panelEl.querySelector('.note-step--locked[data-locked-by]');
+    if (!next) return;
+    const by = next.dataset.lockedBy;
+    const group = UI.protocol.find((g) => g.id === by);
+    if (!group) return;
+    const ready = stepNotesWritten(st, group);
+    const hint = next.querySelector('.step-open-hint');
+    const why = next.querySelector('.step-locked-why');
+    if (hint) hint.textContent = ready ? N.stepReadyHint : N.stepLockedHint;
+    if (why) why.textContent = ready ? N.stepReadyWhy : N.stepLockedWhy(by);
   }
 
   /** 단추의 잠금과 까닭 글자만 제자리에서 고친다. 판은 그대로 둔다. */

@@ -79,7 +79,7 @@ test('UI 는 버튼을 disabled 로 막지 않는다 — 예상 관문은 aria-d
       const aria = src.match(/aria-disabled="/g) ?? [];
       assert.equal(aria.length, 1,
         `notebook.js 가 aria-disabled 를 ${aria.length}군데 답니다 — 예상 관문 하나뿐이어야 합니다`);
-      assert.ok(/gated \? 'aria-disabled="true" aria-describedby="read-why"'/.test(src),
+      assert.ok(/gated \? ' aria-disabled="true" aria-describedby="read-why"' : ''/.test(src),
         '관문이 aria-disabled + aria-describedby 짝으로 붙어 있지 않습니다');
       // 막는 것은 브라우저가 아니라 클릭 처리다. 이 줄이 없으면 aria 만 달고 실제로는 눌린다.
       assert.ok(/getAttribute\('aria-disabled'\) === 'true'\) return/.test(src),
@@ -166,10 +166,28 @@ test('고를 수 있는 값마다 화면에 쓸 단위 표기가 있다', () => 
  * 소스에서 눈으로는 안 보인다. 화면을 열어야 보이고, 그때는 이미 학생이 본 뒤다.
  */
 test('화면 문자열에 마크다운 표시가 남아 있지 않다', () => {
+  /*
+   * **`**굵게**` 를 허용하는 자리는 `emph()` 로 그리는 것뿐이다.**
+   * 탐구 과정 머리말(`stepLeadIn`)·가치 안내는 여덟 실험이 글자까지 같아야 하고
+   * (`tests/uniformity.test.js`), 정본은 강조를 `**` 로 적는다. 그 문자열은 `notebook.js` 가
+   * `emph()` 로 <b> 로 바꿔 그린다 — 그 함수를 거치지 않는 문자열에 `**` 가 있으면 별표가 그대로 나간다.
+   */
+  const viaEmph = new Set(['UI.notebook.stepLeadIn', 'UI.notebook.stepLeadInLocked',
+    'UI.notebook.valuesLead', 'UI.notebook.valuesWatched', 'UI.notebook.valuesNotChecked',
+    'UI.notebook.stepNext', 'UI.notebook.predictLeadIn']);
+  const notebook = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8');
+  for (const key of ['valuesLead']) {
+    assert.ok(notebook.includes(`emph(N.${key})`), `notebook.js 가 N.${key} 를 emph() 로 그리지 않습니다`);
+  }
+  assert.ok(/emph\(benchLocked\(st\) \? N\.stepLeadInLocked : N\.stepLeadIn\)/.test(notebook),
+    'notebook.js 가 탐구 과정 머리말을 emph() 로 그리지 않습니다');
+
   const found = [];
   (function walk(node, path) {
     if (typeof node === 'string') {
-      if (/\*\*|(^|\s)__/.test(node)) found.push(`${path}: ${node.slice(0, 40)}…`);
+      if (/\*\*|(^|\s)__/.test(node) && ![...viaEmph].some((k) => path.startsWith(k))) {
+        found.push(`${path}: ${node.slice(0, 40)}…`);
+      }
     } else if (node && typeof node === 'object') {
       for (const [k, v] of Object.entries(node)) walk(v, `${path}.${k}`);
     }
@@ -241,12 +259,13 @@ test('STEP 아코디언을 눌리지 않게 죽여 두지 않는다', () => {
    * 열 수 없는 것으로 전해진다 — 화면과 낭독기가 서로 다른 말을 한다.
    */
   // 여는 태그만 오려 본다. 파일 전체를 훑으면 저 아래 클릭 처리에 있는 `getAttribute` 에 걸린다.
-  const detailsTag = src.match(/<details class="step-group"[\s\S]*?>/)?.[0] ?? '';
+  const detailsTag = src.match(/<details class="note-step[\s\S]*?>/)?.[0] ?? '';
   assert.ok(detailsTag, 'STEP 아코디언의 여는 태그를 못 찾았습니다');
   assert.equal(/aria-disabled|disabled|tabindex="-1"/.test(detailsTag), false,
     `STEP 머리에 못 쓰는 것이 붙었습니다 — 눌러서 열리는 것을 못 연다고 읽습니다: ${detailsTag}`);
-  const css = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.ok(!/\.step-(group|summary)[^{]*\{[^}]*pointer-events\s*:\s*none/.test(css),
+  // 화면 CSS 는 여덟 실험이 함께 쓰는 한 파일에 있다 (docs/09-uniformity.md §1).
+  const css = readFileSync(new URL('../../../packages/lab-kit/style/shell.css', import.meta.url), 'utf8');
+  assert.ok(!/\.(note-step|step-summary)[^{]*\{[^}]*pointer-events\s*:\s*none/.test(css),
     'CSS 가 STEP 머리를 눌리지 않게 막고 있습니다');
 });
 
