@@ -29,6 +29,7 @@ import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE, STAGE_DIV_UM, foldSkewDeg, focusTolerance } from '../sim/optics.js';
 import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone, resultsMissing } from '../sim/progress.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 /**
  * STEP 마다 **어떤 상태로, 펼쳐서 그릴지.** 상태 하나에서 나온다.
@@ -1332,7 +1333,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       if (next) {
         activeStage = next;
         render();
-        panelEl.querySelector('h2, h3')?.scrollIntoView({ block: 'start' });
+        // 앞서는 본문 첫 제목으로 데려갔다. **탭 줄로 데려간다** — 어디로 왔는지가 보여야 한다.
+        revealNotePage(root);
       }
     });
   }

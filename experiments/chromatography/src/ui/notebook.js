@@ -18,6 +18,7 @@ import { gradeQuestion, gradeRf } from './grading.js';
 import { PIGMENTS, bandMm, ORIGIN_MM } from '../sim/develop.js';
 import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 
 const N = UI.notebook;
@@ -1000,8 +1001,10 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const required = UI.bench.lock.required;
       const stage = activeStage;
       const at = required.indexOf(stage);
-      if (at >= 0 && at < required.length - 1) activeStage = required[at + 1];
+      const moved = at >= 0 && at < required.length - 1;
+      if (moved) activeStage = required[at + 1];
       store.dispatch('MARK_READ', { stage });
+      if (moved) revealNotePage(root);
     });
   }
 

@@ -18,6 +18,7 @@ import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE } from '../sim/optics.js';
 import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 
 const N = UI.notebook;
@@ -979,6 +980,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const next = required[required.indexOf(stage) + 1];
       if (next) activeStage = next;
       store.dispatch('MARK_READ', { stage });
+      if (next) revealNotePage(root);
     });
   }
 

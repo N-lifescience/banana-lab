@@ -18,6 +18,7 @@ import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE } from '../sim/optics.js';
 import { UI, emphasize } from './strings.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 import {
   stepDone, groupDone, resultsDone, CONDITIONS, captureForCondition, capturedSolutions,
 } from '../sim/progress.js';
@@ -987,6 +988,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const next = required[required.indexOf(from) + 1];
       if (next) activeStage = next;
       render();
+      if (next) revealNotePage(root);
     });
   }
 

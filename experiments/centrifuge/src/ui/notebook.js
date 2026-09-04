@@ -18,6 +18,7 @@ import { gradeQuestion, gradeHematocrit } from './grading.js';
 import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
 import { BENCH_KINDS, benchLocked } from './bench.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 
 const N = UI.notebook;
@@ -907,6 +908,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       // 눌렀으면 다음 쪽으로 데려다준다. dispatch 가 render 를 부르므로 먼저 옮겨 둔다.
       if (to) activeStage = to;
       store.dispatch('MARK_READ', { stage: from });
+      if (to) revealNotePage(root);
     });
   }
 

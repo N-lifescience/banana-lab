@@ -23,6 +23,7 @@ import { designSentence } from './design.js';
 import { gradeQuestion, STATUS } from './grading.js';
 import { stepDone, groupDone, resultsDone, distinctConditions } from '../sim/progress.js';
 import { UI } from './strings.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 const N = UI.notebook;
 
@@ -747,7 +748,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       // 그때 activeStage 가 아직 이 쪽이면 학생은 같은 쪽을 다시 본다.
       const to = nextReadStage();
       store.dispatch('MARK_READ', { stage: activeStage });
-      if (to) { activeStage = to; render(); }
+      if (to) { activeStage = to; render(); revealNotePage(root); }
     }
   });
 

@@ -16,6 +16,7 @@ import { renderGraph, resultNotes } from '../render/graph.js';
 import { gradeQuestion } from './grading.js';
 import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone, chamberWith } from '../sim/progress.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 
 /**
@@ -1010,6 +1011,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       const next = required[required.indexOf(from) + 1];
       if (next) { activeStage = next; }
       render();
+      if (next) revealNotePage(root);
     });
   }
 

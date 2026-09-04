@@ -23,6 +23,7 @@ import { designSentence } from './design.js';
 import { gradeQuestion, STATUS } from './grading.js';
 import { stepDone, groupDone, resultsDone, distinctConditions } from '../sim/progress.js';
 import { UI } from './strings.js';
+import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 const N = UI.notebook;
 
@@ -734,7 +735,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       store.dispatch('MARK_READ', { stage: activeStage });
       const order = UI.bench.lock.required;
       const next = order[order.indexOf(activeStage) + 1];
-      if (next) { activeStage = next; render(); }
+      if (next) { activeStage = next; render(); revealNotePage(root); }
       return;
     }
   });
