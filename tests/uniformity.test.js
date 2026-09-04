@@ -239,3 +239,43 @@ for (const exp of EXPS) test(`${exp}: 「어떻게」가 제목을 그대로 베
   }
   assert.deepEqual(same, [], `${exp} 에서 제목보다 짧거나 같은 「어떻게」: ${same.join(' / ')}`);
 });
+
+/*
+ * 「」 로 따온 말은 **화면 어딘가에 그대로 있어야 한다.**
+ *
+ * `how` 에 「원반 뚫기」라고 적어 놓고 그런 단추가 없으면, 학생은 있지도 않은 단추를 찾다가
+ * 자기가 못 찾는 줄 안다. 기능 없는 안내는 없는 것보다 나쁘다 (AGENTS.md).
+ *
+ * 실제로 여기서 하나 잡혔다 — banana 의 「받침 유리 통에서 꺼내면 (가)(나)(다) 가 놓입니다」.
+ * `progress.js` 주석이 이미 못 박아 둔 것이었다: **받침 유리는 처음부터 선반에 나와 있고
+ * 꺼내는 조작이 따로 없다.** 사람이 손으로 쓴 안내가 코드보다 앞서 나간 자리다.
+ *
+ * 단추 이름만 보지 않고 **화면 문자열 전체**에서 찾는다 — 「뜨지 않음」처럼 단추가 아니라
+ * 기록되는 값을 따오는 자리도 있기 때문이다. 다만 `how` 자기 자신은 빼고 본다.
+ *
+ * ── 이 검사가 못 보는 것 ─────────────────────────────────────────
+ * **화면 어딘가에 있기만 하면 통과한다.** 「스포이트 씻기」라고 따오면 그것이 STEP 제목으로
+ * 실재하므로 지나간다 — 누를 단추가 아닌데도. (`revert-check` 로 실제로 확인했다:
+ * 없는 말은 물고, 있는 말은 자리를 안 가리고 놓친다.)
+ * 단추만 보게 좁히면 반대로 「뜨지 않음」 같은 정당한 인용을 물어 버려, 다음 사람이
+ * 맞는 문구를 지운다. **넓게 두고 이 한계를 적어 두는 쪽**을 골랐다.
+ * 따온 말이 정말 누를 수 있는 것인지는 사람이 화면을 열어 봐야 한다.
+ */
+for (const exp of EXPS) test(`${exp}: 「어떻게」가 따온 말이 화면에 실제로 있다`, () => {
+  const UI = UIS[exp];
+  const lines = [];
+  walk(UI, exp, lines);
+  const hows = new Set(UI.protocol.flatMap((g) => g.steps.map((s) => String(s.how ?? ''))));
+  const elsewhere = lines.map(([, v]) => v).filter((v) => !hows.has(v));
+  const orphan = [];
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      for (const m of String(s.how ?? '').matchAll(/「([^」]+)」/g)) {
+        const q = m[1].trim();
+        if (!elsewhere.some((v) => v.includes(q))) orphan.push(`STEP ${g.id} · ${s.label} — 「${q}」`);
+      }
+    }
+  }
+  assert.deepEqual(orphan, [],
+    `${exp} 에서 화면에 없는 말을 따왔습니다 — 학생은 없는 단추를 찾습니다: ${orphan.join(' / ')}`);
+});
