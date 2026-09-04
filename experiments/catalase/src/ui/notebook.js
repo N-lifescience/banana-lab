@@ -437,6 +437,11 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
             ${step.label}
             <span class="substep-state">${done ? N.stepDoneMark : N.stepTodoMark}</span>
           </div>
+          <!-- **「어떻게 하는가」한 줄.** 제목(label)은 무엇을 하는가만 말한다 — 그것만 읽고
+               실험대를 보면 무엇을 어디에 끌어다 대라는 건지 알 수 없다. how 는 실험대의 물건
+               이름을 그대로 써서 손이 할 일을 적는다. 없는 조작은 절대 약속하지 않는다 —
+               tests/uniformity.test.js 가 빈 how 와 실험대에 없는 이름을 잡는다. -->
+          ${step.how ? `<p class="substep-how">${emph(step.how)}</p>` : ''}
           ${isNext ? `<p class="substep-hint">${N.stepNext}</p>` : ''}
           <label class="notes-label" for="note-${key}">${N.notesLabel}</label>
           ${field(key, st.session.notes[key], notePlaceholder(st.session.level, step), 2)}

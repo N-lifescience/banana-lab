@@ -135,7 +135,9 @@ test('화면 문자열에 마크다운 표시가 남아 있지 않다', () => {
    * (`tests/uniformity.test.js`), 정본은 강조를 `**` 로 적는다. 그 문자열은 `notebook.js` 가
    * `emph()` 로 <b> 로 바꿔 그린다 — 그 함수를 거치지 않는 문자열에 `**` 가 있으면 별표가 그대로 나간다.
    */
-  const viaEmph = new Set(['UI.notebook.stepLeadIn', 'UI.notebook.valuesLead', 'UI.notebook.valuesList', 'UI.notebook.predictLeadIn']);
+  const viaEmph = new Set(['UI.notebook.stepLeadIn', 'UI.notebook.valuesLead', 'UI.notebook.valuesList', 'UI.notebook.predictLeadIn',
+    // 세부 단계의 「어떻게 하는가」 — `notebook.js` 가 emph() 로 그린다 (실험대 물건 이름을 굵게).
+    'UI.protocol']);
   const notebook = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8');
   for (const key of ['stepLeadIn', 'valuesLead']) {
     assert.ok(notebook.includes(`emph(N.${key})`), `notebook.js 가 N.${key} 를 emph() 로 그리지 않습니다`);

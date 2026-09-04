@@ -174,7 +174,9 @@ test('화면 문자열에 마크다운 표시가 남아 있지 않다', () => {
    */
   const viaEmph = new Set(['UI.notebook.stepLeadIn', 'UI.notebook.stepLeadInLocked',
     'UI.notebook.valuesLead', 'UI.notebook.valuesWatched', 'UI.notebook.valuesNotChecked',
-    'UI.notebook.stepNext', 'UI.notebook.predictLeadIn']);
+    'UI.notebook.stepNext', 'UI.notebook.predictLeadIn',
+    // 세부 단계의 「어떻게 하는가」 — `notebook.js` 가 emph() 로 그린다 (실험대 물건 이름을 굵게).
+    'UI.protocol']);
   const notebook = readFileSync(new URL('../src/ui/notebook.js', import.meta.url), 'utf8');
   for (const key of ['valuesLead']) {
     assert.ok(notebook.includes(`emph(N.${key})`), `notebook.js 가 N.${key} 를 emph() 로 그리지 않습니다`);

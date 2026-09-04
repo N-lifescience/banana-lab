@@ -184,3 +184,58 @@ for (const exp of EXPS) test(`${exp}: 자기 평가 척도는 다섯 칸에 말�
     assert.deepEqual(scale.map((s) => s.label), ['전혀 아니다', '아니다', '보통이다', '그렇다', '매우 그렇다'], `${exp} 척도 말`);
   }
 });
+
+/* ── 6. 탐구 과정 — 「어떻게 하는가」 ─────────────────────────────
+ *
+ * 제목(`label`)은 **무엇을 하는가**만 말한다. 「비늘잎에 5×5 mm 칼집 내기」를 읽고 실험대를
+ * 봐도 무엇을 어디에 끌어다 대라는 건지 알 수 없다. 선생님이 플레이하시고 짚으셨다 —
+ * 「STEP 을 읽어 보면, 뭘 어떻게 하라는지 설명이 너무 짧아서 못 알아먹겠어.」 (2026-09-04)
+ *
+ * 그래서 세부 단계마다 `how` 한 줄이 붙는다. 여기서 보는 것 셋:
+ *   · 빠진 곳이 없다 — 하나만 비어도 그 칸에서 학생이 멈춘다
+ *   · **실험대에 있는 물건 이름**을 쓴다. 노트에서 읽은 이름을 실험대에서 그대로 찾아야 한다
+ *   · 제목을 그대로 베끼지 않았다 — 같은 말을 두 번 하면 한 줄을 더한 값이 없다
+ */
+for (const exp of EXPS) test(`${exp}: 세부 단계마다 「어떻게 하는가」가 적혀 있다`, () => {
+  const UI = UIS[exp];
+  const missing = [];
+  for (const g of UI.protocol) {
+    for (const [i, s] of g.steps.entries()) {
+      if (!String(s.how ?? '').trim()) missing.push(`STEP ${g.id} · ${i + 1}. ${s.label}`);
+    }
+  }
+  assert.deepEqual(missing, [], `${exp} 에서 「어떻게」가 빈 칸: ${missing.join(' / ')}`);
+});
+
+for (const exp of EXPS) test(`${exp}: 「어떻게」가 실험대에 있는 물건 이름을 쓴다`, () => {
+  const UI = UIS[exp];
+  /*
+   * 실험대에 놓인 물건의 **긴 이름과 짧은 이름 둘 다** 받는다. 짧은 이름은 이름표로 늘
+   * 붙어 있어(`shortNames`) 학생이 화면에서 먼저 만나는 말이고, 긴 이름은 말풍선과
+   * 낭독기가 쓰는 말이다. 어느 쪽으로 적어도 실험대에서 찾을 수 있다.
+   */
+  const names = [...Object.values(UI.bench.items ?? {}), ...Object.values(UI.bench.shortNames ?? {})]
+    .map((s) => String(s).trim()).filter((s) => s.length >= 2);
+  const orphan = [];
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      const how = String(s.how ?? '');
+      if (how && !names.some((n) => how.includes(n))) orphan.push(`STEP ${g.id} · ${s.label} — 「${how}」`);
+    }
+  }
+  assert.deepEqual(orphan, [],
+    `${exp} 에서 실험대 물건을 하나도 안 부르는 「어떻게」: ${orphan.join(' / ')}`);
+});
+
+for (const exp of EXPS) test(`${exp}: 「어떻게」가 제목을 그대로 베끼지 않았다`, () => {
+  const UI = UIS[exp];
+  const same = [];
+  for (const g of UI.protocol) {
+    for (const s of g.steps) {
+      const how = String(s.how ?? '').replace(/\s|\*/g, '');
+      const label = String(s.label ?? '').replace(/\s|\*/g, '');
+      if (how && (how === label || how.length < label.length)) same.push(`STEP ${g.id} · ${s.label}`);
+    }
+  }
+  assert.deepEqual(same, [], `${exp} 에서 제목보다 짧거나 같은 「어떻게」: ${same.join(' / ')}`);
+});

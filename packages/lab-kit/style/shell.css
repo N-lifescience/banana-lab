@@ -297,6 +297,10 @@ input[data-note]{min-height:0}
   border:1px solid var(--rule);border-radius:999px;padding:1px 8px;flex:none}
 .substep[data-done="true"] .substep-state{color:var(--good);border-color:var(--good)}
 .substep[data-done="false"] textarea{opacity:.72}
+/* 「어떻게 하는가」한 줄 — 제목 바로 밑. 제목보다 옅고 작지만 **본문 크기**로 둔다.
+   설명을 각주 크기로 줄이면 안 읽히고, 안 읽히면 없는 것과 같다. */
+.substep-how{margin:0 0 8px 25px;font-size:12.5px;line-height:1.65;color:var(--ink-mute)}
+.substep-how b{color:var(--ink);font-weight:600}
 .substep-hint{margin:4px 0 6px;font-size:12.5px;color:var(--indigo);font-weight:600}
 .substep-hint b{color:var(--ink)}
 .step-notes-recap,.materials-list,.safety-list,.recap{margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.6}
