@@ -254,34 +254,52 @@ input[data-note]{min-height:0}
    어디쯤인지 안다. 잠긴 것은 회색으로 죽이지 않고 **왜 잠겼는지**를 적는다. */
 .step-tally{font-size:12.5px;color:var(--ink-mute);margin:0 0 10px;font-weight:600}
 .step-tally--done{color:var(--good)}
-.note-step{margin-bottom:12px}
+/* ── STEP 카드 ───────────────────────────────────────────────────────
+   **STEP 하나가 카드 하나다.** 제목과 그 속이 한 테두리 안에 든다.
+
+   앞서는 제목만 칩으로 두고 속은 왼쪽 선 하나로 매달아 두었다 (통일 때 banana·osmosis 모양을
+   정본으로 골랐다). 선생님이 플레이하시고 짚으셨다 — 「각 스텝이 UI/UX 가 구분이 잘 안된다.
+   전엔 카드? 배경? 같은 게 나눠져 있었던 것 같은데.」 맞다. 카드가 있던 것은 **catalase 판**이었고,
+   통일하면서 그쪽을 버린 것이 이 실수다. 세부 단계도 저마다 테두리를 두른 상자라, STEP 이
+   테두리가 없으면 **작은 상자만 줄줄이 보이고 어디서 어디까지가 한 STEP 인지 안 보인다.**
+
+   그래서 catalase 판을 여덟에 되돌린다 — 카드 + 제목줄 배경 + 상태별 테두리색. */
+.note-step{border:1px solid var(--rule);border-radius:8px;margin:0 0 12px;
+  background:var(--surface);overflow:hidden}
 .step-summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;cursor:pointer;
-  list-style:none;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;
-  background:var(--sunk)}
+  list-style:none;padding:10px 12px;background:var(--sunk);
+  border-bottom:1px solid transparent}
+/* 펼쳤을 때만 제목줄 밑에 선을 긋는다 — 접힌 카드에 그으면 빈 줄 하나가 떠 보인다. */
+.note-step[open] > .step-summary{border-bottom-color:var(--rule)}
 .step-summary::-webkit-details-marker{display:none}
 .step-summary::before{content:'▸';color:var(--ink-mute);flex:none;font-size:11px}
 .note-step[open] > .step-summary::before{content:'▾'}
 .step-summary:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
-.step-summary-title{font-size:13.5px;font-weight:700;margin:0;display:inline}
+.step-summary-title{font-size:14px;font-weight:700;margin:0;display:inline}
 .step-done-mark{color:var(--good);font-weight:700;margin-left:6px}
 .step-now-badge{font-size:11.5px;font-weight:700;color:var(--surface);background:var(--indigo);
   border-radius:999px;padding:2px 9px;flex:none}
 .step-open-hint{margin-left:auto;font-size:11.5px;color:var(--ink-mute);flex:none}
-.note-step[data-state="now"] > .step-summary{border-color:var(--indigo);background:var(--surface)}
-.note-step[data-state="done"] > .step-summary{border-color:var(--good)}
+/* 상태는 **카드 테두리**가 말한다. 제목줄에만 색을 주면 접었을 때 어디가 지금인지 흐려진다. */
+.note-step[data-state="now"]{border-color:var(--indigo);box-shadow:0 0 0 1px var(--indigo)}
+.note-step[data-state="now"] > .step-summary{background:var(--surface)}
+.note-step[data-state="done"]{border-color:var(--good)}
 .note-step[data-state="later"] > .step-summary{opacity:.6}
 .note-step[data-state="later"] > .step-summary:hover,
 .note-step[data-state="later"] > .step-summary:focus-within{opacity:1}
-.step-body{padding:12px 0 4px 14px;border-left:2px solid var(--rule);margin-left:11px}
-.note-step[data-state="now"] > .step-body{border-left-color:var(--indigo)}
+/* 속은 카드 안이다. 카드 테두리가 이미 경계를 그으므로 왼쪽 선은 두지 않는다 —
+   선이 둘이면 어느 쪽이 STEP 의 끝인지 눈이 헷갈린다. */
+.step-body{padding:12px}
 /* 잠긴 STEP — 제목은 그대로, 눌러도 안 열리니 손가락 커서를 주지 않는다. */
-.note-step--locked > .step-summary{cursor:default;border-style:dashed;opacity:.6}
+.note-step--locked{border-style:dashed;background:var(--sunk)}
+.note-step--locked > .step-summary{cursor:default;opacity:.6;background:none}
 .note-step--locked > .step-summary::before{content:'🔒';font-size:11px}
-.step-locked-why{margin:6px 0 0 25px;font-size:12.5px;color:var(--ink-mute);line-height:1.6}
+.step-locked-why{margin:0;padding:0 12px 10px 12px;font-size:12.5px;color:var(--ink-mute);line-height:1.6}
 /* 기록이 빈 STEP 을 눈에 띄게 — 「틀렸다」로 읽히지 않게 경고색을 쓴다. */
 .step-note-badge{font-size:11.5px;font-weight:700;color:var(--warn);
   border:1px solid var(--warn);border-radius:999px;padding:1px 8px;flex:none}
-.note-step[data-notes-empty="true"] > .step-summary{border-color:var(--warn)}
+/* 기록이 빈 STEP — 상태색과 같은 자리(카드 테두리)에서 말한다. */
+.note-step[data-notes-empty="true"]{border-color:var(--warn)}
 .step-note-hint{margin:0 0 10px;font-size:12.5px;color:var(--warn);font-weight:600;
   background:var(--sunk);border-radius:6px;padding:8px 10px}
 .step-note-hint b{color:var(--ink)}
