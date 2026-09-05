@@ -24,6 +24,7 @@ import { gradeQuestion, STATUS } from './grading.js';
 import { stepDone, groupDone, resultsDone, distinctConditions } from '../sim/progress.js';
 import { UI } from './strings.js';
 import { mountGroupHead, decorateNoteFields } from '../../../../packages/lab-kit/group/panel.js';
+import { mountPracticeHead } from '../../../../packages/lab-kit/practice/panel.js';
 import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 const N = UI.notebook;
@@ -216,7 +217,7 @@ export function reportReadiness(st) {
 
 /* ================================================================== */
 
-export function createNotebook(root, store, { onReport = () => {}, onReady = () => {}, group = null } = {}) {
+export function createNotebook(root, store, { onReport = () => {}, onReady = () => {}, group = null, practice = null } = {}) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
@@ -227,6 +228,8 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
 
   // 모둠 칸 (T35) — 노트 머리 밑. 기록이 들어오면 노트를 다시 그려 칸마다 카드가 붙게 한다.
   if (group) mountGroupHead(root, { ...group, store, rerender: () => render() });
+  // 연습 모드 (T36) — 잘 안 된 것 목록과 「피드백 노트 PDF」. 보고서 단추는 숨는다.
+  if (practice) mountPracticeHead(root, practice);
 
   const tabsEl = root.querySelector('#note-tabs');
   const panelEl = root.querySelector('#note-panel');

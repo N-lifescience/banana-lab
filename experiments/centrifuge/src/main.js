@@ -16,6 +16,7 @@ import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createReport } from './ui/report.js';
 import { UI } from './ui/strings.js';
 import { createGroupStore } from '../../../packages/lab-kit/group/store.js';
+import { createFeedbackLog } from '../../../packages/lab-kit/practice/feedback.js';
 import { manifest } from './manifest.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -144,7 +145,17 @@ let store = null;
  * 상태는 여기서 처음 만들어진다 — `session.level` 은 세션 내내 바뀌지 않는 값이라
  * 시작 화면에서 정해진 뒤에 만들어야 한다. 도중에 단계를 바꾸는 길은 두지 않는다.
  */
-function boot(level, mode = MODES.GROUP, groupSetup = null) {
+function boot(level, mode = MODES.GROUP, groupSetup = null, { practice = false } = {}) {
+
+  /*
+   * ── 실제 실험 연습 (T36) ────────────────────────────────────────────
+   * 연습이면 1단계·혼자로 고정하고, 뜻대로 안 된 조작을 `feedback` 에 모은다 —
+   * 토스트로 나가는 것과 **같은 것**을 같은 자리에서 받는다. 막지 않는다. 적어 둘 뿐이다.
+   */
+  if (practice) { level = 1; mode = MODES.SOLO; groupSetup = null; }
+  const feedback = practice
+    ? createFeedbackLog({ adviceOf: (tag) => UI.toast?.nextAction?.[tag] ?? null })
+    : null;
 
   /*
    * ── 모둠 (T35) ─────────────────────────────────────────────────────
@@ -167,7 +178,7 @@ function boot(level, mode = MODES.GROUP, groupSetup = null) {
   const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
   store = createStore(
     initialState(level, undefined, mode),
-    (message, outcome, tag) => toast.push(message, outcome, tag)
+    (message, outcome, tag) => { toast.push(message, outcome, tag); feedback?.add({ message, outcome, tag }); }
   );
   // 검증 스크립트(scripts/check-*.mjs)가 상태를 만들고 되돌리기 기록을 들여다보는 통로다.
   // 개발 서버에서만 연다 — 배포본에 남기면 누구나 상태를 직접 바꿀 수 있고,
@@ -181,6 +192,10 @@ function boot(level, mode = MODES.GROUP, groupSetup = null) {
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {
     group,
+    practice: feedback ? {
+      feedback, host: dialogHost, appTitle: UI.appTitle,
+      levelName: UI.start?.levels?.find((l) => l.id === 1)?.name ?? '',
+    } : null,
     onOpenZoom: openZoom,
     // 보고서를 연다. **정리를 했는지 보지 않는다** — 안전 수칙은 2쪽에 적어 두기만 하고
     // 앱이 확인하지 않는다. 앞서는 여기서 CHECK_TIDY 를 쏘았는데, 그 액션을 걷어내면서
@@ -188,7 +203,8 @@ function boot(level, mode = MODES.GROUP, groupSetup = null) {
     onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간은 탐구 노트 위쪽에서 조용히 일어난다.
     // 그때 학생은 대개 실험대를 보고 있다 — 알려 주지 않으면 한참 뒤에야 안다.
-    onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),
+    // 연습 모드에는 보고서 단추가 없다 — 「만들 수 있다」고 말하면 거짓이다 (T36)
+    onReady: () => { if (!feedback) toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'); },
   });
 
   startClock(zoom);
@@ -266,4 +282,4 @@ const modeUrl = modeFromUrl();
  */
 if (fromUrl && modeUrl !== MODES.GROUP) boot(fromUrl, modeUrl ?? MODES.GROUP);
 else if (fromUrl) createStart($('#start'), boot, fromUrl, MODES.GROUP, UI, { lock: true });
-else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP, UI);
+else createStart($('#start'), boot, 1, modeUrl ?? MODES.SOLO, UI);

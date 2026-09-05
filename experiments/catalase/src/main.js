@@ -16,6 +16,7 @@
 
 import { UI } from './ui/strings.js';
 import { createGroupStore } from '../../../packages/lab-kit/group/store.js';
+import { createFeedbackLog } from '../../../packages/lab-kit/practice/feedback.js';
 import { manifest } from './manifest.js';
 import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createDesign, designSentence } from './ui/design.js';
@@ -118,7 +119,17 @@ function fromQuery() {
   };
 }
 
-function start(level, mode, groupSetup = null) {
+function start(level, mode, groupSetup = null, { practice = false } = {}) {
+
+  /*
+   * ── 실제 실험 연습 (T36) ────────────────────────────────────────────
+   * 연습이면 1단계·혼자로 고정하고, 뜻대로 안 된 조작을 `feedback` 에 모은다 —
+   * 토스트로 나가는 것과 **같은 것**을 같은 자리에서 받는다. 막지 않는다. 적어 둘 뿐이다.
+   */
+  if (practice) { level = 1; mode = MODES.SOLO; groupSetup = null; }
+  const feedback = practice
+    ? createFeedbackLog({ adviceOf: (tag) => UI.toast?.nextAction?.[tag] ?? null })
+    : null;
 
   /*
    * ── 모둠 (T35) ─────────────────────────────────────────────────────
@@ -142,7 +153,7 @@ function start(level, mode, groupSetup = null) {
   let store;
   const toast = createToastQueue($('#toast-region'), () => store.getState().session.level);
   store = createStore(initialState(level, 20260826, mode),
-    (message, outcome, tag) => toast.push(message, outcome, tag));
+    (message, outcome, tag) => { toast.push(message, outcome, tag); feedback?.add({ message, outcome, tag }); });
 
   // 시작 화면을 걷고 실험 화면을 연다.
   //
@@ -164,9 +175,14 @@ function start(level, mode, groupSetup = null) {
   const report = createReport($('#report'), store, { group });
   createNotebook($('#notebook'), store, {
     group,
+    practice: feedback ? {
+      feedback, host: dialogHost, appTitle: UI.appTitle,
+      levelName: UI.start?.levels?.find((l) => l.id === 1)?.name ?? '',
+    } : null,
     onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간을 알린다 — 탭을 안 보고 있어도 알아야 한다.
-    onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),
+    // 연습 모드에는 보고서 단추가 없다 — 「만들 수 있다」고 말하면 거짓이다 (T36)
+    onReady: () => { if (!feedback) toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'); },
   });
 
   // 설계 문장은 탐구 노트와 보고서도 같은 함수로 만든다 — 두 곳에서 따로 만들면
@@ -266,5 +282,5 @@ if (((q.level && q.mode) || editWanted) && !groupLink) {
 } else if (groupLink) {
   createStart($('#start'), start, q.level, MODES.GROUP, UI, { lock: true });
 } else {
-  createStart($('#start'), start, q.level ?? 1, q.mode ?? MODES.GROUP, UI);
+  createStart($('#start'), start, q.level ?? 1, q.mode ?? MODES.SOLO, UI);
 }

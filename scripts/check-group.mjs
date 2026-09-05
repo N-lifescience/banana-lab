@@ -36,7 +36,9 @@ const ok = (cond, msg) => { if (!cond) { console.log('  ✗', msg); errors.push(
 
 async function start(page, { role, nick, name }) {
   await page.goto(url);
+  await page.click('.start-purpose[data-purpose="virtual"]');   // 1쪽: 가상 실험실
   await page.click('.start-level[data-mode="group"]');
+  await page.click('#start-go');                                 // 2쪽 → 「다음」
   await page.fill('#sg-name', name);
   await page.fill('#sg-size', '3');
   await page.fill('#sg-nick', nick);
@@ -98,7 +100,8 @@ ok((await leader.textContent('#group-head')).includes('모인 기록 1/2'), '모
 ok((await leader.textContent('#group-head')).includes('초록이'), '모둠원 별명이 목록에');
 
 // 6 정리 쪽 — 칸 아래 카드와 초안 채우기
-await leader.click('.note-tab[data-stage="6"]');
+// 「정리」 쪽 — 실험마다 쪽 번호가 다르다 (catalase·fermentation 은 실험 설계 쪽이 하나 더 있다)
+await leader.locator('.note-tab', { hasText: '정리' }).first().click();
 await leader.waitForSelector('#note-q2');
 const cards = await leader.$$('.group-entries');
 ok(cards.length >= 2, `모둠원이 쓴 칸마다 카드 (${cards.length})`);
@@ -133,8 +136,10 @@ ok((await leader.textContent('#group-head')).includes('아직 모인 기록이 �
 // 혼자 하면 모둠 칸이 없다
 const solo = await ctx.newPage(); watch(solo);
 await solo.goto(url);
-await solo.click('.start-level[data-mode="solo"]');
-ok(await solo.isHidden('#start-group'), '혼자 고르면 모둠 짜기가 접힌다');
+await solo.click('.start-purpose[data-purpose="virtual"]');
+ok(await solo.getAttribute('.start-level[data-mode="solo"]', 'aria-checked') === 'true', '기본은 혼자');
+ok(await solo.isHidden('#start-group'), '2쪽에는 모둠 짜기가 없다');
+ok((await solo.textContent('#start-go')).includes('시작') || !(await solo.textContent('#start-go')).includes('다음'), '혼자면 단추가 「시작」');
 await solo.click('#start-go');
 await solo.waitForSelector('#note-panel');
 ok(await solo.$('#group-head') === null, '혼자 하면 모둠 칸이 없다');
@@ -149,6 +154,30 @@ await linked.fill('#sg-nick', '파랑이');
 await linked.click('#start-go');
 await linked.waitForSelector('#group-head');
 ok(await linked.evaluate(() => window.__store.getState().session.level) === 2, '주소의 단계(2)로 시작한다');
+
+// 실제 실험 연습용 — 1쪽에서 바로 시작, 1단계·혼자, 피드백 칸, 보고서 단추 없음
+const prac = await ctx.newPage(); watch(prac);
+await prac.goto(url);
+await prac.click('.start-purpose[data-purpose="practice"]');
+await prac.waitForSelector('#practice-head');
+ok(await prac.evaluate(() => window.__store.getState().session.level) === 1, '연습은 1단계');
+ok(await prac.evaluate(() => window.__store.getState().session.mode) === 'solo', '연습은 혼자');
+ok(await prac.isHidden('#report-slot'), '연습에는 보고서 단추가 없다');
+ok(await prac.$('#group-head') === null, '연습에는 모둠 칸이 없다');
+// 뜻대로 안 된 조작을 하나 일으킨다 — 빈 스포이트로 떨어뜨리기 같은 것. 실험마다 다르니 상태로 흉내 낸다
+await prac.evaluate(() => window.__store.dispatch('UNDO', {}));
+await prac.evaluate(() => window.__store.dispatch('UNDO', {}));
+const head = await prac.textContent('#practice-head');
+ok(/잘 안 된 것 \d+가지/.test(head) || /아직/.test(head), `연습 칸이 산다 (${head.trim().slice(0, 40)}…)`);
+await prac.click('#practice-note-btn');
+await prac.waitForSelector('#practice-dialog[open]');
+await prac.fill('#pn-own', '두 방울만.');
+await prac.evaluate(() => { window.print = () => { window.__printed = true; }; });
+await prac.click('#pn-make');
+await prac.waitForFunction(() => window.__printed === true);
+const sheetHtml = await prac.evaluate(() => document.querySelector('#practice-sheet').innerHTML);
+ok(/피드백 노트/.test(sheetHtml) && /두 방울만/.test(sheetHtml), '피드백 노트 종이가 만들어진다');
+await prac.screenshot({ path: 'shots/practice-head.png' });
 
 await browser.close();
 console.log(`\n${errors.length ? '✗' : '✓'} pass ${pass}, errors ${errors.length}`);

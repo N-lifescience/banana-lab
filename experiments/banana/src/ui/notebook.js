@@ -20,6 +20,7 @@ import { UI } from './strings.js';
 import { stepDone, groupDone, resultsDone } from '../sim/progress.js';
 import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 import { mountGroupHead, decorateNoteFields } from '../../../../packages/lab-kit/group/panel.js';
+import { mountPracticeHead } from '../../../../packages/lab-kit/practice/panel.js';
 
 
 const N = UI.notebook;
@@ -233,7 +234,7 @@ export function reportReadiness(st) {
   return { ready: missing.length === 0, missing };
 }
 
-export function createNotebook(root, store, { onOpenZoom, onReport, onReady, group = null }) {
+export function createNotebook(root, store, { onOpenZoom, onReport, onReady, group = null, practice = null }) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
@@ -248,6 +249,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady, gro
    * 혼자 하면 `group` 이 null 이라 아무것도 안 붙는다.
    */
   if (group) mountGroupHead(root, { ...group, store, rerender: () => render() });
+  // 연습 모드 (T36) — 잘 안 된 것 목록과 「피드백 노트 PDF」. 보고서 단추는 숨는다.
+  if (practice) mountPracticeHead(root, practice);
 
   const reportSlot = root.querySelector('#report-slot');
 

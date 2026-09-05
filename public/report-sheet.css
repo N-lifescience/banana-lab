@@ -44,3 +44,8 @@
 .rp-likert th,.rp-likert td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left}
 .rp-likert th{border-bottom-width:1.5px;border-bottom-color:#666}
 .rp-likert td:last-child{white-space:nowrap;width:1%}
+
+/* ── 피드백 노트 (연습 모드, T36) ── */
+.practice-check{list-style:none;margin:0;padding:0}
+.practice-check li{padding:4px 0;border-bottom:1px dotted #bbb;font-size:11pt}
+.practice-table td:nth-child(2){text-align:center;white-space:nowrap}
