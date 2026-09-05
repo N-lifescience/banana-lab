@@ -42,7 +42,7 @@ export function render(_state = {}) {
     <rect x="0" y="0" width="400" height="300" fill="${PALETTE.bench[0]}"/>
 
     <!-- 2. 천장 -->
-    <rect x="0" y="0" width="400" height="26" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="0" y="0" width="400" height="26" fill="${PALETTE.roomLight[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <line x1="80" y1="0" x2="80" y2="26" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <line x1="160" y1="0" x2="160" y2="26" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <line x1="240" y1="0" x2="240" y2="26" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
@@ -50,17 +50,17 @@ export function render(_state = {}) {
     <line x1="0" y1="26" x2="400" y2="26" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
     <!-- 3. 매입 조명 2조 -->
-    <rect x="92" y="4" width="66" height="15" rx="2" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="96" y="7" width="58" height="9" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
-    <rect x="242" y="4" width="66" height="15" rx="2" fill="${PALETTE.paper[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <rect x="246" y="7" width="58" height="9" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <rect x="92" y="4" width="66" height="15" rx="2" fill="${PALETTE.roomLight[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <rect x="96" y="7" width="58" height="9" fill="${PALETTE.roomLight[1]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
+    <rect x="242" y="4" width="66" height="15" rx="2" fill="${PALETTE.roomLight[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <rect x="246" y="7" width="58" height="9" fill="${PALETTE.roomLight[1]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
     <!--
       4. 상부 수납장 (유리문) — 참고 이미지의 맨 윗단.
 
       선반 위 물건보다 **뒤에** 그려진다. 배경이지 물건이 아니다.
     -->
-    <rect x="18" y="28" width="364" height="17" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="18" y="28" width="364" height="17" fill="${PALETTE.roomLight[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <rect x="25" y="32" width="172" height="9" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <rect x="203" y="32" width="172" height="9" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <!-- 수납장이 벽에 드리우는 그늘. 선반과 붙어 보이지 않게 사이를 띄운다 -->
@@ -81,9 +81,9 @@ export function render(_state = {}) {
       양 끝이 17.5 mm 씩 나갔고, 하나는 왼쪽으로 9.4 mm 나갔다.
       물건을 옮기는 대신 **유리판을 실험대에 맞췄다.** 배치는 실험마다 다르고, 선반은 하나다.
     -->
-    <polygon points="0,65 400,65 380,53 20,53" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <polygon points="0,65 400,65 380,53 20,53" fill="${PALETTE.shelfTop[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <!-- 아래 선반 유리판 (앞 모서리 y=116 → 뒤 y=105) -->
-    <polygon points="0,116 400,116 380,105 20,105" fill="${PALETTE.glass[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <polygon points="0,116 400,116 380,105 20,105" fill="${PALETTE.shelfTop[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <!-- 작업면 상판 (앞 모서리 y=172 → 뒤 y=151) -->
     <polygon points="0,172 400,172 380,151 20,151" fill="${PALETTE.benchTop[0]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
 
@@ -98,7 +98,7 @@ export function render(_state = {}) {
       선반의 **서 있는 면** — 유리판의 두께이자 앞 난간이다. 참고 이미지의 그 난간이
       물건이 굴러 떨어지지 않게 한다. 누운 면보다 한 단 어둡다.
     -->
-    <polygon points="0,65 400,65 400,77 0,77" fill="${PALETTE.glass[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <polygon points="0,65 400,65 400,77 0,77" fill="${PALETTE.shelfTop[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <line x1="0" y1="72" x2="400" y2="72" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
 
     <!--
@@ -111,9 +111,9 @@ export function render(_state = {}) {
       그늘 띠가 브래킷을 덮어 버리고, 받치는 것이 안 보인 채 선반만 떠 있다.
     -->
     <rect x="20" y="77" width="360" height="6" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
-    <polygon points="58,77 78,77 58,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <polygon points="190,77 210,77 190,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <polygon points="322,77 342,77 322,93" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="58,77 78,77 58,93" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="190,77 210,77 190,93" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="322,77 342,77 322,93" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
 
     <!--
       **아래 선반** — 위 선반과 같은 모양이다(누운 유리판은 #room 에, 여기는 난간·그늘·브래킷).
@@ -122,12 +122,12 @@ export function render(_state = {}) {
       서로 포개져 옆 것이 집혔다** — 학생의 실험 조건이 바뀐 채로 시행이 기록된다.
       줄을 갈라 놓으면 그 겹침이 크게 준다. (catalase 가 어느 폭에서나 14쌍이라고 재 왔다)
     -->
-    <polygon points="0,116 400,116 400,128 0,128" fill="${PALETTE.glass[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <polygon points="0,116 400,116 400,128 0,128" fill="${PALETTE.shelfTop[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <line x1="0" y1="123" x2="400" y2="123" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <rect x="20" y="128" width="360" height="6" fill="${PALETTE.bench[1]}" ${PATH_ATTRS}/>
-    <polygon points="58,128 78,128 58,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <polygon points="190,128 210,128 190,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
-    <polygon points="322,128 342,128 322,144" fill="${PALETTE.metal[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="58,128 78,128 58,144" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="190,128 210,128 190,144" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
+    <polygon points="322,128 342,128 322,144" fill="${PALETTE.roomShade[0]}" stroke="${INK}" stroke-width="${STROKE.detail}" ${PATH_ATTRS}/>
   </g>
 
   <!-- 실험대 몸체 (물건이 서는 선 y=172 고정) -->
@@ -143,7 +143,7 @@ export function render(_state = {}) {
       앞에서 본 네모를 아무리 칠해도 안 나오는 것이 이것이다.
       세로 이음선은 문과 문 사이다. 손잡이는 없다 — 서랍은 걷어냈다.
     -->
-    <rect x="32" y="189" width="336" height="66" fill="${PALETTE.paper[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
+    <rect x="32" y="189" width="336" height="66" fill="${PALETTE.roomLight[1]}" stroke="${INK}" stroke-width="${STROKE.outline}" ${PATH_ATTRS}/>
     <line x1="116" y1="200" x2="116" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <line x1="200" y1="200" x2="200" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
     <line x1="284" y1="200" x2="284" y2="255" stroke="${INK}" stroke-width="${STROKE.hair}" ${PATH_ATTRS}/>
@@ -164,7 +164,7 @@ export function render(_state = {}) {
     상판이 앞으로 튀어나와 있으니 그 밑은 그늘진다. 캐비닛 폭에 맞춰 얹는다 —
     상판 두께면과 이어져 하나의 어두운 덩어리로 읽히고, 그 아래가 물러난다.
   -->
-  <rect id="surface-shade" x="32" y="189" width="336" height="10" fill="${PALETTE.metal[1]}"/>
+  <rect id="surface-shade" x="32" y="189" width="336" height="10" fill="${PALETTE.roomShade[1]}"/>
 </svg>`;
 }
 

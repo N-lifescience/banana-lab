@@ -19,7 +19,6 @@ import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createDesign, designSentence } from './ui/design.js';
 import { createBench, CLOCK_SPEED } from './ui/bench.js';
 import { createZoom } from './ui/zoom.js';
-import { renderGraph, graphNotes } from './render/graph.js';
 import { createNotebook } from './ui/notebook.js';
 import { createReport } from './ui/report.js';
 import { createToastQueue } from './ui/toast.js';
@@ -137,7 +136,6 @@ function start(level, mode) {
   // `hidden` 요소의 글자도 그대로 읽히기 때문이다. 눈으로 봐야 알 수 있는 종류다.
   $('#start').hidden = true;
   $('#app').hidden = false;
-  $('#graph-title').textContent = UI.graph.title;
 
   createDesign($('#design-root'), store);
   // 확대 뷰 — 물건을 누르면 열린다. 눌러서 하던 조작은 전부 그 화면의 단추다 (docs/09 §2).
@@ -158,20 +156,18 @@ function start(level, mode) {
   // 학생이 적은 설계와 보고서의 설계가 달라진다.
   const paintSentence = () => { $('#design-sentence').textContent = designSentence(store.getState().design); };
 
-  /**
-   * 결과 그래프. **실험대가 막지 않은 것이 여기서 대답한다.**
-   * 그래프만으로는 왜 점이 떨어져 나왔는지 알 수 없으므로 설명을 함께 붙인다.
+  /*
+   * **결과 그래프는 탐구 노트의 「결과」 쪽에만 있다.**
+   *
+   * 여기 노트 밖에도 같은 그래프를 그리는 판이 하나 더 있었다 (`idPrefix: 'main'`).
+   * 노트가 결과 쪽을 갖기 전에 만든 것인데, 그 뒤로 **어느 탭을 열어 놓든 늘 떠 있었다** —
+   * 문제 인식을 읽는 학생 눈앞에 아직 아무것도 없는 빈 그래프가 붙어 있는 셈이다.
+   * (사장님 지시, 2026-09-05: 「결과 그래프가 모든 탐구노트 탭에 떠있다. 왜지?」)
+   * 노트 쪽이 같은 함수로 그리므로 사본만 걷었다.
    */
-  function paintGraph() {
-    const st = store.getState();
-    $('#graph').innerHTML = renderGraph(st.trials, st.design, { idPrefix: 'main' });
-    $('#graph-notes').innerHTML = graphNotes(st.trials, st.design)
-      .map((line) => `<li>${line}</li>`).join('');
-  }
 
-  store.subscribe(() => { paintSentence(); paintGraph(); });
+  store.subscribe(paintSentence);
   paintSentence();
-  paintGraph();
 
   // 규칙 엔진을 콘솔에서 만져 볼 수 있게 둔다 — **개발 서버에서만.**
   //
