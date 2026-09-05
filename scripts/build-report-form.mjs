@@ -25,8 +25,15 @@ import { join } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname;
 const SRC = join(ROOT, 'src', 'forms', 'report-form.html');
 const OUT_DIR = join(ROOT, 'public', 'forms');
-const PDF = join(OUT_DIR, 'lab-report-form.pdf');
-const STAMP = join(OUT_DIR, 'lab-report-form.sha');
+/*
+ * ★ **파일 이름이 곧 선생님이 저장하게 될 이름이다.**
+ *   `<a download="…">` 로 정해 봐야 소용없다 — 배포 서버가 `Content-Disposition: inline;
+ *   filename="…"` 를 파일 이름 그대로 붙여 보내고, 그 헤더가 속성을 이긴다.
+ *   실제로 그렇게 나갔다: 첫 배포에서 「탐구보고서_양식.pdf」 로 받게 해 두었는데
+ *   내려받아 보니 `lab-report-form.pdf` 였다. 그래서 **파일 이름을 한국어로 둔다.**
+ */
+const PDF = join(OUT_DIR, '탐구보고서_양식.pdf');
+const STAMP = join(OUT_DIR, '탐구보고서_양식.sha');
 const CHECK_ONLY = process.argv.includes('--check');
 
 const html = readFileSync(SRC, 'utf8');
@@ -70,5 +77,5 @@ await browser.close();
 
 writeFileSync(STAMP, `${hash}\n`);
 const kb = (readFileSync(PDF).length / 1024).toFixed(1);
-console.log(`보고서 양식을 구웠습니다 — public/forms/lab-report-form.pdf (${kb} KB)`);
+console.log(`보고서 양식을 구웠습니다 — public/forms/탐구보고서_양식.pdf (${kb} KB)`);
 console.log('원본을 고쳤으면 이 스크립트를 다시 돌리세요. `--check` 가 어긋남을 알려 줍니다.');
