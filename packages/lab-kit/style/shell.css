@@ -630,6 +630,8 @@ input[data-note]{min-height:0}
 .fb-msg b{color:var(--warn);font-weight:600;margin-left:4px}
 .fb-next{color:var(--indigo);font-size:12px}
 .fb-more{color:var(--ink-mute);border:0!important;background:transparent!important;padding:0 2px!important}
+/* 실제 실험용 양식 링크 (T39) — 단추가 아니라 링크다. 누르면 파일이 받아지지 화면이 바뀌지 않는다. */
+.fb-form{font-size:12.5px;color:var(--indigo);text-decoration:underline;text-underline-offset:2px}
 .practice-own-label{margin-top:12px}
 #pn-make{background:var(--indigo);color:var(--surface);border-color:var(--indigo);font-weight:600}
 .start-levels{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}

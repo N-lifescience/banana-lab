@@ -230,6 +230,27 @@ test('첫 화면의 내려받기 링크가 실제 파일을 가리킨다', () =>
   }
 });
 
+/*
+ * ── 실험이 가리키는 양식이 실제로 있는가 ─────────────────────────────
+ *
+ * 앞의 검사는 **첫 화면의 링크**만 본다. 그런데 같은 양식을 **앱의 리허설 칸**과
+ * **선생님 화면**도 가리키고, 그 둘은 `manifest.formFile` 로 주소를 만든다 —
+ * 첫 화면에 안 실린 실험이 생기면 그 두 자리는 아무 검사 없이 404 를 낸다.
+ * 이름은 굽는 쪽(`scripts/build-report-form.mjs`)도 같은 값을 쓰므로, 여기서 셋을 맞댄다.
+ */
+test('실험마다 실제 실험용 양식이 있고, 매니페스트가 그것을 가리킨다', async () => {
+  for (const id of EXPERIMENTS) {
+    const { manifest } = await import(at(`experiments/${id}/src/manifest.js`).href);
+    assert.ok(manifest.formFile, `${id}: manifest.formFile 이 없습니다 — 리허설 칸과 선생님 화면이 양식을 못 겁니다`);
+    assert.ok(existsSync(at(`public/forms/${manifest.formFile}`)),
+      `${id}: 가리키는 양식이 없습니다 — public/forms/${manifest.formFile}\n`
+      + '  → `npm run form` 으로 구우세요. 이름을 바꿨다면 spec.file 과 manifest.formFile 을 함께 고칩니다.');
+    const { form } = await import(at(`experiments/${id}/src/forms/spec.js`).href);
+    assert.equal(form.file, manifest.formFile,
+      `${id}: spec.file 과 manifest.formFile 이 다릅니다 — 굽는 이름과 거는 이름이 어긋납니다`);
+  }
+});
+
 test('실험마다 빌드 진입점이 있다', () => {
   const cfg = read('vite.config.js');
   const missing = EXPERIMENTS.filter((id) => !cfg.includes(`experiments/${id}/index.html`));

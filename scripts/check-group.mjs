@@ -177,6 +177,12 @@ await prac.click('#pn-make');
 await prac.waitForFunction(() => window.__printed === true);
 const sheetHtml = await prac.evaluate(() => document.querySelector('#practice-sheet').innerHTML);
 ok(/피드백 노트/.test(sheetHtml) && /두 방울만/.test(sheetHtml), '피드백 노트 종이가 만들어진다');
+/* 실제 실험용 양식 (T39) — 리허설 칸에서 바로 받을 수 있어야 한다 */
+const formHref = await prac.getAttribute('#practice-form-link', 'href');
+ok(Boolean(formHref) && formHref.startsWith('/forms/'), `리허설 칸에 실제 실험용 양식 링크 (${formHref})`);
+const formRes = await prac.request.get(new URL(formHref, prac.url()).toString());
+ok(formRes.status() === 200 && formRes.headers()['content-type']?.includes('pdf'),
+  `그 양식이 실제로 열린다 (${formRes.status()} ${formRes.headers()['content-type']})`);
 await prac.screenshot({ path: 'shots/practice-head.png' });
 
 /* ── 리허설 링크 (T37) ──────────────────────────────────────────────
@@ -210,6 +216,10 @@ ok((await tc.textContent('.tc-duty')).includes('피드백 노트'), '리허설�
 await tc.click('input[name="tc-purpose"][value="virtual"]');
 await tc.click('input[name="tc-mode"][value="group"]');
 ok((await tc.textContent('.tc-card')).includes('QR 로 모둠장 기기에 모아'), '모둠을 고르면 모으는 법을 말한다');
+const tcForm = await tc.getAttribute('#tc-form-link', 'href');
+ok(Boolean(tcForm) && tcForm.includes('/forms/'), `선생님 화면에서도 이 실험의 양식을 받는다 (${decodeURIComponent(tcForm ?? '')})`);
+const tcRes = await tc.request.get(tcForm);
+ok(tcRes.status() === 200, `그 양식이 실제로 열린다 (${tcRes.status()})`);
 await tc.screenshot({ path: 'shots/teacher-modes.png', fullPage: true });
 
 await browser.close();

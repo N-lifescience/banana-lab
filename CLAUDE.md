@@ -10,9 +10,13 @@ npm run dev      # http://localhost:5173
 npm run check    # 커밋 전 필수 — 테스트 + 아트 디렉션 린터 + 글꼴·양식 어긋남
 ```
 
-첫 화면 문구를 고쳤으면 `npm run fonts`, 실제 실험용 보고서 양식(`src/forms/report-form.html`)을
-고쳤으면 `npm run form` 을 다시 돌린다. 둘 다 **구운 결과가 저장소에 든다** — `npm run check` 가
-어긋남을 잡지만, 고치는 것은 사람 몫이다.
+첫 화면 문구를 고쳤으면 `npm run fonts`, 실제 실험용 보고서 양식을 고쳤으면 `npm run form` 을
+다시 돌린다. 둘 다 **구운 결과가 저장소에 든다** — `npm run check` 가 어긋남을 잡지만,
+고치는 것은 사람 몫이다.
+
+양식은 **틀 하나 + 실험마다 다른 내용**이다 — 틀은 `src/forms/template.js`, 내용은
+`experiments/<실험>/src/forms/spec.js`, 파일 이름은 `manifest.formFile`(셋이 어긋나면 굽다가 멎는다).
+`npm run form -- banana` 로 하나만 구워 볼 수 있고, **두 쪽을 넘기면 실패한다**(교실에서 뽑는 종이다).
 
 ## 이 저장소에서 가장 자주 틀리는 것 세 가지
 

@@ -90,6 +90,18 @@ export const manifest = {
 
   skeleton: 'time-course',
 
+  /**
+
+   * 실제 실험용 보고서 양식(`public/forms/`)의 파일 이름. **이 값이 그 종이의 유일한 주소다** —
+
+   * 앱과 선생님 화면이 이것으로 링크를 만들고, `scripts/build-report-form.mjs` 가 이 이름으로 굽는다.
+
+   * 내용은 `src/forms/spec.js` 에 있다. 둘이 어긋나면 굽는 자리에서 멎는다.
+
+   */
+
+  formFile: '발아_중인_콩의_물질대사_보고서양식.pdf',
+
   /** 'ready' 는 열어서 쓸 수 있다는 뜻. 'draft' 는 목록에 흐리게만 나온다. */
   status: 'ready',
 

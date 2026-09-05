@@ -56,6 +56,8 @@ export function mountPracticeHead(noteRoot, ctx) {
       </ul>` : ''}
       <div class="group-actions">
         <button type="button" id="practice-note-btn">${P.noteButton}</button>
+        ${ctx.formUrl ? `<a class="fb-form" id="practice-form-link" href="${esc(ctx.formUrl)}"
+          download title="${P.formLinkTitle}">${P.formLink} ↓</a>` : ''}
       </div>`;
     slot.querySelector('#practice-note-btn').addEventListener('click', () => openFeedbackNote(ctx));
   }

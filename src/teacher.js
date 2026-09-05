@@ -110,6 +110,14 @@ if (!exp) {
         const qs = q.toString();
         return `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}${qs ? `?${qs}` : ''}`;
       },
+      /**
+       * 이 실험의 **실제 실험용 보고서 양식**. `public/forms/` 에 구워 둔 것이고,
+       * 이름은 매니페스트가 안다(`scripts/build-report-form.mjs` 가 같은 값으로 굽는다).
+       * 아직 양식이 없는 실험이면 `null` — 선생님 화면이 그 칸을 안 그린다.
+       */
+      form: () => (manifest.formFile
+        ? `${location.origin}/forms/${encodeURIComponent(manifest.formFile)}`
+        : null),
     },
   });
 }

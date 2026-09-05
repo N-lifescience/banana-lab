@@ -285,6 +285,15 @@
   .card p{font-size:13.5px;color:var(--ink-2);margin:0;flex:1;word-break:keep-all}
   .card .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
   .page{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+  /* 카드 밑에 붙는 그 실험의 양식 링크 (T39). 카드가 <a> 라 **안에는 못 넣는다** —
+     링크 안에 링크는 없는 문법이다. 그래서 칸(.cell)으로 둘을 묶는다. */
+  .cell{display:flex;flex-direction:column;gap:6px}
+  .cell .card{flex:1}
+  .cell .form{
+    font-size:12px;color:var(--ink-3);text-decoration:none;padding:2px 4px;border-radius:6px;
+    align-self:flex-start;
+  }
+  .cell .form:hover{color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px}
   .badge{font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:999px;white-space:nowrap}
   .badge.done{background:var(--accent);color:#fff}
   .card:hover,.card:focus-visible{transform:translateY(-3px);box-shadow:0 10px 26px var(--shadow);border-color:var(--accent)}
@@ -460,15 +469,16 @@
     </div>
   </div>
 
-  <!-- 이 PDF 는 `src/forms/report-form.html` 을 구운 것이다 (`scripts/build-report-form.mjs`).
-       주소를 고치면 `tests/site.test.js` 의 「내려받기 링크가 실제 파일을 가리킨다」가 운다. -->
+  <!-- 이 PDF 들은 `src/forms/template.js` + 각 실험의 `src/forms/spec.js` 를 구운 것이다
+       (`npm run form`). 주소를 고치면 `tests/site.test.js` 의 「내려받기 링크가 실제 파일을
+       가리킨다」가 운다. 카드마다 붙은 링크는 그 실험 것, 여기 것은 공용이다. -->
   <div class="form-strip">
     <div class="txt">
-      <h3>실제 실험용 <b>탐구 보고서 양식</b></h3>
-      <p>리허설로 절차를 익힌 뒤, <b>진짜 실험실에서 손으로 쓰는 빈 양식</b>입니다. 칸 차례는 화면의 탐구 노트와 같습니다 — 1 문제 인식부터 7 자기 평가까지. 인쇄해 나눠 주시고, 수업에 맞게 고쳐 쓰셔도 됩니다.</p>
-      <span class="meta">A4 · 2쪽 · PDF</span>
+      <h3>실제 실험용 <b>탐구 보고서 양식</b> — 실험마다 있습니다</h3>
+      <p>리허설로 절차를 익힌 뒤, <b>진짜 실험실에서 손으로 쓰는 빈 양식</b>입니다. 칸 차례는 화면의 탐구 노트와 같고(1 문제 인식 … 7 자기 평가), <b>준비물 ☐ 목록과 결과 칸은 그 실험 것</b>입니다 — 현미경 실험은 시야 원, 원심분리는 관의 층, 크로마토그래피는 띠와 Rf, 발효·효소는 시간에 따른 표와 모눈입니다. 아래 <b>실험 카드마다</b>, 그리고 선생님 화면에서 받으실 수 있습니다.</p>
+      <span class="meta">A4 · 2쪽 · PDF · 실험 8종 + 공용</span>
     </div>
-    <a class="btn primary" href="/forms/탐구보고서_양식.pdf" download>양식 PDF 내려받기 ↓</a>
+    <a class="btn primary" href="/forms/공용_탐구보고서_양식.pdf" download>공용 양식 내려받기 ↓</a>
   </div>
 </section>
 
@@ -495,7 +505,7 @@
         <li><b>학생용 링크와 QR</b>이 그 자리에서 나옵니다. 인쇄해 붙이거나 칠판에 띄우세요. 학생은 <b>QR 을 찍으면 고른 모드로 바로</b> 시작합니다 — 가입도 설치도 코드도 없습니다.</li>
         <li>학생이 마치면 <b>PDF</b>(탐구 보고서 또는 피드백 노트)<b>를 저장</b>해 학교 과제방이나 메신저로 냅니다. 파일 이름에 학번·이름이 붙어 모으기 쉽습니다.</li>
       </ol>
-      <p class="note">이 사이트는 <b>학생 정보를 서버에 저장하지 않습니다.</b> 실험 기록은 학생 기기 안에만 있고, 남는 것은 학생이 저장한 PDF 뿐입니다. 모둠명·별명은 링크에 안 실리고 학생 기기에서 정합니다. 실제 실험 때 쓸 <a href="/forms/탐구보고서_양식.pdf" download>보고서 양식 PDF</a> 는 위 「모드」 칸에서 받으실 수 있습니다.</p>
+      <p class="note">이 사이트는 <b>학생 정보를 서버에 저장하지 않습니다.</b> 실험 기록은 학생 기기 안에만 있고, 남는 것은 학생이 저장한 PDF 뿐입니다. 모둠명·별명은 링크에 안 실리고 학생 기기에서 정합니다. 실제 실험 때 쓸 <b>보고서 양식 PDF</b> 는 실험 카드마다, 그리고 선생님 화면에서 받으실 수 있습니다.</p>
       <a class="btn go" href="/teacher">선생님 화면 열기 →</a>
     </div>
   </div>
@@ -517,30 +527,42 @@
       <span class="unit-meta">가상 4</span>
     </div>
     <div class="grid">
-      <a class="card" href="/cell-metabolism/banana">
-        <span class="type">관찰 실험</span>
-        <h3>바나나에서 탄수화물과 지질 관찰하기</h3>
-        <p>과육을 얇게 문질러 시약으로 물들이고, 현미경으로 세포 속 녹말과 지방을 찾는다.</p>
-        <div class="foot"><span class="page">교과서 13쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
-      <a class="card" href="/cell-metabolism/micrometer">
-        <span class="type">관찰 실험</span>
-        <h3>현미경으로 세포의 크기 측정하기</h3>
-        <p>접안·대물 마이크로미터의 눈금을 나란히 겹쳐, 눈으로 보이지 않는 세포를 잰다.</p>
-        <div class="foot"><span class="page">교과서 20쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
-      <a class="card" href="/cell-metabolism/centrifuge">
-        <span class="type">제작 실험 · 재구성</span>
-        <h3>간이 원심분리기로 혈액 나누기</h3>
-        <p>모세관에 혈액을 채워 밀봉하고, 끈을 리듬 있게 당겨 돌려 성분을 층으로 가른다.</p>
-        <div class="foot"><span class="page">교과서 24쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
-      <a class="card" href="/cell-metabolism/osmosis">
-        <span class="type">관찰 실험</span>
-        <h3>세포에서 일어나는 삼투 현상 관찰하기</h3>
-        <p>적양파 표피를 벗겨 봉입하고, 농도가 다른 용액을 흘려 세포 모양의 변화를 본다.</p>
-        <div class="foot"><span class="page">교과서 40쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/banana">
+          <span class="type">관찰 실험</span>
+          <h3>바나나에서 탄수화물과 지질 관찰하기</h3>
+          <p>과육을 얇게 문질러 시약으로 물들이고, 현미경으로 세포 속 녹말과 지방을 찾는다.</p>
+          <div class="foot"><span class="page">교과서 13쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/바나나_탄수화물과_지질_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/micrometer">
+          <span class="type">관찰 실험</span>
+          <h3>현미경으로 세포의 크기 측정하기</h3>
+          <p>접안·대물 마이크로미터의 눈금을 나란히 겹쳐, 눈으로 보이지 않는 세포를 잰다.</p>
+          <div class="foot"><span class="page">교과서 20쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/현미경_세포_크기_측정_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/centrifuge">
+          <span class="type">제작 실험 · 재구성</span>
+          <h3>간이 원심분리기로 혈액 나누기</h3>
+          <p>모세관에 혈액을 채워 밀봉하고, 끈을 리듬 있게 당겨 돌려 성분을 층으로 가른다.</p>
+          <div class="foot"><span class="page">교과서 24쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/간이_원심분리기_혈액_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/osmosis">
+          <span class="type">관찰 실험</span>
+          <h3>세포에서 일어나는 삼투 현상 관찰하기</h3>
+          <p>적양파 표피를 벗겨 봉입하고, 농도가 다른 용액을 흘려 세포 모양의 변화를 본다.</p>
+          <div class="foot"><span class="page">교과서 40쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/삼투_현상_관찰_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>
     <ul class="class-list">
@@ -558,18 +580,24 @@
       <span class="unit-meta">가상 2</span>
     </div>
     <div class="grid">
-      <a class="card" href="/cell-metabolism/catalase">
-        <span class="type">실험 설계</span>
-        <h3>효소의 작용에 영향을 미치는 요인 탐구하기</h3>
-        <p>온도와 pH를 변인으로 설계하고, 감자즙 거름종이가 떠오르는 때로 카탈레이스의 활성을 읽는다.</p>
-        <div class="foot"><span class="page">교과서 72쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
-      <a class="card" href="/cell-metabolism/germination">
-        <span class="type">디지털 활동 · 재구성</span>
-        <h3>발아 중인 콩의 물질대사 대조 실험</h3>
-        <p>발아 콩과 마른 콩의 두 챔버를 꾸미고, 대사가 어느 쪽에서 더 크게 일어나는지 견준다.</p>
-        <div class="foot"><span class="page">교과서 62쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/catalase">
+          <span class="type">실험 설계</span>
+          <h3>효소의 작용에 영향을 미치는 요인 탐구하기</h3>
+          <p>온도와 pH를 변인으로 설계하고, 감자즙 거름종이가 떠오르는 때로 카탈레이스의 활성을 읽는다.</p>
+          <div class="foot"><span class="page">교과서 72쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/효소_작용에_영향을_주는_요인_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/germination">
+          <span class="type">디지털 활동 · 재구성</span>
+          <h3>발아 중인 콩의 물질대사 대조 실험</h3>
+          <p>발아 콩과 마른 콩의 두 챔버를 꾸미고, 대사가 어느 쪽에서 더 크게 일어나는지 견준다.</p>
+          <div class="foot"><span class="page">교과서 62쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/발아_중인_콩의_물질대사_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>
     <ul class="class-list">
@@ -589,18 +617,24 @@
       <span class="unit-meta">가상 2</span>
     </div>
     <div class="grid">
-      <a class="card" href="/cell-metabolism/fermentation">
-        <span class="type">실험 설계</span>
-        <h3>발효 실험 설계하여 수행하기</h3>
-        <p>효모액을 만들고 농도·온도를 변인으로 설계해, 알코올발효로 나오는 기체를 지켜본다.</p>
-        <div class="foot"><span class="page">교과서 98쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
-      <a class="card" href="/cell-metabolism/chromatography">
-        <span class="type">관찰 실험</span>
-        <h3>크로마토그래피로 광합성색소 분리하기</h3>
-        <p>잎에서 뽑은 색소를 판의 원점에 찍고, 전개액을 올려 여러 색의 띠로 나눈다.</p>
-        <div class="foot"><span class="page">교과서 105쪽</span><span class="badge done">지금 열기 →</span></div>
-      </a>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/fermentation">
+          <span class="type">실험 설계</span>
+          <h3>발효 실험 설계하여 수행하기</h3>
+          <p>효모액을 만들고 농도·온도를 변인으로 설계해, 알코올발효로 나오는 기체를 지켜본다.</p>
+          <div class="foot"><span class="page">교과서 98쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/발효_실험_설계_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
+      <div class="cell">
+        <a class="card" href="/cell-metabolism/chromatography">
+          <span class="type">관찰 실험</span>
+          <h3>크로마토그래피로 광합성색소 분리하기</h3>
+          <p>잎에서 뽑은 색소를 판의 원점에 찍고, 전개액을 올려 여러 색의 띠로 나눈다.</p>
+          <div class="foot"><span class="page">교과서 105쪽</span><span class="badge done">지금 열기 →</span></div>
+        </a>
+        <a class="form" href="/forms/광합성_색소_크로마토그래피_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+      </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>
     <ul class="class-list">

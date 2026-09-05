@@ -205,6 +205,11 @@ function boot(level, mode = MODES.GROUP, groupSetup = null, { practice = false }
     group,
     practice: feedback ? {
       feedback, host: dialogHost, appTitle: UI.appTitle,
+      /*
+       * 실제 실험용 양식 (T39). 주소를 아는 것은 **사이트**라 여기서 만들어 넘긴다 —
+       * 부품(`practice/panel.js`)이 `/forms/` 를 알면 다른 곳에 실을 수 없게 된다.
+       */
+      formUrl: manifest.formFile ? `/forms/${encodeURIComponent(manifest.formFile)}` : null,
       levelName: UI.start?.levels?.find((l) => l.id === 1)?.name ?? '',
     } : null,
     onOpenZoom: openZoom,

@@ -105,6 +105,12 @@ function renderShare(root) {
   // 앱의 기본과 같게 **혼자**다 (T36). 여기만 모둠이면 선생님이 고른 적 없는 값이 링크에 실린다.
   let mode = 'solo';
 
+  /*
+   * 이 실험의 실제 실험용 양식 (T39). 주소를 만드는 것은 **사이트**의 일이라 주입받는다 —
+   * 없으면(그런 양식이 아직 없는 실험이면) 그 칸을 아예 안 그린다. 죽은 단추를 두지 않는다.
+   */
+  const formUrl = typeof links.form === 'function' ? links.form() : null;
+
   const draw = () => {
     const practice = purpose === 'practice';
     const url = links.plain(practice ? { practice: true } : { level, mode });
@@ -145,6 +151,9 @@ function renderShare(root) {
         </div>
         <button type="button" id="tc-print-qr">${Sh.print}</button>
         <p class="tc-duty">${practice ? Pt.practiceCollect : Sh.howToCollect}</p>
+        ${formUrl ? `<hr class="tc-rule">
+        <p class="tc-hint">${Pt.formLead}</p>
+        <a class="tc-form" id="tc-form-link" href="${escapeHtml(formUrl)}" download>${Pt.formButton} ↓</a>` : ''}
       </section>
       <div id="tc-print-area" class="tc-print-area">
         <div class="tc-print-one tc-print-qr">
