@@ -92,13 +92,21 @@ if (!exp) {
     escapeHtml,
     links: {
       /**
-       * 나눠 주는 학생 링크 — 실험의 교과 주소에 단계·방식만 붙인다.
+       * 나눠 주는 학생 링크 — 실험의 교과 주소에 **용도**와 단계·방식만 붙인다.
        * 보내는 곳이 없으므로 아무것도 서버에 남지 않는다. 학생은 PDF 로 낸다.
+       *
+       * 실험 리허설은 `?practice=1` **하나뿐**이다 (T37). 연습이 단계·혼자를 고정하므로
+       * (`main.js` 의 `if (practice) { level = 1; mode = SOLO; }`) 함께 실으면 그 값이
+       * 조용히 무시된다 — 링크가 거짓말을 하게 둘 자리는 아니다.
        */
-      plain: ({ level, mode } = {}) => {
+      plain: ({ level, mode, practice } = {}) => {
         const q = new URLSearchParams();
-        if (level) q.set('level', String(level));
-        if (mode) q.set('mode', mode);
+        if (practice) {
+          q.set('practice', '1');
+        } else {
+          if (level) q.set('level', String(level));
+          if (mode) q.set('mode', mode);
+        }
         const qs = q.toString();
         return `${location.origin}${EXP_BASE}/${encodeURIComponent(manifest.id)}${qs ? `?${qs}` : ''}`;
       },

@@ -189,6 +189,34 @@
   .pr .lv span:nth-child(3){opacity:.22}
   @media (max-width:720px){ .principles{grid-template-columns:1fr} }
 
+  /* ── 두 가지 모드 ───────────────────────────────────────── */
+  .modes{padding:40px 0 0}
+  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mode{
+    background:var(--surface);border:1px solid var(--line-2);border-radius:18px;padding:22px 24px 20px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .mode.rehearse{background:var(--surface-2)}
+  .mode h3{font-family:"Gowun Batang",serif;font-weight:700;font-size:20px;margin:0;display:flex;align-items:center;gap:10px}
+  .mode .pill{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--accent-ink);border:1.5px solid var(--accent);border-radius:999px;padding:2px 9px;
+  }
+  .mode p{margin:0;font-size:14px;color:var(--ink-2)}
+  .mode b{color:var(--ink);font-weight:500}
+  .mode .flow{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  .mode .flow li{
+    font-size:12.5px;color:var(--ink-2);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:999px;padding:4px 11px;word-break:keep-all;
+  }
+  .mode.rehearse .flow li{background:var(--surface)}
+  .mode .out{
+    margin-top:auto;padding-top:12px;border-top:1px solid var(--line);
+    font-size:13px;color:var(--ink-2);
+  }
+  .mode .out b{color:var(--accent-ink);font-weight:500}
+  @media (max-width:760px){ .mode-grid{grid-template-columns:1fr} }
+
   /* ── 사용법 ─────────────────────────────────────────────── */
   .use{padding:44px 0 8px}
   .sec-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 18px}
@@ -291,6 +319,7 @@
     </a>
     <nav class="nav" aria-label="바로 가기">
       <a href="#experiments">실험</a>
+      <a href="#modes">모드</a>
       <a href="#how-to">사용법</a>
       <a class="teacher" href="/teacher">선생님 화면 →</a>
     </nav>
@@ -384,6 +413,40 @@
   </div>
 </section>
 
+<!-- 두 모드는 **실험 화면 1쪽에서 학생이 실제로 보는 것**이다 (`packages/lab-kit/practice/strings.js` 의 P).
+     이름을 여기서만 바꾸면 첫 화면과 실험이 다른 말을 하게 된다 — 고칠 때 둘을 같이 본다. -->
+<section class="modes wrap" id="modes" aria-labelledby="modes-title">
+  <div class="sec-head">
+    <h2 id="modes-title">두 가지로 씁니다</h2>
+    <p>실험을 열면 <b>무엇에 쓸지</b>부터 고릅니다. 남는 종이가 다릅니다.</p>
+  </div>
+  <div class="mode-grid">
+    <div class="mode">
+      <h3>탐구 실험 <span class="pill">Inquiry</span></h3>
+      <p>가상 실험을 처음부터 끝까지 하고 <b>탐구 보고서</b>까지 씁니다. 난이도(1·2·3)를 고르고, 혼자 또는 모둠으로 합니다.</p>
+      <ul class="flow">
+        <li>단계 고르기</li>
+        <li>혼자 · 모둠</li>
+        <li>실험대에서 조작</li>
+        <li>탐구 노트 일곱 쪽</li>
+        <li>보고서</li>
+      </ul>
+      <p class="out">남는 것 — <b>탐구 보고서 PDF</b>. 모둠이면 각자 자기 기기에서 실험하고, 기록을 QR 로 모둠장 기기에 모아 토의한 뒤 모둠장이 냅니다.</p>
+    </div>
+    <div class="mode rehearse">
+      <h3>실험 리허설 <span class="pill">Rehearsal</span></h3>
+      <p>실제 실험실에 들어가기 전에 <b>절차를 미리 연습</b>합니다. 할 일을 하나씩 짚어 주고, 잘 안 된 조작을 그 자리에서 모읍니다. 고를 것이 없어 <b>바로 실험대</b>로 열립니다.</p>
+      <ul class="flow">
+        <li>바로 실험대</li>
+        <li>하나씩 짚어 줌</li>
+        <li>잘 안 된 것 모으기</li>
+        <li>피드백 노트</li>
+      </ul>
+      <p class="out">남는 것 — <b>피드백 노트 PDF</b>. 「무엇이 · 몇 번 · 다음엔 이렇게」가 한 장에 담깁니다. 실제 실험 때 옆에 두는 종이라 보고서는 없습니다.</p>
+    </div>
+  </div>
+</section>
+
 <section class="use wrap" id="how-to" aria-labelledby="use-title">
   <div class="sec-head">
     <h2 id="use-title">사용법</h2>
@@ -393,20 +456,21 @@
     <div class="who">
       <h3><span class="tag">Student</span> 학생은 이렇게</h3>
       <ol class="steps">
-        <li><b>실험을 고르고</b> 단계(1·2·3)와 혼자/모둠을 정합니다. 선생님이 주신 QR·링크로 들어왔다면 이미 골라져 있습니다.</li>
+        <li><b>실험을 고르고</b> 「탐구 실험」인지 「실험 리허설」인지 먼저 정합니다. 선생님이 주신 QR·링크로 들어왔다면 이미 골라져 있습니다.</li>
+        <li>탐구 실험이면 <b>단계(1·2·3)와 혼자/모둠</b>을, 모둠이면 <b>모둠명·역할·별명</b>까지 정합니다. 리허설은 묻지 않고 바로 시작합니다.</li>
         <li><b>탐구 노트를 따라</b> 실험대의 기구를 끌어다 씁니다. 틀려도 멈추지 않으니, 결과를 보고 다시 해 보세요. 되돌리기도 있습니다.</li>
-        <li>결과를 기록하고 결론을 쓰면 <b>「보고서 만들기」</b> → 인쇄 창에서 <b>PDF 로 저장</b> → 선생님께 냅니다.</li>
+        <li>다 하면 <b>「보고서 만들기」</b>(리허설은 <b>「피드백 노트 PDF」</b>) → 인쇄 창에서 <b>PDF 로 저장</b> → 선생님께 냅니다.</li>
       </ol>
-      <p class="note">이름과 학번은 보고서를 만들 때만 묻고, 어디에도 보내지 않습니다. 인쇄 창이 닫히면 화면에서도 지웁니다.</p>
+      <p class="note">이름과 학번은 PDF 를 만들 때만 묻고, 어디에도 보내지 않습니다. 인쇄 창이 닫히면 화면에서도 지웁니다. 모둠에서 쓰는 것은 별명뿐입니다.</p>
     </div>
     <div class="who teacher">
       <h3><span class="tag">Teacher</span> 선생님은 이렇게</h3>
       <ol class="steps">
-        <li><b>「선생님 화면」</b>에서 실험을 고르고 단계(1·2·3)와 혼자/모둠을 정하면 <b>학생용 링크와 QR</b>이 나옵니다. 인쇄해 붙이거나 칠판에 띄우세요.</li>
-        <li>학생은 <b>QR 을 찍고 바로 시작</b>합니다. 가입도 설치도 코드도 없습니다.</li>
-        <li>학생이 마치면 <b>보고서를 PDF 로 저장</b>해 학교 과제방이나 메신저로 냅니다. 파일 이름에 학번·이름이 붙어 모으기 쉽습니다.</li>
+        <li><b>「선생님 화면」</b>에서 실험과 <b>용도(탐구 실험 · 실험 리허설)</b>를 고릅니다. 탐구 실험이면 단계(1·2·3)와 혼자/모둠까지 정합니다.</li>
+        <li><b>학생용 링크와 QR</b>이 그 자리에서 나옵니다. 인쇄해 붙이거나 칠판에 띄우세요. 학생은 <b>QR 을 찍으면 고른 모드로 바로</b> 시작합니다 — 가입도 설치도 코드도 없습니다.</li>
+        <li>학생이 마치면 <b>PDF</b>(탐구 보고서 또는 피드백 노트)<b>를 저장</b>해 학교 과제방이나 메신저로 냅니다. 파일 이름에 학번·이름이 붙어 모으기 쉽습니다.</li>
       </ol>
-      <p class="note">이 사이트는 <b>학생 정보를 서버에 저장하지 않습니다.</b> 실험 기록은 학생 기기 안에만 있고, 남는 것은 학생이 저장한 PDF 뿐입니다.</p>
+      <p class="note">이 사이트는 <b>학생 정보를 서버에 저장하지 않습니다.</b> 실험 기록은 학생 기기 안에만 있고, 남는 것은 학생이 저장한 PDF 뿐입니다. 모둠명·별명은 링크에 안 실리고 학생 기기에서 정합니다.</p>
       <a class="btn go" href="/teacher">선생님 화면 열기 →</a>
     </div>
   </div>

@@ -103,6 +103,11 @@ function fromQuery() {
   return {
     level: [1, 2, 3].includes(level) ? level : null,
     mode: Object.values(MODES).includes(mode) ? mode : null,
+    /*
+     * 실험 리허설 (T37) — 선생님 화면이 만드는 세 번째 링크. 단계·방식과 **함께 쓰지 않는다.**
+     * 연습은 `start()` 에서 1단계·혼자로 고정되므로, 같이 실어 주면 고른 값이 조용히 무시된다.
+     */
+    practice: q.get('practice') === '1',
     edit: q.get('edit') === '1',
   };
 }
@@ -220,7 +225,10 @@ const q = fromQuery();
  * 단계·방식 고르기는 잠근 채 그 칸만 보인다. 편집 모드는 그대로 건너뛴다.
  */
 const groupLink = q.mode === MODES.GROUP && Boolean(q.level) && !q.edit;
-if ((q.edit || (q.level && q.mode)) && !groupLink) {
+// 리허설 링크는 묻지 않고 바로 연다 — 고를 것이 없기 때문이다 (T37).
+if (q.practice && !q.edit) {
+  start(1, MODES.SOLO, null, { practice: true });
+} else if ((q.edit || (q.level && q.mode)) && !groupLink) {
   start(q.level ?? 1, q.mode ?? MODES.GROUP);
 } else if (groupLink) {
   createStart($('#start'), start, q.level, MODES.GROUP, UI, { lock: true });

@@ -20,6 +20,8 @@
  */
 
 import { qrSVG } from './ui/qr.js';
+import { P } from './practice/strings.js';
+import { G } from './group/strings.js';
 
 /*
  * 주입받은 것을 담는 자리. `mountTeacher()` 를 부르기 전에는 비어 있다 —
@@ -82,19 +84,48 @@ function bindCopy(root) {
 /* ------------------------------------------------------------------ */
 
 /**
- * 단계·방식을 골라 학생용 링크와 QR 을 만든다. **아무것도 저장하지 않는다.**
+ * 용도(탐구 실험 / 실험 리허설)와 단계·방식을 골라 학생용 링크와 QR 을 만든다.
+ * **아무것도 저장하지 않는다.**
+ *
+ * ── 왜 용도가 여기에도 있는가 (T37) ─────────────────────────────────
+ * 학생 화면은 1쪽에서 용도를 먼저 묻는다(`ui/start.js`). 선생님 화면이 그것을 모르면
+ * 여기서 만든 링크는 **늘 탐구 실험**이고, 「실험 리허설로 한 시간 돌려 보자」는 수업은
+ * 링크를 못 만든다 — 학생마다 1쪽에서 제대로 골랐기를 바라는 수밖에 없다.
+ *
+ * 리허설 링크는 `?practice=1` 하나다. 단계·방식을 안 싣는 이유는 **연습이 그 둘을 고정하기
+ * 때문**이다(`main.js` 의 `if (practice) { level = 1; mode = SOLO; }`). 링크에 실어 주면
+ * 고른 값이 조용히 무시된다 — 그건 거짓말이다.
  */
 function renderShare(root) {
   const S = UI_ALL.start;
   const Sh = T.share;
+  const Pt = P.teacher;
+  let purpose = 'virtual';
   let level = 1;
-  let mode = 'group';
+  // 앱의 기본과 같게 **혼자**다 (T36). 여기만 모둠이면 선생님이 고른 적 없는 값이 링크에 실린다.
+  let mode = 'solo';
 
   const draw = () => {
-    const url = links.plain({ level, mode });
+    const practice = purpose === 'practice';
+    const url = links.plain(practice ? { practice: true } : { level, mode });
+    const subtitle = practice
+      ? P.practice.name
+      : `${S.levels.find((l) => l.id === level)?.name ?? ''} · ${S.modes.find((m) => m.id === mode)?.name ?? ''}`;
     root.innerHTML = `
       <section class="tc-card">
         <h2>${Sh.heading}</h2>
+        <div class="tc-field"><span>${P.purposeLabel}</span>
+          <div class="tc-purposes" role="radiogroup" aria-label="${P.purposeLabel}">
+            ${[['virtual', P.virtual], ['practice', P.practice]].map(([id, m]) => `
+              <label class="tc-purpose${id === purpose ? ' is-on' : ''}">
+                <input type="radio" name="tc-purpose" value="${id}"${id === purpose ? ' checked' : ''}>
+                <span class="tc-purpose-name">${escapeHtml(m.name)}</span>
+                <span class="tc-purpose-desc">${escapeHtml(m.desc)}</span>
+              </label>`).join('')}
+          </div>
+          <p class="tc-hint">${Pt.purposeHint}</p>
+        </div>
+        ${practice ? `<p class="tc-hint tc-locked">${Pt.practiceLocked}</p>` : `
         <div class="tc-field"><span>${S.chooseLabel}</span>
           <div class="tc-choices" role="radiogroup" aria-label="${S.chooseLabel}">
             ${S.levels.map((l) => `<label><input type="radio" name="tc-level" value="${l.id}"${l.id === level ? ' checked' : ''}> <span class="tc-choice">${escapeHtml(l.name)}</span></label>`).join('')}
@@ -102,26 +133,29 @@ function renderShare(root) {
         <div class="tc-field"><span>${S.modeLabel}</span>
           <div class="tc-choices" role="radiogroup" aria-label="${S.modeLabel}">
             ${S.modes.map((m) => `<label><input type="radio" name="tc-mode" value="${m.id}"${m.id === mode ? ' checked' : ''}> <span class="tc-choice">${escapeHtml(m.name)}</span></label>`).join('')}
-          </div></div>
+          </div>
+          ${mode === 'group' ? `<p class="tc-hint">${G.teacherHint}</p>` : ''}
+        </div>`}
         <hr class="tc-rule">
         ${copyable('tc-plain', Sh.linkLabel, url)}
         <div class="tc-qr">
           <span class="tc-copy-label">${Sh.qrLabel}</span>
           <div class="tc-qr-box">${qrSVG(url, { size: 200 })}</div>
-          <p class="tc-hint">${Sh.qrHint}</p>
+          <p class="tc-hint">${practice ? Pt.practiceQrHint : Sh.qrHint}</p>
         </div>
         <button type="button" id="tc-print-qr">${Sh.print}</button>
-        <p class="tc-duty">${Sh.howToCollect}</p>
+        <p class="tc-duty">${practice ? Pt.practiceCollect : Sh.howToCollect}</p>
       </section>
       <div id="tc-print-area" class="tc-print-area">
         <div class="tc-print-one tc-print-qr">
           <h1>${escapeHtml(manifest.title)}</h1>
-          <p>${escapeHtml(S.levels.find((l) => l.id === level)?.name ?? '')} · ${escapeHtml(S.modes.find((m) => m.id === mode)?.name ?? '')}</p>
+          <p>${escapeHtml(subtitle)}</p>
           ${qrSVG(url, { size: 360 })}
           <p class="tc-print-url">${escapeHtml(url)}</p>
         </div>
       </div>`;
     bindCopy(root);
+    root.querySelectorAll('input[name="tc-purpose"]').forEach((el) => el.addEventListener('change', () => { purpose = el.value; draw(); }));
     root.querySelectorAll('input[name="tc-level"]').forEach((el) => el.addEventListener('change', () => { level = Number(el.value); draw(); }));
     root.querySelectorAll('input[name="tc-mode"]').forEach((el) => el.addEventListener('change', () => { mode = el.value; draw(); }));
     $('#tc-print-qr', root).addEventListener('click', () => setTimeout(() => window.print(), 60));

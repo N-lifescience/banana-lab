@@ -179,6 +179,39 @@ const sheetHtml = await prac.evaluate(() => document.querySelector('#practice-sh
 ok(/피드백 노트/.test(sheetHtml) && /두 방울만/.test(sheetHtml), '피드백 노트 종이가 만들어진다');
 await prac.screenshot({ path: 'shots/practice-head.png' });
 
+/* ── 리허설 링크 (T37) ──────────────────────────────────────────────
+ * 선생님 화면이 만드는 세 번째 링크. **묻지 않고 바로 리허설로 열려야** 한다 —
+ * 시작 화면이 한 번이라도 뜨면 QR 을 찍은 학생이 「탐구 실험」을 고를 수 있고,
+ * 그러면 선생님이 고른 것과 다른 수업이 된다.
+ */
+const pracLink = await ctx.newPage(); watch(pracLink);
+await pracLink.goto(`${url}?practice=1`);
+await pracLink.waitForSelector('#practice-head');
+ok(await pracLink.isHidden('#start'), '리허설 링크는 시작 화면을 안 거친다');
+ok(await pracLink.evaluate(() => window.__store.getState().session.level) === 1, '리허설 링크는 1단계');
+ok(await pracLink.evaluate(() => window.__store.getState().session.mode) === 'solo', '리허설 링크는 혼자');
+ok(await pracLink.isHidden('#report-slot'), '리허설 링크에도 보고서 단추는 없다');
+
+/* ── 선생님 화면이 두 모드를 다 만드는가 (T37) ───────────────────────
+ * **선생님은 이 링크를 인쇄해 나눠 준다.** 틀린 채로 나가면 되돌릴 수 없다.
+ */
+const tc = await ctx.newPage(); watch(tc);
+await tc.goto(`${devUrl().replace(/\/$/, '')}/teacher.html?exp=${exp}`);
+await tc.waitForSelector('#tc-plain');
+ok(await tc.inputValue('#tc-plain') === `${new URL(tc.url()).origin}/cell-metabolism/${exp}?level=1&mode=solo`,
+  `탐구 실험 링크가 단계·방식을 싣는다 (${await tc.inputValue('#tc-plain')})`);
+ok(await tc.isVisible('input[name="tc-level"]'), '탐구 실험이면 단계를 고른다');
+await tc.click('input[name="tc-purpose"][value="practice"]');
+await tc.waitForSelector('.tc-locked');
+ok(await tc.inputValue('#tc-plain') === `${new URL(tc.url()).origin}/cell-metabolism/${exp}?practice=1`,
+  `리허설 링크는 practice=1 하나 (${await tc.inputValue('#tc-plain')})`);
+ok(await tc.$('input[name="tc-level"]') === null, '리허설이면 단계·방식을 안 고른다 (고정이라 물으면 거짓말이다)');
+ok((await tc.textContent('.tc-duty')).includes('피드백 노트'), '리허설은 「피드백 노트 받는 법」을 말한다');
+await tc.click('input[name="tc-purpose"][value="virtual"]');
+await tc.click('input[name="tc-mode"][value="group"]');
+ok((await tc.textContent('.tc-card')).includes('QR 로 모둠장 기기에 모아'), '모둠을 고르면 모으는 법을 말한다');
+await tc.screenshot({ path: 'shots/teacher-modes.png', fullPage: true });
+
 await browser.close();
 console.log(`\n${errors.length ? '✗' : '✓'} pass ${pass}, errors ${errors.length}`);
 for (const e of errors) console.log('  ', e);

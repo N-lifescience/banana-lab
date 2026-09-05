@@ -76,6 +76,17 @@ function modeFromUrl() {
 }
 
 /**
+ * 실험 리허설 — `?practice=1` (T37).
+ *
+ * 선생님 화면이 만드는 **세 번째 링크**다. 단계·방식은 여기서 안 읽는다 — 연습은
+ * `boot()` 에서 1단계·혼자로 고정되므로, 링크에 실려 온 값이 있어도 조용히 무시된다.
+ * 실을 수 있는 척하지 않으려고 **아예 안 본다.**
+ */
+function practiceFromUrl() {
+  return new URLSearchParams(location.search).get('practice') === '1';
+}
+
+/**
  * 배치 편집 모드 — `?edit=1`.
  *
  * **배포본에서도 연다.** 선생님이 배치를 잡는 자리는 개발 서버가 아니라 실제 주소이고,
@@ -235,6 +246,8 @@ const modeUrl = modeFromUrl();
  * 주소로 단계가 정해져 있어도 **모둠으로 하는 링크면 모둠 짜기는 거쳐야 한다** (T35) —
  * 모둠명·역할·별명은 링크에 실을 수 없는 것이다. 단계·방식 고르기는 잠근 채 그 칸만 보인다.
  */
-if (fromUrl && modeUrl !== MODES.GROUP) boot(fromUrl, modeUrl ?? MODES.GROUP);
+// 리허설 링크는 묻지 않고 바로 연다 — 고를 것이 없기 때문이다 (T37).
+if (practiceFromUrl()) boot(1, MODES.SOLO, null, { practice: true });
+else if (fromUrl && modeUrl !== MODES.GROUP) boot(fromUrl, modeUrl ?? MODES.GROUP);
 else if (fromUrl) createStart($('#start'), boot, fromUrl, MODES.GROUP, UI, { lock: true });
 else createStart($('#start'), boot, 1, modeUrl ?? MODES.SOLO, UI);
