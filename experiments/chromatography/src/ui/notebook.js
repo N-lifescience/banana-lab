@@ -1065,17 +1065,61 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
   let missedRender = false;
   /** 글칸 저장이 도는 동안. 포커스가 옮겨 가는 중이라 그 자리에서 그리면 안 된다. */
   let savingNote = false;
+  /**
+   * **글을 치고 있는 칸인가.** 라디오·단추는 이미 끝난 일이라 미루지 않는다 —
+   * 미루면 다 골라도 판이 영영 안 그려져 「보고서 만들기」가 안 나온다.
+   * (centrifuge 가 그 자리에서 물렸다. 여기도 같은 것을 쓴다.)
+   */
+  const stillTyping = (el) => Boolean(el) && panelEl.contains(el)
+    && (el.tagName === 'TEXTAREA'
+      || (el.tagName === 'INPUT' && ['text', 'number', 'search', ''].includes(el.type)));
+
+  /**
+   * ★ **손가락에서는 포커스가 `pointerup` 보다 늦게 옮겨 간다.**
+   *
+   * 마우스는 `mousedown` 때 포커스가 옮겨 가지만, 손가락은 `touchend` → `click` 을 거친다.
+   * 그래서 `pointerup` 직후에 판을 갈면 그때 붙잡히는 것은 **아직 옛 칸**이고,
+   * 뒤늦게 도착한 포커스는 **이미 버려진 마디**로 간다 — `body` 에 떨어진다.
+   *
+   * 아이패드에서 실제로 그랬다: 관찰 기록 한 칸에 적고 같은 STEP 의 다음 칸을 짚으면
+   * 커서가 안 들어오고, **실험대에서 아무거나 누른 뒤에야** 들어왔다 (그때 판이 이미
+   * 갈린 뒤라 다음 탭이 성한 마디에 앉는다). 사장님 제보, 2026-09-05.
+   *
+   * 그래서 **손이 아직 글칸에 있으면 그리지 않는다.** 손이 노트를 떠날 때(`focusout`)
+   * 아래에서 따라잡는다. 그동안에도 관문 글자는 `input` 의 `refreshGates` 가 고쳐 준다.
+   */
   const flushSoon = () => setTimeout(() => {
     holding = false;
-    if (missedRender) { missedRender = false; render(); }
+    if (!missedRender) return;
+    if (stillTyping(document.activeElement)) return;
+    missedRender = false;
+    render();
   }, 0);
-  /** 저장이 미뤄 둔 그리기를 따라잡는다. **`holding` 은 건드리지 않는다** — 누름은 아직 안 끝났다. */
+  /**
+   * 저장이 미뤄 둔 그리기를 따라잡는다. **`holding` 은 건드리지 않는다** — 누름은 아직 안 끝났다.
+   *
+   * ★ **여기에도 「아직 치고 있는가」를 본다.** `flushSoon` 에만 달았다가 물렸다 —
+   *   손가락으로 다음 칸을 짚으면 두 타이머가 이 차례로 돈다:
+   *     `flushSoon` → holding 을 풀고, 손이 글칸에 있어서 그리지 않고 물러난다
+   *     `renderSoon` → holding 이 방금 풀렸으니 **그대로 그린다**  ← 여기서 칸이 사라졌다
+   *   한쪽만 막으면 다른 쪽으로 새어 나간다.
+   */
   const renderSoon = () => setTimeout(() => {
-    if (missedRender && !holding) { missedRender = false; render(); }
+    if (!missedRender || holding) return;
+    if (stillTyping(document.activeElement)) return;
+    missedRender = false;
+    render();
   }, 0);
   root.addEventListener('pointerdown', () => { holding = true; }, true);
   document.addEventListener('pointerup', flushSoon, true);
   document.addEventListener('pointercancel', flushSoon, true);
+  // 칸에서 칸으로 옮길 때는 위에서 걸러지고, **노트를 떠날 때** 여기서 밀린 것을 그린다.
+  root.addEventListener('focusout', () => setTimeout(() => {
+    if (holding || !missedRender) return;
+    if (stillTyping(document.activeElement)) return;
+    missedRender = false;
+    render();
+  }, 0));
 
   /*
    * **다시 그리면 손을 두고 있던 자리가 사라진다.**

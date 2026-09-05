@@ -61,6 +61,7 @@ npm run dev                      # /  앱,  /harness.html  하네스
 node scripts/check-ui.mjs        # 조작 UI — 화면을 띄워야 아는 것
 node scripts/check-bench.mjs     # 실험대 어포던스 — 말풍선·하이라이트·문지르기
 node scripts/check-grading.mjs   # 서술형 첨삭 — 바깥에서 던지는 문장
+node scripts/check-touch.mjs     # 손가락으로 노트 적기 — 아이패드에서만 나던 자리
 node scripts/perf-fov.mjs --dom  # 시야 렌더러 성능
 
 # 검사가 그 버그를 **정말 무는지** — 손으로 하면 두 가지를 틀린다
