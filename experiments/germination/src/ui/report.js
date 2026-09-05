@@ -23,6 +23,7 @@ import { isGroup } from './notebook.js';
 import { actualSummary, escapeHtml } from './notebook.js';
 import { UI } from './strings.js';
 import { manifest } from '../manifest.js';
+import { groupHeadRows, memberAppendix } from '../../../../packages/lab-kit/group/report-part.js';
 
 const R = UI.report;
 const N = UI.notebook;
@@ -34,7 +35,7 @@ const or = (v, fallback = R.blank) => (String(v ?? '').trim() ? escapeHtml(v) : 
 /* 종이 한 벌 만들기 — 여기서는 상태를 읽기만 한다                       */
 /* ------------------------------------------------------------------ */
 
-function head(st, who, group) {
+function head(st, who, group = false, groupStore = null) {
   const level = UI.start.levels.find((l) => l.id === st.session.level);
   /*
    * **모둠 활동지에는 모둠 칸도 함께 돈다.**
@@ -57,6 +58,7 @@ function head(st, who, group) {
       <h1>${R.sheetTitle}</h1>
       <dl class="rp-who">
         ${rows}
+        ${group ? groupHeadRows(groupStore) : ''}
         <div><dt>${R.levelLabel}</dt><dd>${level ? level.name : R.blank}</dd></div>
         <div><dt>${R.dateLabel}</dt><dd>${R.date(new Date())}</dd></div>
       </dl>
@@ -215,10 +217,18 @@ function selfEval(st) {
  * @param {object} who    이 화면에서만 받은 이름·학번. 상태에도 저장소에도 넣지 않는다.
  * @param {'solo'|'group'} [kind]  활동지 종류. 생략하면 세션이 정한 대로.
  */
-export function buildSheet(st, who, kind) {
+/** groupStore — 모둠장 기기면 모인 기록(T35). 머리에 별명 줄, 끝에 「모둠원별 기록」 절. 별명뿐이다. */
+export function buildSheet(st, who, kind, groupStore = null) {
   const group = kind ? kind === 'group' : isGroup(st);
+  const memberItems = [
+    { key: 'q.a', label: N.qaContinueLabel },
+    { key: 'q2', label: N.q2Label },
+    { key: 'q3', label: N.q3Label },
+    ...(N.q4Label ? [{ key: 'q4', label: N.q4Label }] : []),
+    ...(N.discussionItems ?? []).map(({ key, label }) => ({ key: `discuss.${key}`, label })),
+  ];
   return `
-    ${head(st, who, group)}
+    ${head(st, who, group, groupStore)}
     <section><h2>${R.sections.problem}</h2><p>${N.problem}</p></section>
     <section><h2>${R.sections.materials}</h2>
       <ul class="rp-steps">${N.materials.map((m) =>
@@ -229,7 +239,8 @@ export function buildSheet(st, who, kind) {
     ${results(st)}
     ${wrapup(st, group)}
     ${group ? discussion(st) : ''}
-    ${selfEval(st)}`;
+    ${selfEval(st)}
+    ${group ? memberAppendix(groupStore, memberItems) : ''}`;
 }
 
 /**
@@ -379,7 +390,8 @@ export function payloadOf(st, who, kind) {
   };
 }
 
-export function createReport(root, store) {
+export function createReport(root, store, { group = null } = {}) {
+  const groupStore = group?.groupStore ?? null;
   const fieldHtml = (f) => `
     <label class="rp-field${f.width === 'wide' ? ' rp-field--wide' : ''}">
       <span>${f.label}</span>
@@ -456,7 +468,7 @@ export function createReport(root, store) {
 
   root.querySelector('#rp-make').addEventListener('click', async () => {
     const who = Object.fromEntries(inputs.map((el) => [el.dataset.field, el.value]));
-    sheet.innerHTML = buildSheet(store.getState(), who, kind);
+    sheet.innerHTML = buildSheet(store.getState(), who, kind, groupStore);
     // 브라우저 인쇄는 문서 제목을 파일 이름의 기본값으로 쓴다.
     // 서른 명이 낸 파일 이름이 전부 같으면 받는 쪽에서 누구 것인지 알 수 없다.
     document.title = R.fileName(UI.appTitle, fileTag(who));
@@ -475,6 +487,9 @@ export function createReport(root, store) {
       kind = isGroup(store.getState()) ? 'group' : 'solo';
       paintKind();
       dialog.showModal();
+      // 모둠명은 시작할 때 이미 적었다 — 채워 둔다. 고칠 수는 있다. (T35)
+      const teamEl = inputs.find((el) => el.dataset.field === 'team');
+      if (teamEl && groupStore?.me.name) teamEl.value = groupStore.me.name;
       inputs[0]?.focus();
     },
   };

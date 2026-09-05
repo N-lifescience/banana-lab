@@ -57,15 +57,24 @@ function functionMask(size, version) {
   return f;
 }
 
-/** 형식 정보 15비트를 되읽어 (오류정정, 마스크)를 얻는다. */
+/**
+ * 형식 정보 15비트를 되읽어 (오류정정, 마스크)를 얻는다.
+ *
+ * ★ **(8,0) 이 비트 14(MSB) 다** — 규격 그림 25. 앞서 이 되읽기는 인코더와 **같은 방향으로
+ *   뒤집혀** 있었다. 「인코더와 따로 썼다」고 해도 같은 머리에서 나오면 같은 데서 틀린다 —
+ *   그래서 `tests/group-codec.test.js` 는 남이 만든 해독기(jsQR)로 한 번 더 읽는다.
+ *   (T35, 2026-09-05)
+ */
 function readFormat(m, size) {
-  let bits = 0;
   const get = (r, c) => (m[r][c] ? 1 : 0);
-  const seq = [];
-  for (let i = 0; i <= 5; i++) seq.push(get(8, i));
-  seq.push(get(8, 7), get(8, 8), get(7, 8));
-  for (let i = 9; i <= 14; i++) seq.push(get(14 - i, 8));
-  for (let i = 14; i >= 0; i--) bits = (bits << 1) | seq[i];
+  const b = new Array(15).fill(0);            // b[i] = 비트 i
+  for (let i = 0; i <= 5; i++) b[14 - i] = get(8, i);
+  b[8] = get(8, 7);
+  b[7] = get(8, 8);
+  b[6] = get(7, 8);
+  for (let r = 0; r <= 5; r++) b[r] = get(r, 8);
+  let bits = 0;
+  for (let i = 14; i >= 0; i--) bits = (bits << 1) | b[i];
   const unmasked = bits ^ 0b101010000010010;
   return { ec: (unmasked >>> 13) & 0b11, mask: (unmasked >>> 10) & 0b111 };
 }
@@ -186,5 +195,6 @@ test('SVG 는 바깥 여백을 두고 자기 안에서 완결된다', () => {
 });
 
 test('담을 수 없이 길면 조용히 틀린 것을 내지 않고 멈춘다', () => {
-  assert.throws(() => encodeQR('x'.repeat(200)), /너무 깁니다/);
+  // 버전 20(666 B)까지 늘렸다 (T35). 그보다 길면 여전히 멈춰야 한다.
+  assert.throws(() => encodeQR('x'.repeat(700)), /너무 깁니다/);
 });

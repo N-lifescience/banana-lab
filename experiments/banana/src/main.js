@@ -14,6 +14,9 @@ import { createNotebook } from './ui/notebook.js';
 import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createReport } from './ui/report.js';
 import { UI } from './ui/strings.js';
+import { createGroupStore } from '../../../packages/lab-kit/group/store.js';
+import { observability } from './sim/quality.js';
+import { manifest } from './manifest.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -146,9 +149,26 @@ let store = null;
  * 상태는 여기서 처음 만들어진다 — `session.level` 은 세션 내내 바뀌지 않는 값이라
  * 시작 화면에서 정해진 뒤에 만들어야 한다. 도중에 단계를 바꾸는 길은 두지 않는다.
  */
-function boot(level, mode = MODES.GROUP) {
+/**
+ * ── 모둠 (T35) ────────────────────────────────────────────────────────
+ * `groupSetup` 은 시작 화면이 받은 모둠명·인원·역할·별명이다. 실험 store 밖에 산다 —
+ * 조작이 아니고 되돌릴 것도 아니다. 혼자 하면 null 이라 모둠 부품이 하나도 안 그려진다.
+ */
+function boot(level, mode = MODES.GROUP, groupSetup = null) {
   $('#start').hidden = true;
   $('#app').hidden = false;
+
+  const groupStore = mode === MODES.GROUP && groupSetup ? createGroupStore(groupSetup) : null;
+  // 모둠 대화상자(보내기·모으기)가 붙을 자리. 보고서 창과 섞이지 않게 따로 둔다.
+  let dialogHost = $('#group-dialogs');
+  if (!dialogHost) {
+    dialogHost = document.createElement('div');
+    dialogHost.id = 'group-dialogs';
+    document.body.appendChild(dialogHost);
+  }
+  const group = groupStore ? {
+    groupStore, host: dialogHost, exp: manifest.id, capScore: (c) => observability(c).score,
+  } : null;
 
   // getLevel 은 store 를 나중에 참조한다 — 실제로 호출되는 시점(토스트가 뜰 때)에는
   // store 가 이미 만들어져 있으므로 순서상 문제 없다.
@@ -164,10 +184,11 @@ function boot(level, mode = MODES.GROUP) {
 
   const zoom = createZoom($('#zoom'), store);
   const openZoom = (mode, slideId, opener, tool) => zoom.open(mode, slideId, opener, tool);
-  const report = createReport($('#report'), store);
+  const report = createReport($('#report'), store, { group });
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {
     onOpenZoom: openZoom,
+    group,
     // 보고서를 여는 것이 곧 "실험을 마친다" 는 뜻이다. 그때 정리를 했는지 한 번 본다
     onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간은 탐구 노트 위쪽에서 조용히 일어난다.
@@ -207,5 +228,11 @@ bindEditShortcut();
 
 const fromUrl = levelFromUrl();
 const modeUrl = modeFromUrl();
-if (fromUrl) boot(fromUrl, modeUrl ?? MODES.GROUP);
+/*
+ * 주소로 단계가 정해져 있어도 **모둠으로 하는 링크면 모둠 짜기는 거쳐야 한다** (T35) —
+ * 모둠명·역할·별명은 링크에 실을 수 없는 것이다. 단계·방식 고르기는 잠근 채 그 칸만 보인다.
+ * `?mode=solo` 나 방식이 없는 옛 링크는 그대로 건너뛴다 — 혼자 하는 학생에게 물을 것이 없다.
+ */
+if (fromUrl && modeUrl !== MODES.GROUP) boot(fromUrl, modeUrl ?? MODES.GROUP);
+else if (fromUrl) createStart($('#start'), boot, fromUrl, MODES.GROUP, UI, { lock: true });
 else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP, UI);

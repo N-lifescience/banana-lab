@@ -15,6 +15,8 @@ import { createNotebook } from './ui/notebook.js';
 import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createReport } from './ui/report.js';
 import { UI } from './ui/strings.js';
+import { createGroupStore } from '../../../packages/lab-kit/group/store.js';
+import { manifest } from './manifest.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -142,7 +144,21 @@ let store = null;
  * 상태는 여기서 처음 만들어진다 — `session.level` 은 세션 내내 바뀌지 않는 값이라
  * 시작 화면에서 정해진 뒤에 만들어야 한다. 도중에 단계를 바꾸는 길은 두지 않는다.
  */
-function boot(level, mode = MODES.GROUP) {
+function boot(level, mode = MODES.GROUP, groupSetup = null) {
+
+  /*
+   * ── 모둠 (T35) ─────────────────────────────────────────────────────
+   * `groupSetup` 은 시작 화면이 받은 모둠명·인원·역할·별명이다. 실험 store 밖에 산다 —
+   * 조작이 아니고 되돌릴 것도 아니다. 혼자 하면 null 이라 모둠 부품이 하나도 안 그려진다.
+   */
+  const groupStore = mode === MODES.GROUP && groupSetup ? createGroupStore(groupSetup) : null;
+  let dialogHost = $('#group-dialogs');
+  if (!dialogHost) {
+    dialogHost = document.createElement('div');
+    dialogHost.id = 'group-dialogs';
+    document.body.appendChild(dialogHost);
+  }
+  const group = groupStore ? { groupStore, host: dialogHost, exp: manifest.id } : null;
   $('#start').hidden = true;
   $('#app').hidden = false;
 
@@ -161,9 +177,10 @@ function boot(level, mode = MODES.GROUP) {
   const zoom = createZoom($('#zoom'), store);
   // 셋째 인자는 물건 화면의 물건 id (tapTable 의 `view`).
   const openZoom = (mode, opener, id) => zoom.open(mode, opener, id);
-  const report = createReport($('#report'), store);
+  const report = createReport($('#report'), store, { group });
   createBench($('#bench'), store, { onOpenZoom: openZoom, edit: editMode() });
   createNotebook($('#notebook'), store, {
+    group,
     onOpenZoom: openZoom,
     // 보고서를 연다. **정리를 했는지 보지 않는다** — 안전 수칙은 2쪽에 적어 두기만 하고
     // 앱이 확인하지 않는다. 앞서는 여기서 CHECK_TIDY 를 쏘았는데, 그 액션을 걷어내면서
@@ -243,5 +260,10 @@ bindEditShortcut();
 
 const fromUrl = levelFromUrl();
 const modeUrl = modeFromUrl();
-if (fromUrl) boot(fromUrl, modeUrl ?? MODES.GROUP);
+/*
+ * 주소로 단계가 정해져 있어도 **모둠으로 하는 링크면 모둠 짜기는 거쳐야 한다** (T35) —
+ * 모둠명·역할·별명은 링크에 실을 수 없는 것이다. 단계·방식 고르기는 잠근 채 그 칸만 보인다.
+ */
+if (fromUrl && modeUrl !== MODES.GROUP) boot(fromUrl, modeUrl ?? MODES.GROUP);
+else if (fromUrl) createStart($('#start'), boot, fromUrl, MODES.GROUP, UI, { lock: true });
 else createStart($('#start'), boot, 1, modeUrl ?? MODES.GROUP, UI);

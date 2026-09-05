@@ -28,6 +28,7 @@ import { observability } from '../sim/quality.js';
 import { gradeQuestion, gradeMagnification } from './grading.js';
 import { EYEPIECE, STAGE_DIV_UM, foldSkewDeg, focusTolerance } from '../sim/optics.js';
 import { UI } from './strings.js';
+import { mountGroupHead, decorateNoteFields } from '../../../../packages/lab-kit/group/panel.js';
 import { stepDone, groupDone, resultsDone, resultsMissing } from '../sim/progress.js';
 import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
@@ -463,7 +464,7 @@ export function reportReadiness(st) {
   return { ready: missing.length === 0, missing };
 }
 
-export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
+export function createNotebook(root, store, { onOpenZoom, onReport, onReady, group = null }) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
@@ -471,6 +472,9 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     </div>
     <div id="note-tabs" class="note-tabs" role="tablist"></div>
     <div id="note-panel" class="note-panel"></div>`;
+
+  // 모둠 칸 (T35) — 노트 머리 밑. 기록이 들어오면 노트를 다시 그려 칸마다 카드가 붙게 한다.
+  if (group) mountGroupHead(root, { ...group, store, rerender: () => render() });
 
   const reportSlot = root.querySelector('#report-slot');
 
@@ -1624,6 +1628,8 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
         }
       }
     }
+    // 모둠장 화면이면 칸마다 모둠원 기록 카드 + 「초안 채우기」 (T35)
+    if (group) decorateNoteFields(panelEl, { ...group, store });
     renderReportSlot(st);
   }
 

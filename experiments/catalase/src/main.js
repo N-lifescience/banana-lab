@@ -15,6 +15,8 @@
  */
 
 import { UI } from './ui/strings.js';
+import { createGroupStore } from '../../../packages/lab-kit/group/store.js';
+import { manifest } from './manifest.js';
 import { createStart } from '../../../packages/lab-kit/ui/start.js';
 import { createDesign, designSentence } from './ui/design.js';
 import { createBench, CLOCK_SPEED } from './ui/bench.js';
@@ -116,7 +118,21 @@ function fromQuery() {
   };
 }
 
-function start(level, mode) {
+function start(level, mode, groupSetup = null) {
+
+  /*
+   * ── 모둠 (T35) ─────────────────────────────────────────────────────
+   * `groupSetup` 은 시작 화면이 받은 모둠명·인원·역할·별명이다. 실험 store 밖에 산다 —
+   * 조작이 아니고 되돌릴 것도 아니다. 혼자 하면 null 이라 모둠 부품이 하나도 안 그려진다.
+   */
+  const groupStore = mode === MODES.GROUP && groupSetup ? createGroupStore(groupSetup) : null;
+  let dialogHost = $('#group-dialogs');
+  if (!dialogHost) {
+    dialogHost = document.createElement('div');
+    dialogHost.id = 'group-dialogs';
+    document.body.appendChild(dialogHost);
+  }
+  const group = groupStore ? { groupStore, host: dialogHost, exp: manifest.id } : null;
   // 토스트는 **막힌 이유를 말하는 유일한 통로**다. 결과로 답하는 실험이라 대부분은
   // 그림이 말하지만, 마개·손·폐액처럼 그림에 안 나타나는 것은 여기서만 전해진다.
   //
@@ -145,8 +161,9 @@ function start(level, mode) {
   redrawBench = () => createBench($('#bench'), store, { edit: isEditMode(), onOpenZoom: openZoom });
 
   createClock(store);
-  const report = createReport($('#report'), store);
+  const report = createReport($('#report'), store, { group });
   createNotebook($('#notebook'), store, {
+    group,
     onReport: () => report.open(),
     // 보고서를 낼 수 있게 된 순간을 알린다 — 탭을 안 보고 있어도 알아야 한다.
     onReady: () => toast.push(UI.notebook.reportReadyToast, 'ok', 'report-ready'),
@@ -239,8 +256,15 @@ const q = fromQuery();
  * 빠진 값을 채워 여는 것이 학생 쪽에 영향을 주지 않는다.
  */
 const editWanted = isEditMode();
-if ((q.level && q.mode) || editWanted) {
+/*
+ * 모둠으로 하는 링크면 모둠 짜기는 거쳐야 한다 (T35) — 모둠명·역할·별명은 링크에 못 싣는다.
+ * 단계·방식 고르기는 잠근 채 그 칸만 보인다. 편집 모드는 그대로 건너뛴다.
+ */
+const groupLink = q.mode === MODES.GROUP && Boolean(q.level) && !editWanted;
+if (((q.level && q.mode) || editWanted) && !groupLink) {
   start(q.level ?? 1, q.mode ?? MODES.GROUP);
+} else if (groupLink) {
+  createStart($('#start'), start, q.level, MODES.GROUP, UI, { lock: true });
 } else {
   createStart($('#start'), start, q.level ?? 1, q.mode ?? MODES.GROUP, UI);
 }

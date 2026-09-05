@@ -23,6 +23,7 @@ import { designSentence } from './design.js';
 import { gradeQuestion, STATUS } from './grading.js';
 import { stepDone, groupDone, resultsDone, distinctConditions } from '../sim/progress.js';
 import { UI } from './strings.js';
+import { mountGroupHead, decorateNoteFields } from '../../../../packages/lab-kit/group/panel.js';
 import { revealNotePage } from '../../../../packages/lab-kit/ui/reveal-note.js';
 
 const N = UI.notebook;
@@ -215,7 +216,7 @@ export function reportReadiness(st) {
 
 /* ================================================================== */
 
-export function createNotebook(root, store, { onReport = () => {}, onReady = () => {} } = {}) {
+export function createNotebook(root, store, { onReport = () => {}, onReady = () => {}, group = null } = {}) {
   root.innerHTML = `
     <div class="note-head">
       <h1>${N.heading}</h1>
@@ -223,6 +224,9 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     </div>
     <div id="note-tabs" class="note-tabs" role="tablist"></div>
     <div id="note-panel" class="note-panel"></div>`;
+
+  // 모둠 칸 (T35) — 노트 머리 밑. 기록이 들어오면 노트를 다시 그려 칸마다 카드가 붙게 한다.
+  if (group) mountGroupHead(root, { ...group, store, rerender: () => render() });
 
   const tabsEl = root.querySelector('#note-tabs');
   const panelEl = root.querySelector('#note-panel');
@@ -758,6 +762,8 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     stowDesign();
     panelEl.innerHTML = STAGE_BODY[activeStage](st) + readFooter(st);
     placeDesign();
+    // 모둠장 화면이면 칸마다 모둠원 기록 카드 + 「초안 채우기」 (T35)
+    if (group) decorateNoteFields(panelEl, { ...group, store });
     renderReportSlot(st);
   }
 

@@ -617,6 +617,7 @@ input[data-note]{min-height:0}
   border-radius:12px;padding:28px 26px}
 .start-card h1{font-size:20px;margin:0 0 8px}
 .start-lead{font-size:13.5px;color:var(--ink-mute);margin:0 0 20px}
+.start-levels[hidden],.start-sub[hidden]{display:none}
 .start-levels{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
 .start-level{display:block;width:100%;text-align:left;border:1px solid var(--rule);
   background:var(--sunk);border-radius:8px;padding:14px 16px}
@@ -629,6 +630,52 @@ input[data-note]{min-height:0}
 .start-note{font-size:11.5px;color:var(--ink-mute);margin:14px 0 0;text-align:center}
 .start-sub{font-size:13.5px;margin:0 0 10px}
 .start-modes{margin-bottom:20px}
+
+/* ── 모둠 짜기 (시작 화면) · 모둠 칸 · 보내기/모으기 창 (T35) ──────── */
+.start-group[hidden]{display:none}
+.start-group-lead{font-size:12.5px;color:var(--ink-mute);margin:0 0 12px;line-height:1.55}
+.start-group-fields{display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:16px}
+.start-field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-mute);min-width:0}
+.start-field--wide{grid-column:1/-1}
+.start-field input{min-width:0;border:1px solid var(--rule);border-radius:5px;background:var(--sunk);
+  color:var(--ink);padding:9px;font:inherit}
+.start-roles{margin-bottom:20px}
+.group-head{border:1px solid var(--rule);border-radius:8px;background:var(--sunk);padding:10px 12px;margin:0 0 14px}
+.group-head-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.group-title{font-size:14px;margin:0}
+.group-badge{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--indigo);color:var(--surface)}
+.group-badge[data-role="member"]{background:var(--good)}
+.group-nick{font-size:12px;color:var(--ink-mute)}
+.group-hint{font-size:12px;color:var(--ink-mute);margin:6px 0 8px;line-height:1.5}
+.group-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.group-actions button{padding:8px 12px;font-size:13px;font-weight:600}
+.group-count{font-size:12px;color:var(--ink-mute)}
+.group-members{list-style:none;margin:8px 0 0;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.group-members li{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--surface);
+  border:1px solid var(--rule);border-radius:999px;padding:3px 4px 3px 10px}
+.group-remove{font-size:11px;padding:2px 8px;border-radius:999px}
+.group-entries{margin:6px 0 14px;border-left:3px solid var(--indigo);padding:6px 0 2px 10px}
+.group-entries-head{display:flex;justify-content:space-between;align-items:center;gap:8px;
+  font-size:12px;color:var(--ink-mute);margin-bottom:6px}
+.group-fill{font-size:12px;padding:5px 10px}
+.group-entry-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.group-entry{font-size:12.5px;line-height:1.5;display:grid;grid-template-columns:auto 1fr;gap:8px}
+.group-entry b{color:var(--indigo);white-space:nowrap}
+.group-dialog{max-width:520px}
+.group-qr{display:flex;justify-content:center;margin:6px 0}
+.group-qr svg{width:min(100%,420px);height:auto;border:1px solid var(--rule);border-radius:6px}
+.group-frame{text-align:center;font-size:13px;color:var(--ink-mute);margin:4px 0 10px;min-height:1.4em}
+.group-code summary{cursor:pointer;font-size:13px}
+.group-code-msg{font-size:12px;color:var(--good);margin:6px 0}
+.group-code-text{width:100%;font:12px/1.4 ui-monospace,monospace;border:1px solid var(--rule);
+  border-radius:5px;background:var(--sunk);color:var(--ink);padding:8px;resize:vertical;word-break:break-all}
+.group-cam{position:relative;aspect-ratio:1/1;max-height:50vh;background:#111;border-radius:8px;overflow:hidden;
+  display:flex;align-items:center;justify-content:center}
+.group-cam video{width:100%;height:100%;object-fit:cover}
+.group-status{font-size:13px;margin:10px 0 6px;min-height:1.4em}
+.group-got{list-style:none;margin:0 0 10px;padding:0;display:flex;gap:6px;flex-wrap:wrap;font-size:12.5px}
+.group-got li{background:var(--sunk);border:1px solid var(--rule);border-radius:999px;padding:3px 10px}
+.group-got-head{background:transparent!important;border:0!important;color:var(--ink-mute)}
 
 /* ── 보고서 만들기 창 ──────────────────────────────────────────── */
 .report-dialog{border:1px solid var(--rule);border-radius:10px;background:var(--surface);
@@ -666,7 +713,7 @@ input[data-note]{min-height:0}
 @media print{
   @page{margin:14mm}
   html,body{height:auto;background:#fff;color:#000}
-  .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot{display:none!important}
+  .layout,#toast-region,#zoom,#start,.report-dialog,.site-foot,#group-dialogs{display:none!important}
   .report-sheet{display:block}
 }
 /* 손가락으로 쓰는 화면 — 단추는 44px. 물건(.token)은 ::after 로 이미 보장한다. */
