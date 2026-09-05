@@ -155,7 +155,7 @@ await linked.click('#start-go');
 await linked.waitForSelector('#group-head');
 ok(await linked.evaluate(() => window.__store.getState().session.level) === 2, '주소의 단계(2)로 시작한다');
 
-// 실제 실험 연습용 — 1쪽에서 바로 시작, 1단계·혼자, 피드백 칸, 보고서 단추 없음
+// 실험 리허설 — 1쪽에서 바로 시작, 1단계·혼자, 피드백 칸, 보고서 단추 없음
 const prac = await ctx.newPage(); watch(prac);
 await prac.goto(url);
 await prac.click('.start-purpose[data-purpose="practice"]');

@@ -133,7 +133,7 @@ export const QUESTIONS = [
   {
     id: 'q4',
     available: false,
-    feedback: '아직 다른 모둠의 결과를 보지 않았습니다',
+    feedback: '모둠원의 기록을 모은 뒤 견주어 쓰는 문항이라 첨삭하지 않습니다. 자유롭게 쓰세요',
   },
 ];
 
