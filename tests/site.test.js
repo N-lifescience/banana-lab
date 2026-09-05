@@ -210,6 +210,26 @@ test('선생님 화면이 아는 실험 목록이 실제 폴더와 같다', () =
  * **실험을 늘리고 여기를 안 늘리면 그 실험은 배포본에 아예 안 실린다.**
  * 로컬 개발 서버에서는 멀쩡히 열리므로 **배포한 뒤에야** 안다.
  */
+/*
+ * ── 내려받기 링크가 **실제 파일**을 가리키는가 ───────────────────────
+ *
+ * 선생님이 이 양식을 눌러 인쇄해 나눠 준다. 주소가 어긋나면 **404 를 눌러 보고서야** 안다 —
+ * 그것도 수업 직전에. 파일 이름을 바꾸는 것은 흔한 일이고, 그때 첫 화면은 조용하다.
+ * (글꼴과 같은 사정이다: 구운 것과 그것을 부르는 쪽을 맞대는 검사가 있어야 한다)
+ */
+test('첫 화면의 내려받기 링크가 실제 파일을 가리킨다', () => {
+  const html = read('index.html');
+  const links = [...new Set([...html.matchAll(/<a[^>]+href="(\/[^"]+\.pdf)"/g)].map((m) => m[1]))];
+  assert.ok(links.length > 0,
+    '첫 화면에 내려받기 링크가 하나도 없습니다 — 이 검사가 헛돌고 있습니다\n'
+    + '  → 양식을 뺐다면 이 검사도 함께 빼세요.');
+  for (const href of links) {
+    assert.ok(existsSync(at(`public${href}`)),
+      `첫 화면이 없는 파일로 데려갑니다: ${href}\n`
+      + `  → public${href} 가 없습니다. \`node scripts/build-report-form.mjs\` 로 구우세요.`);
+  }
+});
+
 test('실험마다 빌드 진입점이 있다', () => {
   const cfg = read('vite.config.js');
   const missing = EXPERIMENTS.filter((id) => !cfg.includes(`experiments/${id}/index.html`));

@@ -16,7 +16,9 @@
     "check:art": "node scripts/check-art-direction.mjs",
     "fonts": "node scripts/build-fonts.mjs",
     "check:fonts": "node scripts/build-fonts.mjs --check",
-    "check": "npm run test && npm run check:art && npm run check:fonts",
+    "form": "node scripts/build-report-form.mjs",
+    "check:form": "node scripts/build-report-form.mjs --check",
+    "check": "npm run test && npm run check:art && npm run check:fonts && npm run check:form",
     "check:build": "node scripts/check-build.mjs",
     "shot": "node scripts/shot.mjs"
   },
