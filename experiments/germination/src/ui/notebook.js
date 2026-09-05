@@ -1045,7 +1045,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     // 막히는 순간 붙일 자리가 없어 판을 갈아야 한다 — 그러면 치던 칸이 사라진다.
     return `
       <div class="read-mark">
-        <p>${N.readLeadIn}</p>
+        <p>${N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <p class="read-why" id="read-why"${blocked ? '' : ' hidden'}>${N.readNeedPredict(st.session.level)}</p>
         <button type="button" id="mark-read" class="read-confirm" aria-describedby="read-why"
           ${blocked ? 'aria-disabled="true"' : ''}>${N.readConfirm}</button>

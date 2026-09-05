@@ -964,7 +964,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const why = readBlockedWhy(st, activeStage);
     return `
       <div class="read-mark">
-        <p>${N.readLeadIn}</p>
+        <p>${N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <button type="button" id="mark-read" class="read-confirm"
           aria-disabled="${why ? 'true' : 'false'}"
           aria-describedby="${why ? 'read-blocked' : ''}">${N.readConfirm}</button>

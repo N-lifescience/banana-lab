@@ -1021,7 +1021,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const whyId = 'read-blocked-why';
     return `
       <div class="read-mark">
-        <p>${N.readLeadIn}</p>
+        <p>${N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <button type="button" id="mark-read" class="read-confirm"
           ${blocked ? `aria-disabled="true" aria-describedby="${whyId}"` : ''}>${N.readConfirm}</button>
         <!-- 까닭 문단은 **늘 그리고 hidden 으로만 여닫는다.** 글칸에 손이 있는 동안에는

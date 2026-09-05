@@ -279,3 +279,44 @@ for (const exp of EXPS) test(`${exp}: 「어떻게」가 따온 말이 화면에
   assert.deepEqual(orphan, [],
     `${exp} 에서 화면에 없는 말을 따왔습니다 — 학생은 없는 단추를 찾습니다: ${orphan.join(' / ')}`);
 });
+
+/* ── 7. 학생 화면에 개발용이 실리지 않는다 ────────────────────────
+ *
+ * 개발 하네스(`harness.html`)는 애셋과 모형을 눈으로 보는 페이지다. **배포본에 안 들어간다**
+ * (`vite.config.js` 의 input 에 없다). 그런데 앱 화면에서 거기로 가는 **링크**는 실릴 수 있다 —
+ * 학생이 누르면 404 를 만난다.
+ *
+ * 실제로 두 번 있었다. catalase 가 먼저 겪고 「이제 `scripts/check-screen.mjs` 가 잡는다」고
+ * 주석까지 남겼는데, **그 파일은 존재하지 않았다** (이름이 바뀌면서 검사가 통째로 사라졌다).
+ * 그래서 fermentation 에는 「개발 하네스에서 조건별 결과 보기」 링크가 그대로 남아
+ * 학생 화면 1쪽에 떠 있었다 (사장님이 찾으셨다, 2026-09-05).
+ *
+ * **없는 검사를 있다고 적어 두는 것이 검사가 아예 없는 것보다 나쁘다** — 다음 사람이
+ * 지켜지고 있다고 믿는다. 이번에는 진짜로 만든다.
+ */
+for (const exp of EXPS) test(`${exp}: 학생 화면이 개발 하네스로 가는 길을 내지 않는다`, () => {
+  const html = read(exp, 'index.html').replace(/<!--[\s\S]*?-->/g, '');
+  assert.ok(!html.includes('harness.html'),
+    `${exp}/index.html 이 harness.html 로 링크합니다 — 배포본에 그 페이지는 없습니다`);
+});
+
+/*
+ * 「실험대는 1~N 쪽을 읽고 나면 열립니다」의 N 이 **정말 마지막 쪽인가.**
+ *
+ * 앞서는 여덟 실험 모두 「1~4 쪽」을 글자로 박아 두었다. catalase·fermentation 에
+ * 「3. 실험 설계」가 끼어들어 다섯 쪽이 된 순간 **그 둘이 거짓말을 하기 시작했다** —
+ * 학생은 넷을 읽고 왜 안 열리는지 모른 채 화면을 들여다본다 (2026-09-05).
+ * 이제 `readLeadIn` 은 마지막 쪽 번호를 **받아서** 문장을 만든다. 여기서 그 값이
+ * `UI.bench.lock.required` 의 끝과 같은지 본다 — 두 곳이 어긋나면 그때 운다.
+ */
+for (const exp of EXPS) test(`${exp}: 「1~N 쪽」의 N 이 자물쇠가 요구하는 마지막 쪽이다`, () => {
+  const UI = UIS[exp];
+  assert.equal(typeof UI.notebook.readLeadIn, 'function', `${exp} readLeadIn 은 함수여야 한다`);
+  const last = UI.bench.lock.required.at(-1);
+  const line = UI.notebook.readLeadIn(last);
+  assert.equal(line, `실험대는 1~${last} 쪽을 읽고 나면 열립니다.`, `${exp} readLeadIn`);
+  // 쪽 목록이 1부터 빠짐없이 이어지는가 — 그래야 「1~N」이 참말이 된다.
+  assert.deepEqual(UI.bench.lock.required,
+    Array.from({ length: Number(last) }, (_, i) => String(i + 1)),
+    `${exp} 의 자물쇠 쪽이 1부터 이어지지 않습니다 — 「1~N 쪽」이 거짓말이 됩니다`);
+});

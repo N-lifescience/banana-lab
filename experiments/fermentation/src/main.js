@@ -125,8 +125,6 @@ function start(level, mode) {
   $('#start').hidden = true;
   $('#app').hidden = false;
   $('#app').classList.add('shell');
-  $('#shell-note').textContent = UI.shellNote;
-  $('#shell-harness').textContent = UI.shellHarnessLink;
 
   createDesign($('#design-root'), store);
   // 확대 뷰 — 물건을 누르면 열린다. 눌러서 하던 조작은 전부 그 화면의 단추다 (docs/09 §2).

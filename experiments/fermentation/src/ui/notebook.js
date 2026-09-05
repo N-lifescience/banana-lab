@@ -723,7 +723,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     // **막을 때는 지금 할 일을 말한다.** 까닭 없는 회색 단추는 고장으로 읽힌다.
     return `
       <div class="read-mark">
-        <p id="read-why">${gated ? gateWhy : N.readLeadIn}</p>
+        <p id="read-why">${gated ? gateWhy : N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <button type="button" id="read-confirm" class="read-confirm"${
           gated ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
       </div>`;

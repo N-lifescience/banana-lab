@@ -666,7 +666,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
     const blocked = activeStage === PREDICT_STAGE && !predictDone(st);
     return `
       <div class="read-mark">
-        <p id="read-why">${blocked ? predictWhyBlocked(st) : N.readLeadIn}</p>
+        <p id="read-why">${blocked ? predictWhyBlocked(st) : N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <button type="button" id="mark-read" class="read-confirm"${
           blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
       </div>`;
@@ -819,7 +819,7 @@ export function createNotebook(root, store, { onReport = () => {}, onReady = () 
       btn.removeAttribute('aria-describedby');
     }
     const why = root.querySelector('#read-why');
-    if (why) why.textContent = blocked ? predictWhyBlocked(st) : N.readLeadIn;
+    if (why) why.textContent = blocked ? predictWhyBlocked(st) : N.readLeadIn(UI.bench.lock.required.at(-1));
   }
 
   /**

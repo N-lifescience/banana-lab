@@ -16,7 +16,7 @@ import { isRunning, mixPct } from '../sim/state.js';
 import {
   OBSERVE_LIMIT_MIN, GLUCOSE_POUR_ML, YEAST_POUR_ML, KOH_POUR_ML,
 } from '../sim/fermentation.js';
-import { renderTube, tubeAssetState, gasNow, tubeContents } from '../render/tube.js';
+import { tubeAssetState, gasNow, tubeContents } from '../render/tube.js';
 import { UI } from './strings.js';
 import { wakeBench } from '../../../../packages/lab-kit/ui/bench-wake.js';
 
@@ -427,7 +427,6 @@ export function createBench(root, store, { edit = false, onOpenZoom = () => {} }
     </div>
     <!-- 관찰 창. 실험대의 작은 발효관 토큰에서는 맹관부에 기체가 고이는 것이 보이지 않는다 —
          이 실험에서 **보는 것이 결과 전부**라 크게 그릴 자리가 따로 있어야 한다. -->
-    <div class="bench-watch" id="bench-watch"></div>
     <div class="bench-stage">
       <div class="bench-bg" aria-hidden="true"></div>
       <div class="bench-tokens"></div>
@@ -1264,29 +1263,30 @@ export function createBench(root, store, { edit = false, onOpenZoom = () => {} }
     root.querySelector('#trials').textContent = UI.bench.trials(st.trials.length);
   }
 
-  /**
-   * 관찰 창 — 맹관부에 기체가 모이는 그림.
+  /*
+   * **관찰 창은 걷었다.** (사장님 지시, 2026-09-05)
    *
-   * 실험대의 발효관 토큰은 화면에서 작아 맹관부의 기체가 보이지 않는다. 이 실험은
-   * **보는 것이 결과 전부**이므로 크게 그릴 자리가 따로 있어야 한다.
+   * 실험대 위에 비커(발효관)를 크게 그린 판이 하나 더 있었다. 토큰이 작아 결과가 안 보인다는
+   * 것이 까닭이었는데, **T34 로 모든 물건이 자기 화면을 갖게 되면서 그 까닭이 사라졌다** —
+   * 물건을 누르면 열리는 화면이 `renderBeaker`/`renderTube` **같은 그림**을 그리고
+   * (그 코드의 주석도 「관찰 창과 같은 그림」이라고 적고 있었다), `store.subscribe` 로
+   * 시계가 가는 동안에도 살아 움직이며, 「결과 기록」 단추까지 거기 있다.
+   *
+   * 남겨 두니 **같은 물건이 화면에 둘**이었다 — 실험대 위의 토큰과, 그 위에 뜬 큰 그림.
+   * 무엇을 보라는 것인지가 아니라 무엇이 잘못됐는지로 읽힌다.
+   * 지금 무슨 일이 일어나는지는 실험대 막대(`renderBar`)가 글로 계속 말한다.
    */
-  function renderWatch() {
-    const t = store.getState().bench.tube;
-    root.querySelector('#bench-watch').innerHTML = renderTube(t, { idPrefix: 'watch' });
-  }
 
   // 드래그 도중에는 다시 그리지 않는다. TICK 처럼 사용자와 무관하게 들어오는 상태 변경이
   // DOM 을 새로 만들면 setPointerCapture 가 무효화돼 드래그가 조용히 끊긴다.
   // 드래그가 끝나면 onPointerUp 이 최신 상태로 어차피 다시 그린다.
   store.subscribe(() => {
     renderBar();
-    renderWatch();
     renderLock();
     if (!drag) renderTokens();
   });
   renderTokens();
   renderBar();
-  renderWatch();
   renderLock();
   renderEditPanel();
 }

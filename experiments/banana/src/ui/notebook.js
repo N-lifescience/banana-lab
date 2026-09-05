@@ -419,7 +419,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
       btn.removeAttribute('aria-describedby');
     }
     const why = panelEl.querySelector('#read-why');
-    if (why) why.textContent = blocked ? needsPredictText(st.session.level) : N.readLeadIn;
+    if (why) why.textContent = blocked ? needsPredictText(st.session.level) : N.readLeadIn(UI.bench.lock.required.at(-1));
   }
 
   /**
@@ -1020,7 +1020,7 @@ export function createNotebook(root, store, { onOpenZoom, onReport, onReady }) {
     const blocked = activeStage === '3' && !predictDone(st);
     return `
       <div class="read-mark">
-        <p id="read-why">${blocked ? needsPredictText(st.session.level) : N.readLeadIn}</p>
+        <p id="read-why">${blocked ? needsPredictText(st.session.level) : N.readLeadIn(UI.bench.lock.required.at(-1))}</p>
         <button type="button" id="mark-read" class="read-confirm"${
           blocked ? ' aria-disabled="true" aria-describedby="read-why"' : ''}>${N.readConfirm}</button>
       </div>`;
