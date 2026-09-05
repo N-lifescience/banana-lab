@@ -6,7 +6,7 @@ export const P = {
   purposeLead: '오늘은 어떻게 할까요?',
   purposeLabel: '용도',
   virtual: {
-    name: '탐구 실험',
+    name: '가상 탐구 실험',
     desc: '가상 실험을 처음부터 끝까지 하고 탐구 보고서까지 씁니다. 난이도를 고르고, 혼자 또는 모둠으로 합니다.',
   },
   practice: {

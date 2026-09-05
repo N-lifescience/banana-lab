@@ -187,7 +187,7 @@ await prac.screenshot({ path: 'shots/practice-head.png' });
 
 /* ── 리허설 링크 (T37) ──────────────────────────────────────────────
  * 선생님 화면이 만드는 세 번째 링크. **묻지 않고 바로 리허설로 열려야** 한다 —
- * 시작 화면이 한 번이라도 뜨면 QR 을 찍은 학생이 「탐구 실험」을 고를 수 있고,
+ * 시작 화면이 한 번이라도 뜨면 QR 을 찍은 학생이 「가상 탐구 실험」을 고를 수 있고,
  * 그러면 선생님이 고른 것과 다른 수업이 된다.
  */
 const pracLink = await ctx.newPage(); watch(pracLink);
@@ -205,8 +205,8 @@ const tc = await ctx.newPage(); watch(tc);
 await tc.goto(`${devUrl().replace(/\/$/, '')}/teacher.html?exp=${exp}`);
 await tc.waitForSelector('#tc-plain');
 ok(await tc.inputValue('#tc-plain') === `${new URL(tc.url()).origin}/cell-metabolism/${exp}?level=1&mode=solo`,
-  `탐구 실험 링크가 단계·방식을 싣는다 (${await tc.inputValue('#tc-plain')})`);
-ok(await tc.isVisible('input[name="tc-level"]'), '탐구 실험이면 단계를 고른다');
+  `가상 탐구 실험 링크가 단계·방식을 싣는다 (${await tc.inputValue('#tc-plain')})`);
+ok(await tc.isVisible('input[name="tc-level"]'), '가상 탐구 실험이면 단계를 고른다');
 await tc.click('input[name="tc-purpose"][value="practice"]');
 await tc.waitForSelector('.tc-locked');
 ok(await tc.inputValue('#tc-plain') === `${new URL(tc.url()).origin}/cell-metabolism/${exp}?practice=1`,
@@ -216,8 +216,15 @@ ok((await tc.textContent('.tc-duty')).includes('피드백 노트'), '리허설�
 await tc.click('input[name="tc-purpose"][value="virtual"]');
 await tc.click('input[name="tc-mode"][value="group"]');
 ok((await tc.textContent('.tc-card')).includes('QR 로 모둠장 기기에 모아'), '모둠을 고르면 모으는 법을 말한다');
+/*
+ * 실제 실험용 양식은 **리허설을 골랐을 때만** 나온다 (2026-09-06). 실험실에 들고 가는 종이라
+ * 가상으로 끝나는 수업에는 쓸 자리가 없다. 「있는가」와 함께 **「없어야 할 때 없는가」**를 본다.
+ */
+ok(await tc.$('#tc-form-link') === null, '가상 탐구 실험에는 양식 단추가 없다');
+await tc.click('input[name="tc-purpose"][value="practice"]');
+await tc.waitForSelector('#tc-form-link');
 const tcForm = await tc.getAttribute('#tc-form-link', 'href');
-ok(Boolean(tcForm) && tcForm.includes('/forms/'), `선생님 화면에서도 이 실험의 양식을 받는다 (${decodeURIComponent(tcForm ?? '')})`);
+ok(Boolean(tcForm) && tcForm.includes('/forms/'), `리허설을 고르면 이 실험의 양식을 받는다 (${decodeURIComponent(tcForm ?? '')})`);
 const tcRes = await tc.request.get(tcForm);
 ok(tcRes.status() === 200, `그 양식이 실제로 열린다 (${tcRes.status()})`);
 await tc.screenshot({ path: 'shots/teacher-modes.png', fullPage: true });

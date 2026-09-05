@@ -289,11 +289,17 @@
      링크 안에 링크는 없는 문법이다. 그래서 칸(.cell)으로 둘을 묶는다. */
   .cell{display:flex;flex-direction:column;gap:6px}
   .cell .card{flex:1}
+  /* ★ **단추처럼 보여야 눌린다.** 처음에는 회색 글씨 한 줄이었는데, 카드 밑의 작은 글씨는
+     설명으로 읽히지 누를 것으로 안 읽힌다 (사장님: 「UI 가 좀 눈에 안 띈다」). */
   .cell .form{
-    font-size:12px;color:var(--ink-3);text-decoration:none;padding:2px 4px;border-radius:6px;
-    align-self:flex-start;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+    font-size:12.5px;font-weight:500;color:var(--accent-ink);text-decoration:none;
+    padding:9px 12px;border:1.5px solid var(--accent);border-radius:12px;background:var(--surface);
+    transition:background .14s ease,color .14s ease,transform .14s ease;
   }
-  .cell .form:hover{color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px}
+  .cell .form svg{width:15px;height:15px;flex:none}
+  .cell .form:hover{background:var(--accent);color:#fff;transform:translateY(-1px)}
+  .cell .form:hover svg{stroke:#fff}
   .badge{font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:999px;white-space:nowrap}
   .badge.done{background:var(--accent);color:#fff}
   .card:hover,.card:focus-visible{transform:translateY(-3px);box-shadow:0 10px 26px var(--shadow);border-color:var(--accent)}
@@ -445,7 +451,7 @@
   </div>
   <div class="mode-grid">
     <div class="mode">
-      <h3>탐구 실험 <span class="pill">Inquiry</span></h3>
+      <h3>가상 탐구 실험 <span class="pill">Inquiry</span></h3>
       <p>가상 실험을 처음부터 끝까지 하고 <b>탐구 보고서</b>까지 씁니다. 난이도(1·2·3)를 고르고, 혼자 또는 모둠으로 합니다.</p>
       <ul class="flow">
         <li>단계 고르기</li>
@@ -491,8 +497,8 @@
     <div class="who">
       <h3><span class="tag">Student</span> 학생은 이렇게</h3>
       <ol class="steps">
-        <li><b>실험을 고르고</b> 「탐구 실험」인지 「실험 리허설」인지 먼저 정합니다. 선생님이 주신 QR·링크로 들어왔다면 이미 골라져 있습니다.</li>
-        <li>탐구 실험이면 <b>단계(1·2·3)와 혼자/모둠</b>을, 모둠이면 <b>모둠명·역할·별명</b>까지 정합니다. 리허설은 묻지 않고 바로 시작합니다.</li>
+        <li><b>실험을 고르고</b> 「가상 탐구 실험」인지 「실험 리허설」인지 먼저 정합니다. 선생님이 주신 QR·링크로 들어왔다면 이미 골라져 있습니다.</li>
+        <li>가상 탐구 실험이면 <b>단계(1·2·3)와 혼자/모둠</b>을, 모둠이면 <b>모둠명·역할·별명</b>까지 정합니다. 리허설은 묻지 않고 바로 시작합니다.</li>
         <li><b>탐구 노트를 따라</b> 실험대의 기구를 끌어다 씁니다. 틀려도 멈추지 않으니, 결과를 보고 다시 해 보세요. 되돌리기도 있습니다.</li>
         <li>다 하면 <b>「보고서 만들기」</b>(리허설은 <b>「피드백 노트 PDF」</b>) → 인쇄 창에서 <b>PDF 로 저장</b> → 선생님께 냅니다.</li>
       </ol>
@@ -501,7 +507,7 @@
     <div class="who teacher">
       <h3><span class="tag">Teacher</span> 선생님은 이렇게</h3>
       <ol class="steps">
-        <li><b>「선생님 화면」</b>에서 실험과 <b>용도(탐구 실험 · 실험 리허설)</b>를 고릅니다. 탐구 실험이면 단계(1·2·3)와 혼자/모둠까지 정합니다.</li>
+        <li><b>「선생님 화면」</b>에서 실험과 <b>용도(가상 탐구 실험 · 실험 리허설)</b>를 고릅니다. 가상 탐구 실험이면 단계(1·2·3)와 혼자/모둠까지 정합니다.</li>
         <li><b>학생용 링크와 QR</b>이 그 자리에서 나옵니다. 인쇄해 붙이거나 칠판에 띄우세요. 학생은 <b>QR 을 찍으면 고른 모드로 바로</b> 시작합니다 — 가입도 설치도 코드도 없습니다.</li>
         <li>학생이 마치면 <b>PDF</b>(탐구 보고서 또는 피드백 노트)<b>를 저장</b>해 학교 과제방이나 메신저로 냅니다. 파일 이름에 학번·이름이 붙어 모으기 쉽습니다.</li>
       </ol>
@@ -534,7 +540,7 @@
           <p>과육을 얇게 문질러 시약으로 물들이고, 현미경으로 세포 속 녹말과 지방을 찾는다.</p>
           <div class="foot"><span class="page">교과서 13쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/바나나_탄수화물과_지질_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/바나나_탄수화물과_지질_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
       <div class="cell">
         <a class="card" href="/cell-metabolism/micrometer">
@@ -543,7 +549,7 @@
           <p>접안·대물 마이크로미터의 눈금을 나란히 겹쳐, 눈으로 보이지 않는 세포를 잰다.</p>
           <div class="foot"><span class="page">교과서 20쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/현미경_세포_크기_측정_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/현미경_세포_크기_측정_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
       <div class="cell">
         <a class="card" href="/cell-metabolism/centrifuge">
@@ -552,7 +558,7 @@
           <p>모세관에 혈액을 채워 밀봉하고, 끈을 리듬 있게 당겨 돌려 성분을 층으로 가른다.</p>
           <div class="foot"><span class="page">교과서 24쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/간이_원심분리기_혈액_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/간이_원심분리기_혈액_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
       <div class="cell">
         <a class="card" href="/cell-metabolism/osmosis">
@@ -561,7 +567,7 @@
           <p>적양파 표피를 벗겨 봉입하고, 농도가 다른 용액을 흘려 세포 모양의 변화를 본다.</p>
           <div class="foot"><span class="page">교과서 40쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/삼투_현상_관찰_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/삼투_현상_관찰_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>
@@ -587,7 +593,7 @@
           <p>온도와 pH를 변인으로 설계하고, 감자즙 거름종이가 떠오르는 때로 카탈레이스의 활성을 읽는다.</p>
           <div class="foot"><span class="page">교과서 72쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/효소_작용에_영향을_주는_요인_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/효소_작용에_영향을_주는_요인_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
       <div class="cell">
         <a class="card" href="/cell-metabolism/germination">
@@ -596,7 +602,7 @@
           <p>발아 콩과 마른 콩의 두 챔버를 꾸미고, 대사가 어느 쪽에서 더 크게 일어나는지 견준다.</p>
           <div class="foot"><span class="page">교과서 62쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/발아_중인_콩의_물질대사_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/발아_중인_콩의_물질대사_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>
@@ -624,7 +630,7 @@
           <p>효모액을 만들고 농도·온도를 변인으로 설계해, 알코올발효로 나오는 기체를 지켜본다.</p>
           <div class="foot"><span class="page">교과서 98쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/발효_실험_설계_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/발효_실험_설계_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
       <div class="cell">
         <a class="card" href="/cell-metabolism/chromatography">
@@ -633,7 +639,7 @@
           <p>잎에서 뽑은 색소를 판의 원점에 찍고, 전개액을 올려 여러 색의 띠로 나눈다.</p>
           <div class="foot"><span class="page">교과서 105쪽</span><span class="badge done">지금 열기 →</span></div>
         </a>
-        <a class="form" href="/forms/광합성_색소_크로마토그래피_보고서양식.pdf" download>실제 실험용 보고서 양식 PDF ↓</a>
+        <a class="form" href="/forms/광합성_색소_크로마토그래피_보고서양식.pdf" download><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5"/><path d="M4 14v2.5h12V14"/></svg>실제 실험용 보고서 양식 PDF</a>
       </div>
     </div>
     <p class="class-head">교실·교과서에서 하는 활동</p>

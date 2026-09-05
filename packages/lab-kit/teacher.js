@@ -84,12 +84,12 @@ function bindCopy(root) {
 /* ------------------------------------------------------------------ */
 
 /**
- * 용도(탐구 실험 / 실험 리허설)와 단계·방식을 골라 학생용 링크와 QR 을 만든다.
+ * 용도(가상 탐구 실험 / 실험 리허설)와 단계·방식을 골라 학생용 링크와 QR 을 만든다.
  * **아무것도 저장하지 않는다.**
  *
  * ── 왜 용도가 여기에도 있는가 (T37) ─────────────────────────────────
  * 학생 화면은 1쪽에서 용도를 먼저 묻는다(`ui/start.js`). 선생님 화면이 그것을 모르면
- * 여기서 만든 링크는 **늘 탐구 실험**이고, 「실험 리허설로 한 시간 돌려 보자」는 수업은
+ * 여기서 만든 링크는 **늘 가상 탐구 실험**이고, 「실험 리허설로 한 시간 돌려 보자」는 수업은
  * 링크를 못 만든다 — 학생마다 1쪽에서 제대로 골랐기를 바라는 수밖에 없다.
  *
  * 리허설 링크는 `?practice=1` 하나다. 단계·방식을 안 싣는 이유는 **연습이 그 둘을 고정하기
@@ -108,6 +108,10 @@ function renderShare(root) {
   /*
    * 이 실험의 실제 실험용 양식 (T39). 주소를 만드는 것은 **사이트**의 일이라 주입받는다 —
    * 없으면(그런 양식이 아직 없는 실험이면) 그 칸을 아예 안 그린다. 죽은 단추를 두지 않는다.
+   *
+   * ★ **리허설을 골랐을 때만 보인다** (사장님 지시 2026-09-06).
+   *   그 종이는 **실험실에 들고 가는 것**이라, 가상으로 끝나는 수업에는 쓸 자리가 없다.
+   *   두 모드에 다 두면 「가상 탐구 실험에도 종이가 필요한가」로 읽힌다. 되살리지 말 것.
    */
   const formUrl = typeof links.form === 'function' ? links.form() : null;
 
@@ -151,7 +155,7 @@ function renderShare(root) {
         </div>
         <button type="button" id="tc-print-qr">${Sh.print}</button>
         <p class="tc-duty">${practice ? Pt.practiceCollect : Sh.howToCollect}</p>
-        ${formUrl ? `<hr class="tc-rule">
+        ${practice && formUrl ? `<hr class="tc-rule">
         <p class="tc-hint">${Pt.formLead}</p>
         <a class="tc-form" id="tc-form-link" href="${escapeHtml(formUrl)}" download>${Pt.formButton} ↓</a>` : ''}
       </section>
